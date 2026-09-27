@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Chụp ảnh KĐ 15-07D</string>
+    <string name="title_main">Chụp ảnh KĐ 15-07D</string>
+    <string name="title_camera">Chụp ảnh kiểm định</string>
+    <string name="title_review">Xem lại ảnh</string>
+    <string name="title_settings">Cài đặt kết nối</string>
+
+    <!-- Capture Buttons -->
+    <string name="photo_rear_45">Góc SAU 45°</string>
+    <string name="photo_front_45">Góc TRƯỚC 45°</string>
+    <string name="photo_chassis">Số khung / Khoang máy</string>
+    <string name="photo_passenger">Khoang hành khách</string>
+    <string name="photo_new_vehicle">Ảnh xe mới</string>
+    <string name="btn_review">XEM LẠI ẢNH</string>
+
+    <!-- Plate Selection / Manual Entry -->
+    <string name="section_manual_plate">Nhập biển số thủ công</string>
+    <string name="hint_plate">VD: 15A-123.45 hoặc 15A12345</string>
+    <string name="plate_color_label">Màu biển:</string>
+    <string name="plate_white">Trắng (T)</string>
+    <string name="plate_yellow">Vàng (V)</string>
+    <string name="plate_blue">Xanh (X)</string>
+    <string name="btn_select">CHỌN</string>
+    <string name="error_invalid_plate">Biển số không hợp lệ</string>
+
+    <!-- Vehicle List -->
+    <string name="section_today_vehicles">Danh sách xe hôm nay</string>
+    <string name="empty_vehicle_list">Không có xe nào hoặc không kết nối được máy chủ</string>
+    <string name="time_label">Giờ vào: %s</string>
+
+    <!-- Settings -->
+    <string name="setting_lan_ip">Địa chỉ IP LAN (Wi-Fi nội bộ)</string>
+    <string name="setting_tailscale_ip">Địa chỉ IP Tailscale / 4G</string>
+    <string name="setting_port">Cổng dịch vụ (Port)</string>
+    <string name="setting_vehicle_list">Hiển thị danh sách xe từ máy tính</string>
+    <string name="btn_test_connection">KIỂM TRA KẾT NỐI</string>
+    <string name="btn_save_settings">LƯU CÀI ĐẶT</string>
+    <string name="settings_saved">Đã lưu cài đặt</string>
+    <string name="test_testing">Đang kiểm tra kết nối...</string>
+    <string name="test_lan_ok">LAN: OK</string>
+    <string name="test_lan_fail">LAN: Thất bại</string>
+    <string name="test_ts_ok">Tailscale: OK</string>
+    <string name="test_ts_fail">Tailscale: Thất bại</string>
+
+    <!-- Review & Delete -->
+    <string name="btn_delete">Xoá</string>
+    <string name="btn_recapture">Chụp lại</string>
+    <string name="no_photos_yet">Chưa có ảnh nào cho xe này</string>
+    <string name="confirm_delete_title">Xác nhận xoá</string>
+    <string name="confirm_delete_msg">Bạn có chắc chắn muốn xoá ảnh này?</string>
+    <string name="dialog_yes">Xoá</string>
+    <string name="dialog_no">Huỷ</string>
+    <string name="photo_deleted">Đã xoá ảnh</string>
+
+    <!-- Pending / Offline -->
+    <string name="pending_badge">⏳ %d ảnh chờ gửi lên máy chủ</string>
+    <string name="upload_success">✅ Đã tải ảnh lên máy chủ</string>
+    <string name="upload_offline">⏳ Không có kết nối mạng. Đã lưu tạm để gửi sau.</string>
+    <string name="uploading">Đang xử lý và tải ảnh...</string>
+</resources>
