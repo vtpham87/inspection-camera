@@ -18,6 +18,9 @@ class PhotoConfig(BaseModel):
     vehicle_list_enabled: bool = True
     server_port: int = 8095
     photo_save_dir: str = "D:\\Photos"
+    passenger_path: str = "D:\\Photos\\{date}\\{plate}"
+    new_vehicle_path: str = "D:\\Photos\\{date}\\{plate}"
+    sync_new_vehicle_45: bool = True
     paths: dict[str, str] = {
         "rear_45": "D:\\Photos\\{date}",
         "front_45": "D:\\Photos\\{date}",
@@ -33,13 +36,29 @@ class PhotoConfig(BaseModel):
     def model_post_init(self, __context):
         root = self.photo_save_dir.rstrip("\\/")
         if root != "D:\\Photos" and all(v.startswith("D:\\Photos") for v in self.paths.values()):
-            self.paths = {
-                "rear_45": f"{root}\\{{date}}",
-                "front_45": f"{root}\\{{date}}",
-                "chassis": f"{root}\\{{date}}",
-                "passenger": f"{root}\\{{date}}\\{{plate}}",
-                "new_vehicle": f"{root}\\{{date}}\\{{plate}}",
-            }
+            self.paths["rear_45"] = f"{root}\\{{date}}"
+            self.paths["front_45"] = f"{root}\\{{date}}"
+            self.paths["chassis"] = f"{root}\\{{date}}"
+            if self.passenger_path == "D:\\Photos\\{date}\\{plate}":
+                self.passenger_path = f"{root}\\{{date}}\\{{plate}}"
+                self.paths["passenger"] = self.passenger_path
+            if self.new_vehicle_path == "D:\\Photos\\{date}\\{plate}":
+                self.new_vehicle_path = f"{root}\\{{date}}\\{{plate}}"
+                self.paths["new_vehicle"] = self.new_vehicle_path
+
+        # If passenger_path was explicitly set
+        if self.passenger_path != "D:\\Photos\\{date}\\{plate}":
+            p_val = self.passenger_path.rstrip("\\/")
+            if "{plate}" not in p_val:
+                p_val = f"{p_val}\\{{date}}\\{{plate}}" if "{date}" not in p_val else f"{p_val}\\{{plate}}"
+            self.paths["passenger"] = p_val
+
+        # If new_vehicle_path was explicitly set
+        if self.new_vehicle_path != "D:\\Photos\\{date}\\{plate}":
+            nv_val = self.new_vehicle_path.rstrip("\\/")
+            if "{plate}" not in nv_val:
+                nv_val = f"{nv_val}\\{{date}}\\{{plate}}" if "{date}" not in nv_val else f"{nv_val}\\{{plate}}"
+            self.paths["new_vehicle"] = nv_val
 
 CONFIG_DEFAULTS = PhotoConfig()
 

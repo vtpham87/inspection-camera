@@ -30,6 +30,8 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var etTailscaleIp: TextInputEditText
     private lateinit var etPort: TextInputEditText
     private lateinit var etPhotoSaveDir: TextInputEditText
+    private lateinit var etPassengerPath: TextInputEditText
+    private lateinit var etNewVehiclePath: TextInputEditText
     private lateinit var switchVehicleList: MaterialSwitch
     private lateinit var btnTest: MaterialButton
     private lateinit var tvTestResult: TextView
@@ -94,6 +96,8 @@ class SettingsActivity : AppCompatActivity() {
         etTailscaleIp = findViewById(R.id.et_settings_tailscale_ip)
         etPort = findViewById(R.id.et_settings_port)
         etPhotoSaveDir = findViewById(R.id.et_settings_photo_save_dir)
+        etPassengerPath = findViewById(R.id.et_settings_passenger_path)
+        etNewVehiclePath = findViewById(R.id.et_settings_new_vehicle_path)
         switchVehicleList = findViewById(R.id.switch_settings_vehicle_list)
         btnTest = findViewById(R.id.btn_settings_test)
         tvTestResult = findViewById(R.id.tv_settings_test_result)
@@ -179,6 +183,8 @@ class SettingsActivity : AppCompatActivity() {
         etTailscaleIp.setText(prefs.tailscaleIp)
         etPort.setText(prefs.serverPort.toString())
         etPhotoSaveDir.setText(prefs.photoSaveDir)
+        etPassengerPath.setText(prefs.passengerPath)
+        etNewVehiclePath.setText(prefs.newVehiclePath)
         switchVehicleList.isChecked = prefs.vehicleListEnabled
 
         switchTimestamp.isChecked = prefs.timestampEnabled
@@ -270,6 +276,8 @@ class SettingsActivity : AppCompatActivity() {
         val tailscaleIp = etTailscaleIp.text?.toString()?.trim().orEmpty()
         val port = etPort.text?.toString()?.trim()?.toIntOrNull()
         val saveDir = etPhotoSaveDir.text?.toString()?.trim().orEmpty()
+        val passengerPath = etPassengerPath.text?.toString()?.trim().orEmpty()
+        val newVehiclePath = etNewVehiclePath.text?.toString()?.trim().orEmpty()
 
         if (lanIp.isEmpty()) {
             etLanIp.error = "IP LAN không được để trống"
@@ -296,6 +304,8 @@ class SettingsActivity : AppCompatActivity() {
         prefs.tailscaleIp = tailscaleIp
         prefs.serverPort = port
         prefs.photoSaveDir = saveDir
+        if (passengerPath.isNotEmpty()) prefs.passengerPath = passengerPath
+        if (newVehiclePath.isNotEmpty()) prefs.newVehiclePath = newVehiclePath
         prefs.vehicleListEnabled = switchVehicleList.isChecked
 
         prefs.timestampEnabled = switchTimestamp.isChecked

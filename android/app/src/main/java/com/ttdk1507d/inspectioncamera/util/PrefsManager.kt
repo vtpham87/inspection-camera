@@ -67,6 +67,14 @@ class PrefsManager(private val prefs: SharedPreferences) {
         get() = prefs.getString("photo_save_dir", "D:\\Photos") ?: "D:\\Photos"
         set(value) { prefs.edit().putString("photo_save_dir", value).commit() }
 
+    var passengerPath: String
+        get() = prefs.getString("passenger_path", "D:\\Photos\\{date}\\{plate}") ?: "D:\\Photos\\{date}\\{plate}"
+        set(value) { prefs.edit().putString("passenger_path", value).commit() }
+
+    var newVehiclePath: String
+        get() = prefs.getString("new_vehicle_path", "D:\\Photos\\{date}\\{plate}") ?: "D:\\Photos\\{date}\\{plate}"
+        set(value) { prefs.edit().putString("new_vehicle_path", value).commit() }
+
     val lanUrl: String get() = "http://$lanIp:$serverPort"
     val tailscaleUrl: String get() = "http://$tailscaleIp:$serverPort"
 
@@ -75,6 +83,9 @@ class PrefsManager(private val prefs: SharedPreferences) {
             vehicleListEnabled = vehicleListEnabled,
             serverPort = serverPort,
             photoSaveDir = photoSaveDir,
+            passengerPath = passengerPath,
+            newVehiclePath = newVehiclePath,
+            syncNewVehicle45 = true,
             jpegQuality = jpegQuality,
             plateColorSuffix = plateColorSuffix,
             photoResolution = photoResolution,
@@ -92,6 +103,8 @@ class PrefsManager(private val prefs: SharedPreferences) {
         vehicleListEnabled = config.vehicleListEnabled
         serverPort = config.serverPort
         photoSaveDir = config.photoSaveDir
+        passengerPath = config.passengerPath
+        newVehiclePath = config.newVehiclePath
         jpegQuality = config.jpegQuality
         plateColorSuffix = config.plateColorSuffix
         photoResolution = config.photoResolution

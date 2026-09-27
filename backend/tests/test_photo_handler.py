@@ -197,3 +197,34 @@ def test_save_photo_auto_increments_seq(tmp_path):
     res4 = save_photo(jpeg, "15A12345", None, "passenger", None, config)
     assert res4["ok"] is True
     assert res4["filename"] == "15A12345_11.jpg"
+
+
+def test_sync_new_vehicle_copies_front_and_rear(tmp_path):
+    root = str(tmp_path / "photos")
+    config = PhotoConfig(
+        paths={
+            "rear_45": os.path.join(root, "{date}"),
+            "front_45": os.path.join(root, "{date}"),
+            "chassis": os.path.join(root, "{date}"),
+            "passenger": os.path.join(root, "{date}", "{plate}"),
+            "new_vehicle": os.path.join(root, "{date}", "{plate}"),
+        },
+        sync_new_vehicle_45=True,
+    )
+    jpeg = b"\xff\xd8\xff\xe0" + b"\x00" * 20 + b"\xff\xd9"
+
+    # Save rear and front first
+    res_rear = save_photo(jpeg, "15A12345", "T", "rear_45", None, config)
+    assert res_rear["ok"] is True
+    res_front = save_photo(jpeg, "15A12345", "T", "front_45", None, config)
+    assert res_front["ok"] is True
+
+    # Now save new_vehicle photo
+    res_nv = save_photo(jpeg, "15A12345", "T", "new_vehicle", None, config)
+    assert res_nv["ok"] is True
+
+    # Check that new_vehicle subfolder now contains rear_45 and front_45 copies!
+    nv_dir = os.path.dirname(res_nv["path"])
+    assert os.path.exists(os.path.join(nv_dir, "15A12345T.jpg"))
+    assert os.path.exists(os.path.join(nv_dir, "bs15A12345T.jpg"))
+    assert os.path.exists(os.path.join(nv_dir, "15A12345_1.jpg"))

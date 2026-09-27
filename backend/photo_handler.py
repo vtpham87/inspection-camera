@@ -1,5 +1,6 @@
 import os
 import re
+import shutil
 from datetime import datetime
 from pathlib import Path
 from config import PhotoConfig
@@ -68,6 +69,43 @@ def validate_jpeg(file_bytes: bytes) -> bool:
     return file_bytes[:3] == JPEG_MAGIC
 
 
+def sync_new_vehicle_photos(plate: str, config: PhotoConfig) -> None:
+    if not getattr(config, "sync_new_vehicle_45", True):
+        return
+
+    new_veh_dir = resolve_save_path("new_vehicle", plate, config, create_dir=False)
+    if not os.path.exists(new_veh_dir) or not os.path.isdir(new_veh_dir):
+        return
+
+    rear_dir = resolve_save_path("rear_45", plate, config, create_dir=False)
+    front_dir = resolve_save_path("front_45", plate, config, create_dir=False)
+
+    candidate_colors = [None, "T", "V", "X"]
+    # Sync rear_45
+    if os.path.exists(rear_dir):
+        for c in candidate_colors:
+            try:
+                fname = build_filename(plate, c, "rear_45", None, config.plate_color_suffix)
+                src = os.path.join(rear_dir, fname)
+                dst = os.path.join(new_veh_dir, fname)
+                if os.path.exists(src) and not os.path.exists(dst):
+                    shutil.copy2(src, dst)
+            except ValueError:
+                pass
+
+    # Sync front_45
+    if os.path.exists(front_dir):
+        for c in candidate_colors:
+            try:
+                fname = build_filename(plate, c, "front_45", None, config.plate_color_suffix)
+                src = os.path.join(front_dir, fname)
+                dst = os.path.join(new_veh_dir, fname)
+                if os.path.exists(src) and not os.path.exists(dst):
+                    shutil.copy2(src, dst)
+            except ValueError:
+                pass
+
+
 def save_photo(
     file_bytes: bytes,
     plate: str,
@@ -123,5 +161,8 @@ def save_photo(
 
     with open(full_path, "wb") as f:
         f.write(file_bytes)
+
+    if photo_type in ("new_vehicle", "rear_45", "front_45"):
+        sync_new_vehicle_photos(plate, config)
 
     return {"ok": True, "path": full_path, "filename": filename}

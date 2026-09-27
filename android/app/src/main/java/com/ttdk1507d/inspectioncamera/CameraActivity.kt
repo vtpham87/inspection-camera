@@ -81,7 +81,6 @@ class CameraActivity : AppCompatActivity() {
 
     private lateinit var btnRear45: MaterialButton
     private lateinit var btnFront45: MaterialButton
-    private lateinit var btnChassis: MaterialButton
     private lateinit var btnPassenger: MaterialButton
     private lateinit var btnNewVehicle: MaterialButton
     private lateinit var btnReview: MaterialButton
@@ -100,6 +99,7 @@ class CameraActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         setContentView(R.layout.activity_camera)
 
         prefs = PrefsManager(this)
@@ -141,7 +141,6 @@ class CameraActivity : AppCompatActivity() {
         val button = when (focusType) {
             PhotoType.REAR_45.apiName -> btnRear45
             PhotoType.FRONT_45.apiName -> btnFront45
-            PhotoType.CHASSIS.apiName -> btnChassis
             PhotoType.PASSENGER.apiName -> btnPassenger
             PhotoType.NEW_VEHICLE.apiName -> btnNewVehicle
             else -> null
@@ -175,7 +174,6 @@ class CameraActivity : AppCompatActivity() {
 
         btnRear45 = findViewById(R.id.btn_rear_45)
         btnFront45 = findViewById(R.id.btn_front_45)
-        btnChassis = findViewById(R.id.btn_chassis)
         btnPassenger = findViewById(R.id.btn_passenger)
         btnNewVehicle = findViewById(R.id.btn_new_vehicle)
         btnReview = findViewById(R.id.btn_review)
@@ -217,7 +215,6 @@ class CameraActivity : AppCompatActivity() {
 
         btnRear45.setOnClickListener { takePhoto(PhotoType.REAR_45, null) }
         btnFront45.setOnClickListener { takePhoto(PhotoType.FRONT_45, null) }
-        btnChassis.setOnClickListener { takePhoto(PhotoType.CHASSIS, null) }
         btnPassenger.setOnClickListener { takePhoto(PhotoType.PASSENGER, passengerSeq) }
         btnNewVehicle.setOnClickListener { takePhoto(PhotoType.NEW_VEHICLE, newVehicleSeq) }
 
@@ -339,7 +336,6 @@ class CameraActivity : AppCompatActivity() {
 
         updateButtonUI(btnRear45, PhotoType.REAR_45, capturedStatus[PhotoType.REAR_45] == true)
         updateButtonUI(btnFront45, PhotoType.FRONT_45, capturedStatus[PhotoType.FRONT_45] == true)
-        updateButtonUI(btnChassis, PhotoType.CHASSIS, capturedStatus[PhotoType.CHASSIS] == true)
         updateButtonUI(btnPassenger, PhotoType.PASSENGER, capturedStatus[PhotoType.PASSENGER] == true, passengerCount)
         updateButtonUI(btnNewVehicle, PhotoType.NEW_VEHICLE, capturedStatus[PhotoType.NEW_VEHICLE] == true, newVehicleCount)
     }
@@ -374,7 +370,6 @@ class CameraActivity : AppCompatActivity() {
         when (type) {
             PhotoType.REAR_45 -> updateButtonUI(btnRear45, PhotoType.REAR_45, true)
             PhotoType.FRONT_45 -> updateButtonUI(btnFront45, PhotoType.FRONT_45, true)
-            PhotoType.CHASSIS -> updateButtonUI(btnChassis, PhotoType.CHASSIS, true)
             PhotoType.PASSENGER -> {
                 passengerSeq++
                 updateButtonUI(btnPassenger, PhotoType.PASSENGER, true, passengerSeq - 1)
@@ -383,6 +378,7 @@ class CameraActivity : AppCompatActivity() {
                 newVehicleSeq++
                 updateButtonUI(btnNewVehicle, PhotoType.NEW_VEHICLE, true, newVehicleSeq - 1)
             }
+            else -> {}
         }
 
         Toast.makeText(this, "📸 Đã chụp: ${type.label}", Toast.LENGTH_SHORT).show()

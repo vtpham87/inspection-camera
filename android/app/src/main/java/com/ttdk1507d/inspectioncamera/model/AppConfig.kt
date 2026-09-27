@@ -19,6 +19,9 @@ data class AppConfig(
     @SerializedName("vehicle_list_enabled") val vehicleListEnabled: Boolean = true,
     @SerializedName("server_port") val serverPort: Int = 8095,
     @SerializedName("photo_save_dir") val photoSaveDir: String = "D:\\Photos",
+    @SerializedName("passenger_path") val passengerPath: String = "D:\\Photos\\{date}\\{plate}",
+    @SerializedName("new_vehicle_path") val newVehiclePath: String = "D:\\Photos\\{date}\\{plate}",
+    @SerializedName("sync_new_vehicle_45") val syncNewVehicle45: Boolean = true,
     val paths: Map<String, String> = mapOf(
         "rear_45" to "D:\\Photos\\{date}",
         "front_45" to "D:\\Photos\\{date}",
