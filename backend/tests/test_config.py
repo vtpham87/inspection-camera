@@ -46,3 +46,17 @@ def test_save_and_reload(tmp_path):
     save_config(cfg, path)
     reloaded = load_config(path)
     assert reloaded.jpeg_quality == 70
+
+def test_save_config_creates_parent_dir(tmp_path):
+    path = str(tmp_path / "sub" / "nested" / "config.json")
+    cfg = CONFIG_DEFAULTS.model_copy()
+    save_config(cfg, path)
+    assert os.path.exists(path)
+    assert load_config(path).server_port == 8095
+
+def test_load_config_corrupt_returns_defaults(tmp_path):
+    path = str(tmp_path / "corrupt.json")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("{ invalid json")
+    loaded = load_config(path)
+    assert loaded == CONFIG_DEFAULTS

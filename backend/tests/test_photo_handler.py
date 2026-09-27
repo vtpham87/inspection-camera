@@ -149,3 +149,51 @@ def test_save_photo_rejects_invalid_photo_type(tmp_path):
     result = save_photo(jpeg, "15A12345", "T", "invalid_type", None, config)
     assert result["ok"] is False
     assert "Loại ảnh không hợp lệ" in result["error"]
+
+def test_save_photo_rejects_invalid_plate_color(tmp_path):
+    config = PhotoConfig()
+    config.paths["rear_45"] = str(tmp_path / "{date}")
+    jpeg = b"\xff\xd8\xff\xe0" + b"\x00" * 100 + b"\xff\xd9"
+    result = save_photo(jpeg, "15A12345", "INVALID", "rear_45", None, config)
+    assert result["ok"] is False
+    assert result["error"] == "Màu biển không hợp lệ"
+
+def test_save_photo_valid_plate_colors(tmp_path):
+    config = PhotoConfig()
+    config.paths["rear_45"] = str(tmp_path / "{date}")
+    jpeg = b"\xff\xd8\xff\xe0" + b"\x00" * 100 + b"\xff\xd9"
+    for color in (None, "", "T", "V", "X"):
+        res = save_photo(jpeg, "15A12345", color, "rear_45", None, config)
+        assert res["ok"] is True
+
+def test_save_photo_auto_increments_seq(tmp_path):
+    config = PhotoConfig()
+    config.paths["passenger"] = str(tmp_path / "{date}" / "{plate}")
+    jpeg = b"\xff\xd8\xff\xe0" + b"\x00" * 100 + b"\xff\xd9"
+    # First save with seq=None
+    res1 = save_photo(jpeg, "15A12345", None, "passenger", None, config)
+    assert res1["ok"] is True
+    assert res1["filename"] == "15A12345_1.jpg"
+    assert os.path.exists(res1["path"])
+
+    # Second save with seq=None
+    res2 = save_photo(jpeg, "15A12345", None, "passenger", None, config)
+    assert res2["ok"] is True
+    assert res2["filename"] == "15A12345_2.jpg"
+    assert os.path.exists(res2["path"])
+
+    # Third save with seq=None
+    res3 = save_photo(jpeg, "15A12345", None, "passenger", None, config)
+    assert res3["ok"] is True
+    assert res3["filename"] == "15A12345_3.jpg"
+    assert os.path.exists(res3["path"])
+
+    # Explicit seq is preserved
+    res_explicit = save_photo(jpeg, "15A12345", None, "passenger", 10, config)
+    assert res_explicit["ok"] is True
+    assert res_explicit["filename"] == "15A12345_10.jpg"
+
+    # Next auto seq picks up max + 1
+    res4 = save_photo(jpeg, "15A12345", None, "passenger", None, config)
+    assert res4["ok"] is True
+    assert res4["filename"] == "15A12345_11.jpg"

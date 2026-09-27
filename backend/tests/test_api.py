@@ -210,3 +210,41 @@ def test_delete_old_plate(setup_env):
     assert r_del.status_code == 200
     assert r_del.json()["ok"] is True
 
+def test_delete_photo_invalid_photo_type(setup_env):
+    client, _ = setup_env
+    r = client.request(
+        "DELETE",
+        "/api/photos",
+        json={"plate": "15A12345", "photo_type": "invalid_type"},
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"] == "Loại ảnh không hợp lệ"
+
+def test_upload_invalid_plate_color(setup_env):
+    client, _ = setup_env
+    r = client.post(
+        "/api/upload",
+        data={"plate": "15A12345", "plate_color": "INVALID", "photo_type": "rear_45"},
+        files={"file": ("test.jpg", FAKE_JPEG, "image/jpeg")},
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"] == "Màu biển không hợp lệ"
+
+def test_upload_auto_seq_passenger(setup_env):
+    client, _ = setup_env
+    r1 = client.post(
+        "/api/upload",
+        data={"plate": "15A12345", "photo_type": "passenger"},
+        files={"file": ("test1.jpg", FAKE_JPEG, "image/jpeg")},
+    )
+    assert r1.status_code == 200
+    assert r1.json()["filename"] == "15A12345_1.jpg"
+
+    r2 = client.post(
+        "/api/upload",
+        data={"plate": "15A12345", "photo_type": "passenger"},
+        files={"file": ("test2.jpg", FAKE_JPEG, "image/jpeg")},
+    )
+    assert r2.status_code == 200
+    assert r2.json()["filename"] == "15A12345_2.jpg"
+

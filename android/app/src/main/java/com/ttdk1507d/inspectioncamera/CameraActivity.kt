@@ -26,6 +26,7 @@ import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.work.Constraints
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
@@ -293,7 +294,7 @@ class CameraActivity : AppCompatActivity() {
         val existingPhotos = reviewPhotos.distinct()
 
         for (pt in PhotoType.values()) {
-            capturedStatus[pt] = capturedStatus[pt] == true || existingPhotos.any { it.photoType == pt }
+            capturedStatus[pt] = existingPhotos.any { it.photoType == pt }
         }
 
         passengerSeq = (existingPhotos.filter { it.photoType == PhotoType.PASSENGER }.mapNotNull { it.seq }.maxOrNull() ?: 0) + 1
@@ -506,7 +507,11 @@ class CameraActivity : AppCompatActivity() {
                         .build()
                 )
                 .build()
-            WorkManager.getInstance(this@CameraActivity).enqueue(oneTimeRequest)
+            WorkManager.getInstance(this@CameraActivity).enqueueUniqueWork(
+                "PendingUploadWorker_OneTime",
+                ExistingWorkPolicy.KEEP,
+                oneTimeRequest
+            )
         } catch (e: Exception) {
             // Failed to save to pending queue
         }

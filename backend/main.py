@@ -16,6 +16,7 @@ from photo_handler import (
     extract_plate_color,
     build_filename,
     resolve_save_path,
+    VALID_PHOTO_TYPES,
 )
 from vehicle_service import get_vehicles_today
 
@@ -77,6 +78,8 @@ class DeleteRequest(BaseModel):
 
 @app.delete("/api/photos")
 def delete_photo(req: DeleteRequest):
+    if req.photo_type not in VALID_PHOTO_TYPES:
+        raise HTTPException(status_code=400, detail="Loại ảnh không hợp lệ")
     config = load_config(get_config_path())
     try:
         plate_clean = normalize_plate(req.plate)

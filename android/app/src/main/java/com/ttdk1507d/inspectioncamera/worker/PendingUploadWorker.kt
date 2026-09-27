@@ -47,11 +47,15 @@ class PendingUploadWorker(
 
         var anyFailed = false
 
+        val baseUrl = NetworkUtil.resolveBaseUrl(prefs.lanUrl, prefs.tailscaleUrl)
+        val service = ApiClient.getService(baseUrl)
+
         for (metaFile in metaFiles) {
+            var imgFile: File? = null
             try {
                 val json = metaFile.readText()
                 val meta = gson.fromJson(json, PendingUploadMetadata::class.java)
-                val imgFile = File(pendingDir, meta.imageFileName)
+                imgFile = File(pendingDir, meta.imageFileName)
 
                 if (!imgFile.exists() || imgFile.length() == 0L) {
                     // Invalid/corrupted entry, clean up
@@ -59,9 +63,6 @@ class PendingUploadWorker(
                     imgFile.delete()
                     continue
                 }
-
-                val baseUrl = NetworkUtil.resolveBaseUrl(prefs.lanUrl, prefs.tailscaleUrl)
-                val service = ApiClient.getService(baseUrl)
 
                 val fileReq = imgFile.asRequestBody("image/jpeg".toMediaTypeOrNull())
                 val filePart = MultipartBody.Part.createFormData("file", imgFile.name, fileReq)
@@ -85,7 +86,7 @@ class PendingUploadWorker(
                 }
             } catch (e: HttpException) {
                 if (e.code() in 400..499) {
-                    imgFile.delete()
+                    imgFile?.delete()
                     metaFile.delete()
                 } else {
                     anyFailed = true

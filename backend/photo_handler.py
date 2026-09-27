@@ -1,6 +1,7 @@
 import os
 import re
 from datetime import datetime
+from pathlib import Path
 from config import PhotoConfig
 
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
@@ -81,6 +82,10 @@ def save_photo(
     except ValueError as e:
         return {"ok": False, "error": str(e)}
 
+    # Validate plate color
+    if plate_color not in (None, "", "T", "V", "X"):
+        return {"ok": False, "error": "Màu biển không hợp lệ"}
+
     # Validate photo type
     if photo_type not in VALID_PHOTO_TYPES:
         return {"ok": False, "error": f"Loại ảnh không hợp lệ: {photo_type}"}
@@ -93,15 +98,27 @@ def save_photo(
     if len(file_bytes) > MAX_FILE_SIZE:
         return {"ok": False, "error": f"File vượt quá {MAX_FILE_SIZE // (1024*1024)}MB"}
 
+    save_dir = resolve_save_path(photo_type, plate, config)
+
+    # Auto-increment seq when seq is None for multi-photo types
+    if photo_type in ("passenger", "new_vehicle") and seq is None:
+        pattern = re.compile(rf"^{re.escape(plate)}_(\d+)\.jpg$", re.IGNORECASE)
+        existing = []
+        if os.path.exists(save_dir) and os.path.isdir(save_dir):
+            for fname in os.listdir(save_dir):
+                m = pattern.match(fname)
+                if m:
+                    existing.append(int(m.group(1)))
+        seq = max(existing) + 1 if existing else 1
+
     # Build filename and path
     filename = build_filename(plate, plate_color, photo_type, seq, config.plate_color_suffix)
-    save_dir = resolve_save_path(photo_type, plate, config)
     full_path = os.path.join(save_dir, filename)
 
     # Final path traversal check
     real_dir = os.path.realpath(save_dir)
     real_path = os.path.realpath(full_path)
-    if not real_path.startswith(real_dir):
+    if not Path(real_path).is_relative_to(Path(real_dir)):
         return {"ok": False, "error": "Đường dẫn không hợp lệ"}
 
     with open(full_path, "wb") as f:

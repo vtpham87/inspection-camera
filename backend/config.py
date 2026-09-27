@@ -33,13 +33,19 @@ CONFIG_DEFAULTS = PhotoConfig()
 
 def load_config(path: str = "photo_config.json") -> PhotoConfig:
     if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return PhotoConfig(**data)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return PhotoConfig(**data)
+        except (json.JSONDecodeError, Exception):
+            return CONFIG_DEFAULTS
     config = PhotoConfig()
     save_config(config, path)
     return config
 
 def save_config(config: PhotoConfig, path: str = "photo_config.json") -> None:
+    dirname = os.path.dirname(path)
+    if dirname:
+        os.makedirs(dirname, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(config.model_dump(), f, indent=2, ensure_ascii=False)
