@@ -12,7 +12,8 @@
         android:allowBackup="true"
         android:label="Chụp ảnh KĐ 15-07D"
         android:theme="@style/Theme.InspectionCamera"
-        android:supportsRtl="true">
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="true">
 
         <activity
             android:name=".MainActivity"
