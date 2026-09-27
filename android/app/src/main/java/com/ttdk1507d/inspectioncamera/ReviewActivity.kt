@@ -8,10 +8,13 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
 import com.google.gson.Gson
 import com.ttdk1507d.inspectioncamera.adapter.PhotoReviewAdapter
 import com.ttdk1507d.inspectioncamera.adapter.PhotoReviewItem
@@ -23,6 +26,9 @@ import com.ttdk1507d.inspectioncamera.worker.PendingUploadMetadata
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 
 class ReviewActivity : AppCompatActivity() {
@@ -43,6 +49,13 @@ class ReviewActivity : AppCompatActivity() {
     private lateinit var tvEmpty: TextView
     private lateinit var pbLoading: ProgressBar
 
+    // Sync card
+    private lateinit var cardSync: MaterialCardView
+    private lateinit var tvSyncStatus: TextView
+    private lateinit var pbSync: ProgressBar
+    private lateinit var btnSync: MaterialButton
+    private var isSyncing = false
+
     private lateinit var adapter: PhotoReviewAdapter
     private val reviewItems = mutableListOf<PhotoReviewItem>()
 
@@ -57,6 +70,10 @@ class ReviewActivity : AppCompatActivity() {
         initViews()
         setupRecyclerView()
         loadPhotos()
+
+        if (reviewItems.any { it.isPending }) {
+            uploadPendingPhotos()
+        }
     }
 
     private fun initViews() {
@@ -67,15 +84,23 @@ class ReviewActivity : AppCompatActivity() {
         tvEmpty = findViewById(R.id.tv_empty_review)
         pbLoading = findViewById(R.id.pb_review_loading)
 
+        cardSync = findViewById(R.id.card_review_sync)
+        tvSyncStatus = findViewById(R.id.tv_review_sync_status)
+        pbSync = findViewById(R.id.pb_review_sync)
+        btnSync = findViewById(R.id.btn_review_sync)
+
         toolbar.setNavigationOnClickListener { finish() }
         tvPlate.text = plate
+
+        btnSync.setOnClickListener {
+            uploadPendingPhotos()
+        }
     }
 
     private fun setupRecyclerView() {
         adapter = PhotoReviewAdapter(
             items = reviewItems,
             onRecaptureClick = { item ->
-                // Return to camera activity with focus type
                 val intent = Intent(this, CameraActivity::class.java).apply {
                     putExtra(CameraActivity.EXTRA_PLATE, plate)
                     putExtra(CameraActivity.EXTRA_PLATE_COLOR, plateColor)
@@ -156,15 +181,123 @@ class ReviewActivity : AppCompatActivity() {
         adapter.updateItems(reviewItems)
 
         tvPhotoCount.text = "${reviewItems.size} ảnh"
+        val pendingCount = reviewItems.count { it.isPending }
         if (reviewItems.isEmpty()) {
             tvEmpty.visibility = View.VISIBLE
+            cardSync.visibility = View.GONE
         } else {
             tvEmpty.visibility = View.GONE
+            cardSync.visibility = View.VISIBLE
+            if (pendingCount == 0) {
+                tvSyncStatus.text = getString(R.string.sync_all_done)
+                tvSyncStatus.setTextColor(ContextCompat.getColor(this, R.color.status_done_text))
+                pbSync.visibility = View.GONE
+                btnSync.visibility = View.GONE
+            } else {
+                tvSyncStatus.text = getString(R.string.sync_pending_count, pendingCount)
+                tvSyncStatus.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+                btnSync.visibility = View.VISIBLE
+                btnSync.text = getString(R.string.btn_sync_photos)
+                pbSync.visibility = View.GONE
+            }
+        }
+    }
+
+    private fun uploadPendingPhotos() {
+        if (isSyncing) return
+        val pendingDir = File(filesDir, "pending")
+        if (!pendingDir.exists() || !pendingDir.isDirectory) return
+
+        val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
+        val gson = Gson()
+        val plateMetas = mutableListOf<Pair<File, PendingUploadMetadata>>()
+
+        for (mf in metaFiles) {
+            try {
+                val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
+                if (meta.plate.equals(plate, ignoreCase = true)) {
+                    plateMetas.add(mf to meta)
+                }
+            } catch (e: Exception) {
+                // Ignore
+            }
+        }
+
+        if (plateMetas.isEmpty()) {
+            tvSyncStatus.text = getString(R.string.sync_all_done)
+            tvSyncStatus.setTextColor(ContextCompat.getColor(this, R.color.status_done_text))
+            btnSync.visibility = View.GONE
+            pbSync.visibility = View.GONE
+            return
+        }
+
+        isSyncing = true
+        pbSync.visibility = View.VISIBLE
+        btnSync.isEnabled = false
+
+        lifecycleScope.launch {
+            val baseUrl = withContext(Dispatchers.IO) {
+                NetworkUtil.resolveBaseUrl(prefs.lanUrl, prefs.tailscaleUrl)
+            }
+
+            if (baseUrl == null) {
+                isSyncing = false
+                pbSync.visibility = View.GONE
+                btnSync.isEnabled = true
+                tvSyncStatus.text = getString(R.string.sync_failed)
+                tvSyncStatus.setTextColor(ContextCompat.getColor(this@ReviewActivity, R.color.error))
+                return@launch
+            }
+
+            val service = ApiClient.getService(baseUrl)
+            val total = plateMetas.size
+            var uploadedCount = 0
+
+            for ((metaFile, meta) in plateMetas) {
+                val imgFile = File(pendingDir, meta.imageFileName)
+                if (!imgFile.exists()) {
+                    metaFile.delete()
+                    continue
+                }
+
+                tvSyncStatus.text = getString(R.string.sync_in_progress, uploadedCount + 1, total)
+
+                val success = withContext(Dispatchers.IO) {
+                    try {
+                        val fileReq = imgFile.readBytes().toRequestBody("image/jpeg".toMediaTypeOrNull())
+                        val filePart = MultipartBody.Part.createFormData("file", meta.imageFileName, fileReq)
+                        val plateReq = meta.plate.toRequestBody("text/plain".toMediaTypeOrNull())
+                        val photoTypeReq = meta.photoType.toRequestBody("text/plain".toMediaTypeOrNull())
+                        val colorReq = meta.plateColor?.toRequestBody("text/plain".toMediaTypeOrNull())
+                        val seqReq = meta.seq?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
+
+                        val resp = service.uploadPhoto(filePart, plateReq, colorReq, photoTypeReq, seqReq)
+                        resp.isSuccessful && resp.body()?.get("ok") == true
+                    } catch (e: Exception) {
+                        false
+                    }
+                }
+
+                if (success) {
+                    imgFile.delete()
+                    metaFile.delete()
+                    uploadedCount++
+                }
+            }
+
+            isSyncing = false
+            pbSync.visibility = View.GONE
+            btnSync.isEnabled = true
+            loadPhotos()
+
+            if (uploadedCount > 0) {
+                Toast.makeText(this@ReviewActivity, "Đã gửi thành công $uploadedCount ảnh về máy tính", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
     private fun parsePhotoReviewItem(file: File, isPending: Boolean): PhotoReviewItem? {
-        val nameWithoutExt = file.nameWithoutExtension // e.g. "rear_45" or "passenger_1"
+        val nameWithoutExt = file.nameWithoutExtension
         for (type in PhotoType.values()) {
             if (nameWithoutExt.startsWith(type.apiName)) {
                 val remainder = nameWithoutExt.removePrefix(type.apiName).removePrefix("_")
@@ -198,15 +331,17 @@ class ReviewActivity : AppCompatActivity() {
             // 1. Delete on server
             try {
                 val baseUrl = NetworkUtil.resolveBaseUrl(prefs.lanUrl, prefs.tailscaleUrl)
-                val service = ApiClient.getService(baseUrl)
-                val body = mutableMapOf<String, Any?>(
-                    "plate" to plate,
-                    "plate_color" to plateColor,
-                    "photo_type" to item.photoType.apiName,
-                    "seq" to item.seq
-                )
-                withContext(Dispatchers.IO) {
-                    service.deletePhoto(body)
+                if (baseUrl != null) {
+                    val service = ApiClient.getService(baseUrl)
+                    val body = mutableMapOf<String, Any?>(
+                        "plate" to plate,
+                        "plate_color" to plateColor,
+                        "photo_type" to item.photoType.apiName,
+                        "seq" to item.seq
+                    )
+                    withContext(Dispatchers.IO) {
+                        service.deletePhoto(body)
+                    }
                 }
             } catch (e: Exception) {
                 // If offline, proceed with local cleanup

@@ -156,6 +156,7 @@ class CameraActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        appConfig = prefs.getAppConfig()
         refreshLocalPhotoStatus()
     }
 
@@ -283,25 +284,7 @@ class CameraActivity : AppCompatActivity() {
 
     private fun loadConfigAndState() {
         appConfig = prefs.getAppConfig()
-        lifecycleScope.launch {
-            try {
-                val baseUrl = NetworkUtil.resolveBaseUrl(prefs.lanUrl, prefs.tailscaleUrl)
-                if (baseUrl != null) {
-                    val service = ApiClient.getService(baseUrl)
-                    val configResp = withContext(Dispatchers.IO) { service.getConfig() }
-                    if (configResp.isSuccessful && configResp.body() != null) {
-                        val gson = Gson()
-                        val jsonStr = gson.toJson(configResp.body())
-                        val fetched = gson.fromJson(jsonStr, AppConfig::class.java)
-                        appConfig = fetched
-                        prefs.saveFromAppConfig(fetched)
-                    }
-                }
-            } catch (e: Exception) {
-                // Keep local prefs config
-            }
-            refreshLocalPhotoStatus()
-        }
+        refreshLocalPhotoStatus()
     }
 
     private fun refreshLocalPhotoStatus() {
@@ -383,32 +366,51 @@ class CameraActivity : AppCompatActivity() {
     private fun takePhoto(type: PhotoType, seq: Int?) {
         val capture = imageCapture ?: return
 
-        layoutLoading.visibility = View.VISIBLE
-        tvLoadingText.text = getString(R.string.uploading)
+        // 1. Instant tactile feedback
+        vibrateSuccess()
 
+        // 2. Optimistic UI update: immediately mark button as captured
+        capturedStatus[type] = true
+        when (type) {
+            PhotoType.REAR_45 -> updateButtonUI(btnRear45, PhotoType.REAR_45, true)
+            PhotoType.FRONT_45 -> updateButtonUI(btnFront45, PhotoType.FRONT_45, true)
+            PhotoType.CHASSIS -> updateButtonUI(btnChassis, PhotoType.CHASSIS, true)
+            PhotoType.PASSENGER -> {
+                passengerSeq++
+                updateButtonUI(btnPassenger, PhotoType.PASSENGER, true, passengerSeq - 1)
+            }
+            PhotoType.NEW_VEHICLE -> {
+                newVehicleSeq++
+                updateButtonUI(btnNewVehicle, PhotoType.NEW_VEHICLE, true, newVehicleSeq - 1)
+            }
+        }
+
+        Toast.makeText(this, "📸 Đã chụp: ${type.label}", Toast.LENGTH_SHORT).show()
+
+        // 3. Capture in background thread without blocking camera preview
         capture.takePicture(
             cameraExecutor,
             object : ImageCapture.OnImageCapturedCallback() {
                 override fun onCaptureSuccess(imageProxy: ImageProxy) {
-                    processAndUpload(imageProxy, type, seq)
+                    processAndSave(imageProxy, type, seq)
                 }
 
                 override fun onError(exception: ImageCaptureException) {
                     runOnUiThread {
-                        layoutLoading.visibility = View.GONE
                         Toast.makeText(this@CameraActivity, "Chụp ảnh thất bại: ${exception.message}", Toast.LENGTH_SHORT).show()
+                        refreshLocalPhotoStatus()
                     }
                 }
             }
         )
     }
 
-    private fun processAndUpload(imageProxy: ImageProxy, type: PhotoType, seq: Int?) {
+    private fun processAndSave(imageProxy: ImageProxy, type: PhotoType, seq: Int?) {
         try {
             val rawBitmap = imageProxyToBitmap(imageProxy)
             imageProxy.close()
 
-            // 1. Resize according to photo_resolution
+            // 1. Resize according to appConfig.photoResolution
             val resizedBitmap = TimestampPainter.resizeBitmap(rawBitmap, appConfig.photoResolution)
 
             // 2. Draw timestamp if enabled
@@ -423,18 +425,85 @@ class CameraActivity : AppCompatActivity() {
             stampedBitmap.compress(Bitmap.CompressFormat.JPEG, appConfig.jpegQuality, baos)
             val jpegBytes = baos.toByteArray()
 
-            // 4. Haptic feedback (50ms vibration)
-            vibrateSuccess()
-
-            // 5. Save copy to local review cache
+            // 4. Save copy to local review cache on phone
             saveToLocalReview(type, seq, jpegBytes)
 
-            // 6. Upload or queue
-            uploadPhotoBytes(type, seq, jpegBytes)
+            // 5. Save to pending queue for upload
+            saveToPendingQueue(type, seq, jpegBytes)
+
+            // 6. If uploadMode is "immediate", trigger background upload
+            if (prefs.uploadMode == "immediate") {
+                triggerBackgroundUpload(type, seq, jpegBytes)
+            }
+
+            runOnUiThread {
+                refreshLocalPhotoStatus()
+            }
         } catch (e: Exception) {
             runOnUiThread {
-                layoutLoading.visibility = View.GONE
                 Toast.makeText(this, "Lỗi xử lý ảnh: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun saveToPendingQueue(type: PhotoType, seq: Int?, bytes: ByteArray) {
+        try {
+            val pendingDir = File(filesDir, "pending")
+            if (!pendingDir.exists()) pendingDir.mkdirs()
+
+            val timestamp = System.currentTimeMillis()
+            val imgFile = File(pendingDir, "pending_${timestamp}_${type.apiName}.jpg")
+            val metaFile = File(pendingDir, "pending_${timestamp}_${type.apiName}.meta")
+
+            FileOutputStream(imgFile).use { it.write(bytes) }
+
+            val meta = PendingUploadMetadata(
+                imageFileName = imgFile.name,
+                plate = plate,
+                plateColor = plateColor,
+                photoType = type.apiName,
+                seq = seq,
+                timestamp = timestamp
+            )
+            val metaJson = Gson().toJson(meta)
+            metaFile.writeText(metaJson)
+        } catch (e: Exception) {
+            // Non-critical queue write
+        }
+    }
+
+    private fun triggerBackgroundUpload(type: PhotoType, seq: Int?, bytes: ByteArray) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val baseUrl = NetworkUtil.resolveBaseUrl(prefs.lanUrl, prefs.tailscaleUrl) ?: return@launch
+                val service = ApiClient.getService(baseUrl)
+
+                val fileReq = bytes.toRequestBody("image/jpeg".toMediaTypeOrNull())
+                val filePart = MultipartBody.Part.createFormData("file", "upload.jpg", fileReq)
+                val plateReq = plate.toRequestBody("text/plain".toMediaTypeOrNull())
+                val photoTypeReq = type.apiName.toRequestBody("text/plain".toMediaTypeOrNull())
+                val colorReq = plateColor?.toRequestBody("text/plain".toMediaTypeOrNull())
+                val seqReq = seq?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
+
+                val resp = service.uploadPhoto(filePart, plateReq, colorReq, photoTypeReq, seqReq)
+                if (resp.isSuccessful && resp.body()?.get("ok") == true) {
+                    val pendingDir = File(filesDir, "pending")
+                    val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
+                    val gson = Gson()
+                    for (mf in metaFiles) {
+                        try {
+                            val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
+                            if (meta.plate == plate && meta.photoType == type.apiName && meta.seq == seq) {
+                                File(pendingDir, meta.imageFileName).delete()
+                                mf.delete()
+                            }
+                        } catch (e: Exception) {
+                            // Ignore
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                // Kept in pending queue
             }
         }
     }
@@ -487,84 +556,6 @@ class CameraActivity : AppCompatActivity() {
             FileOutputStream(targetFile).use { it.write(bytes) }
         } catch (e: Exception) {
             // Non-critical cache
-        }
-    }
-
-    private fun uploadPhotoBytes(type: PhotoType, seq: Int?, bytes: ByteArray) {
-        lifecycleScope.launch {
-            var uploadSuccess = false
-            try {
-                val baseUrl = NetworkUtil.resolveBaseUrl(prefs.lanUrl, prefs.tailscaleUrl)
-                val service = ApiClient.getService(baseUrl)
-
-                val fileReq = bytes.toRequestBody("image/jpeg".toMediaTypeOrNull())
-                val filePart = MultipartBody.Part.createFormData("file", "upload.jpg", fileReq)
-                val plateReq = plate.toRequestBody("text/plain".toMediaTypeOrNull())
-                val photoTypeReq = type.apiName.toRequestBody("text/plain".toMediaTypeOrNull())
-                val colorReq = plateColor?.toRequestBody("text/plain".toMediaTypeOrNull())
-                val seqReq = seq?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
-
-                val resp = withContext(Dispatchers.IO) {
-                    service.uploadPhoto(filePart, plateReq, colorReq, photoTypeReq, seqReq)
-                }
-
-                if (resp.isSuccessful && resp.body()?.get("ok") == true) {
-                    uploadSuccess = true
-                }
-            } catch (e: Exception) {
-                uploadSuccess = false
-            }
-
-            layoutLoading.visibility = View.GONE
-
-            if (uploadSuccess) {
-                Toast.makeText(this@CameraActivity, getString(R.string.upload_success), Toast.LENGTH_SHORT).show()
-            } else {
-                saveToOfflineQueue(type, seq, bytes)
-                Toast.makeText(this@CameraActivity, getString(R.string.upload_offline), Toast.LENGTH_LONG).show()
-            }
-
-            refreshLocalPhotoStatus()
-        }
-    }
-
-    private suspend fun saveToOfflineQueue(type: PhotoType, seq: Int?, bytes: ByteArray) = withContext(Dispatchers.IO) {
-        try {
-            val pendingDir = File(filesDir, "pending")
-            if (!pendingDir.exists()) pendingDir.mkdirs()
-
-            val timestamp = System.currentTimeMillis()
-            val imgFile = File(pendingDir, "pending_${timestamp}_${type.apiName}.jpg")
-            val metaFile = File(pendingDir, "pending_${timestamp}_${type.apiName}.meta")
-
-            FileOutputStream(imgFile).use { it.write(bytes) }
-
-            val meta = PendingUploadMetadata(
-                imageFileName = imgFile.name,
-                plate = plate,
-                plateColor = plateColor,
-                photoType = type.apiName,
-                seq = seq,
-                timestamp = timestamp
-            )
-            val metaJson = Gson().toJson(meta)
-            metaFile.writeText(metaJson)
-
-            // Trigger worker
-            val oneTimeRequest = OneTimeWorkRequestBuilder<PendingUploadWorker>()
-                .setConstraints(
-                    Constraints.Builder()
-                        .setRequiredNetworkType(NetworkType.CONNECTED)
-                        .build()
-                )
-                .build()
-            WorkManager.getInstance(this@CameraActivity).enqueueUniqueWork(
-                "PendingUploadWorker_OneTime",
-                ExistingWorkPolicy.KEEP,
-                oneTimeRequest
-            )
-        } catch (e: Exception) {
-            // Failed to save to pending queue
         }
     }
 }

@@ -16,6 +16,7 @@ import com.google.android.material.textfield.TextInputEditText
 import com.ttdk1507d.inspectioncamera.api.ApiClient
 import com.ttdk1507d.inspectioncamera.util.NetworkUtil
 import com.ttdk1507d.inspectioncamera.util.PrefsManager
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -43,6 +44,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var spinnerResolution: Spinner
     private lateinit var spinnerJpegQuality: Spinner
     private lateinit var switchPlateColorSuffix: MaterialSwitch
+    private lateinit var spinnerUploadMode: Spinner
 
     private lateinit var btnSave: MaterialButton
 
@@ -70,6 +72,8 @@ class SettingsActivity : AppCompatActivity() {
     )
 
     private val jpegQualities = listOf(75, 85, 90, 95)
+
+    private val uploadModeKeys = listOf("review", "immediate")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -101,6 +105,7 @@ class SettingsActivity : AppCompatActivity() {
         spinnerResolution = findViewById(R.id.spinner_settings_resolution)
         spinnerJpegQuality = findViewById(R.id.spinner_settings_jpeg_quality)
         switchPlateColorSuffix = findViewById(R.id.switch_settings_plate_color_suffix)
+        spinnerUploadMode = findViewById(R.id.spinner_settings_upload_mode)
 
         btnSave = findViewById(R.id.btn_settings_save)
 
@@ -157,6 +162,14 @@ class SettingsActivity : AppCompatActivity() {
         spinnerJpegQuality.adapter = ArrayAdapter(
             this, android.R.layout.simple_spinner_dropdown_item, qualityLabels
         )
+
+        val uploadModeLabels = listOf(
+            "Chỉ tải khi mở Xem lại (Khuyên dùng - Nhanh nhất)",
+            "Tự động tải ngầm ngay khi chụp"
+        )
+        spinnerUploadMode.adapter = ArrayAdapter(
+            this, android.R.layout.simple_spinner_dropdown_item, uploadModeLabels
+        )
     }
 
     private fun loadCurrentSettings() {
@@ -167,24 +180,27 @@ class SettingsActivity : AppCompatActivity() {
 
         switchTimestamp.isChecked = prefs.timestampEnabled
 
-        val fmtIdx = formatKeys.indexOf(prefs.timestampFormat).coerceAtLeast(0)
-        spinnerTimestampFormat.setSelection(fmtIdx)
+        val fmtIdx = formatKeys.indexOf(prefs.timestampFormat)
+        spinnerTimestampFormat.setSelection(if (fmtIdx >= 0) fmtIdx else 0)
 
-        val posIdx = positionKeys.indexOf(prefs.timestampPosition).coerceAtLeast(0)
-        spinnerTimestampPosition.setSelection(posIdx)
+        val posIdx = positionKeys.indexOf(prefs.timestampPosition)
+        spinnerTimestampPosition.setSelection(if (posIdx >= 0) posIdx else 0)
 
-        val fontIdx = fontSizes.indexOf(prefs.timestampFontSize).coerceAtLeast(1)
-        spinnerTimestampFontSize.setSelection(fontIdx)
+        val fontIdx = fontSizes.indexOf(prefs.timestampFontSize)
+        spinnerTimestampFontSize.setSelection(if (fontIdx >= 0) fontIdx else 1)
 
         switchTimestampStroke.isChecked = prefs.timestampStrokeEnabled
 
-        val resIdx = resolutionKeys.indexOf(prefs.photoResolution).coerceAtLeast(0)
-        spinnerResolution.setSelection(resIdx)
+        val resIdx = resolutionKeys.indexOf(prefs.photoResolution)
+        spinnerResolution.setSelection(if (resIdx >= 0) resIdx else 0)
 
-        val qualIdx = jpegQualities.indexOf(prefs.jpegQuality).coerceAtLeast(1)
-        spinnerJpegQuality.setSelection(qualIdx)
+        val qualIdx = jpegQualities.indexOf(prefs.jpegQuality)
+        spinnerJpegQuality.setSelection(if (qualIdx >= 0) qualIdx else 1)
 
         switchPlateColorSuffix.isChecked = prefs.plateColorSuffix
+
+        val upIdx = uploadModeKeys.indexOf(prefs.uploadMode)
+        spinnerUploadMode.setSelection(if (upIdx >= 0) upIdx else 0)
     }
 
     private fun setupListeners() {
@@ -266,6 +282,7 @@ class SettingsActivity : AppCompatActivity() {
             return
         }
 
+        // Save immediately to local persistent preferences
         prefs.lanIp = lanIp
         prefs.tailscaleIp = tailscaleIp
         prefs.serverPort = port
@@ -280,12 +297,13 @@ class SettingsActivity : AppCompatActivity() {
         prefs.photoResolution = resolutionKeys[spinnerResolution.selectedItemPosition.coerceIn(0, resolutionKeys.lastIndex)]
         prefs.jpegQuality = jpegQualities[spinnerJpegQuality.selectedItemPosition.coerceIn(0, jpegQualities.lastIndex)]
         prefs.plateColorSuffix = switchPlateColorSuffix.isChecked
+        prefs.uploadMode = uploadModeKeys[spinnerUploadMode.selectedItemPosition.coerceIn(0, uploadModeKeys.lastIndex)]
 
-        // Sync with server in background if reachable
+        // Sync with server using independent scope so it outlives this activity's finish()
         val currentConfig = prefs.getAppConfig()
         val lanUrl = prefs.lanUrl
         val tailscaleUrl = prefs.tailscaleUrl
-        lifecycleScope.launch(Dispatchers.IO) {
+        CoroutineScope(Dispatchers.IO).launch {
             try {
                 val baseUrl = NetworkUtil.resolveBaseUrl(lanUrl, tailscaleUrl)
                 if (baseUrl != null) {

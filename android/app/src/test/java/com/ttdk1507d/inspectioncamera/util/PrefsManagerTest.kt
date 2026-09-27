@@ -57,6 +57,13 @@ class PrefsManagerTest {
     }
 
     @Test
+    fun testUploadMode() {
+        assertEquals("review", prefsManager.uploadMode)
+        prefsManager.uploadMode = "immediate"
+        assertEquals("immediate", prefsManager.uploadMode)
+    }
+
+    @Test
     fun testCustomUrlCombinations() {
         prefsManager.lanIp = "10.0.0.1"
         prefsManager.tailscaleIp = "100.64.0.1"
