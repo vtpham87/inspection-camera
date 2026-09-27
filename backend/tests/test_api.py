@@ -173,3 +173,40 @@ def test_delete_photo_invalid_plate(setup_env):
         json={"plate": "invalid!plate@", "photo_type": "rear_45"},
     )
     assert r.status_code == 400
+
+
+def test_delete_photo_without_color_suffix_fallback(setup_env):
+    client, _ = setup_env
+    r_up = client.post(
+        "/api/upload",
+        data={"plate": "15A12345", "plate_color": "T", "photo_type": "rear_45"},
+        files={"file": ("test.jpg", FAKE_JPEG, "image/jpeg")},
+    )
+    assert r_up.status_code == 200
+
+    r_del = client.request(
+        "DELETE",
+        "/api/photos",
+        json={"plate": "15A12345", "photo_type": "rear_45"},
+    )
+    assert r_del.status_code == 200
+    assert r_del.json()["ok"] is True
+
+
+def test_delete_old_plate(setup_env):
+    client, _ = setup_env
+    r_up = client.post(
+        "/api/upload",
+        data={"plate": "11K2639", "photo_type": "rear_45"},
+        files={"file": ("test.jpg", FAKE_JPEG, "image/jpeg")},
+    )
+    assert r_up.status_code == 200
+
+    r_del = client.request(
+        "DELETE",
+        "/api/photos",
+        json={"plate": "11K2639", "photo_type": "rear_45"},
+    )
+    assert r_del.status_code == 200
+    assert r_del.json()["ok"] is True
+

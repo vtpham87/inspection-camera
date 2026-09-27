@@ -290,7 +290,7 @@ class CameraActivity : AppCompatActivity() {
             }
         }
 
-        val existingPhotos = reviewPhotos
+        val existingPhotos = reviewPhotos.distinct()
 
         for (pt in PhotoType.values()) {
             capturedStatus[pt] = capturedStatus[pt] == true || existingPhotos.any { it.photoType == pt }

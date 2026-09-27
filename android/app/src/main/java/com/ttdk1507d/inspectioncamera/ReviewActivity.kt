@@ -201,6 +201,7 @@ class ReviewActivity : AppCompatActivity() {
                 val service = ApiClient.getService(baseUrl)
                 val body = mutableMapOf<String, Any?>(
                     "plate" to plate,
+                    "plate_color" to plateColor,
                     "photo_type" to item.photoType.apiName,
                     "seq" to item.seq
                 )

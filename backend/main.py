@@ -10,7 +10,13 @@ if PROJECT_DIR not in sys.path:
     sys.path.insert(0, PROJECT_DIR)
 
 from config import load_config, save_config, PhotoConfig
-from photo_handler import save_photo, normalize_plate, extract_plate_color
+from photo_handler import (
+    save_photo,
+    normalize_plate,
+    extract_plate_color,
+    build_filename,
+    resolve_save_path,
+)
 from vehicle_service import get_vehicles_today
 
 CONFIG_PATH = os.environ.get("PHOTO_CONFIG_PATH") or os.path.join(PROJECT_DIR, "photo_config.json")
@@ -66,6 +72,7 @@ class DeleteRequest(BaseModel):
     plate: str
     photo_type: str
     seq: int | None = None
+    plate_color: str | None = None
 
 
 @app.delete("/api/photos")
@@ -76,19 +83,27 @@ def delete_photo(req: DeleteRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    from photo_handler import build_filename, resolve_save_path
     plate_num, color = extract_plate_color(plate_clean)
-    try:
-        filename = build_filename(plate_num, color, req.photo_type, req.seq, config.plate_color_suffix)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    if req.plate_color:
+        color = req.plate_color
 
+    candidate_colors = [color] if color else [None, "T", "V", "X"]
     save_dir = resolve_save_path(req.photo_type, plate_num, config, create_dir=False)
-    full_path = os.path.join(save_dir, filename)
 
-    if os.path.exists(full_path):
-        os.remove(full_path)
-        return {"ok": True, "deleted": full_path}
+    deleted_path = None
+    for c in candidate_colors:
+        try:
+            filename = build_filename(plate_num, c, req.photo_type, req.seq, config.plate_color_suffix)
+            full_path = os.path.join(save_dir, filename)
+            if os.path.exists(full_path):
+                os.remove(full_path)
+                deleted_path = full_path
+                break
+        except ValueError:
+            pass
+
+    if deleted_path:
+        return {"ok": True, "deleted": deleted_path}
     raise HTTPException(status_code=404, detail="File không tồn tại")
 
 
