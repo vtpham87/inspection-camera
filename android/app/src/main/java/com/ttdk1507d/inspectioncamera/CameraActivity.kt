@@ -2,6 +2,8 @@ package com.ttdk1507d.inspectioncamera
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
@@ -10,6 +12,8 @@ import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.view.OrientationEventListener
+import android.view.Surface
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageButton
@@ -73,6 +77,7 @@ class CameraActivity : AppCompatActivity() {
     private lateinit var tvPlate: TextView
     private lateinit var tvPlateColor: TextView
     private lateinit var btnBack: ImageButton
+    private lateinit var btnRotate: ImageButton
 
     private lateinit var btnRear45: MaterialButton
     private lateinit var btnFront45: MaterialButton
@@ -86,6 +91,7 @@ class CameraActivity : AppCompatActivity() {
 
     private var imageCapture: ImageCapture? = null
     private lateinit var cameraExecutor: ExecutorService
+    private var orientationEventListener: OrientationEventListener? = null
 
     // Track state of captured photos for current plate
     private val capturedStatus = mutableMapOf<PhotoType, Boolean>()
@@ -155,6 +161,7 @@ class CameraActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        orientationEventListener?.disable()
         cameraExecutor.shutdown()
     }
 
@@ -163,6 +170,7 @@ class CameraActivity : AppCompatActivity() {
         tvPlate = findViewById(R.id.tv_camera_plate)
         tvPlateColor = findViewById(R.id.tv_camera_plate_color)
         btnBack = findViewById(R.id.btn_camera_back)
+        btnRotate = findViewById(R.id.btn_camera_rotate)
 
         btnRear45 = findViewById(R.id.btn_rear_45)
         btnFront45 = findViewById(R.id.btn_front_45)
@@ -197,6 +205,15 @@ class CameraActivity : AppCompatActivity() {
     private fun setupListeners() {
         btnBack.setOnClickListener { finish() }
 
+        btnRotate.setOnClickListener {
+            val isLand = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+            requestedOrientation = if (isLand) {
+                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            } else {
+                ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            }
+        }
+
         btnRear45.setOnClickListener { takePhoto(PhotoType.REAR_45, null) }
         btnFront45.setOnClickListener { takePhoto(PhotoType.FRONT_45, null) }
         btnChassis.setOnClickListener { takePhoto(PhotoType.CHASSIS, null) }
@@ -225,29 +242,63 @@ class CameraActivity : AppCompatActivity() {
                     .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                     .build()
 
+                val displayRotation = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    display?.rotation ?: Surface.ROTATION_0
+                } else {
+                    @Suppress("DEPRECATION")
+                    windowManager.defaultDisplay.rotation
+                }
+                imageCapture?.targetRotation = displayRotation
+
                 val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture)
+
+                setupOrientationListener()
             } catch (e: Exception) {
                 Toast.makeText(this, "Lỗi mở camera: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }, ContextCompat.getMainExecutor(this))
     }
 
+    private fun setupOrientationListener() {
+        orientationEventListener?.disable()
+        orientationEventListener = object : OrientationEventListener(this) {
+            override fun onOrientationChanged(orientation: Int) {
+                if (orientation == ORIENTATION_UNKNOWN) return
+                val rotation = when (orientation) {
+                    in 45 until 135 -> Surface.ROTATION_270
+                    in 135 until 225 -> Surface.ROTATION_180
+                    in 225 until 315 -> Surface.ROTATION_90
+                    else -> Surface.ROTATION_0
+                }
+                imageCapture?.targetRotation = rotation
+            }
+        }
+        if (orientationEventListener?.canDetectOrientation() == true) {
+            orientationEventListener?.enable()
+        }
+    }
+
     private fun loadConfigAndState() {
+        appConfig = prefs.getAppConfig()
         lifecycleScope.launch {
             try {
                 val baseUrl = NetworkUtil.resolveBaseUrl(prefs.lanUrl, prefs.tailscaleUrl)
-                val service = ApiClient.getService(baseUrl)
-                val configResp = withContext(Dispatchers.IO) { service.getConfig() }
-                if (configResp.isSuccessful && configResp.body() != null) {
-                    val gson = Gson()
-                    val jsonStr = gson.toJson(configResp.body())
-                    appConfig = gson.fromJson(jsonStr, AppConfig::class.java)
+                if (baseUrl != null) {
+                    val service = ApiClient.getService(baseUrl)
+                    val configResp = withContext(Dispatchers.IO) { service.getConfig() }
+                    if (configResp.isSuccessful && configResp.body() != null) {
+                        val gson = Gson()
+                        val jsonStr = gson.toJson(configResp.body())
+                        val fetched = gson.fromJson(jsonStr, AppConfig::class.java)
+                        appConfig = fetched
+                        prefs.saveFromAppConfig(fetched)
+                    }
                 }
             } catch (e: Exception) {
-                // Use default AppConfig
+                // Keep local prefs config
             }
             refreshLocalPhotoStatus()
         }

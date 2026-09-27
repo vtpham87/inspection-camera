@@ -30,6 +30,22 @@
     <string name="empty_vehicle_list">Không có xe nào hoặc không kết nối được máy chủ</string>
     <string name="time_label">Giờ vào: %s</string>
 
+    <!-- Settings Headers -->
+    <string name="title_settings">Cài đặt ứng dụng</string>
+    <string name="header_server_connection">1. KẾT NỐI MÁY CHỦ TRẠM</string>
+    <string name="header_timestamp_settings">2. IN THỜI GIAN LÊN ẢNH (TIMESTAMP)</string>
+    <string name="header_photo_settings">3. ĐỘ PHÂN GIẢI &amp; CHẤT LƯỢNG ẢNH</string>
+
+    <string name="setting_timestamp_enabled">In thời gian chụp lên ảnh</string>
+    <string name="setting_timestamp_format">Định dạng ngày giờ</string>
+    <string name="setting_timestamp_position">Vị trí in trên ảnh</string>
+    <string name="setting_timestamp_font_size">Cỡ chữ in</string>
+    <string name="setting_timestamp_stroke">Viền đen chữ trắng (chống lóa)</string>
+
+    <string name="setting_photo_resolution">Độ phân giải ảnh</string>
+    <string name="setting_jpeg_quality">Chất lượng nén JPEG</string>
+    <string name="setting_plate_color_suffix">Thêm hậu tố màu biển (T/V/X)</string>
+
     <!-- Settings -->
     <string name="setting_lan_ip">Địa chỉ IP LAN (Wi-Fi nội bộ)</string>
     <string name="setting_tailscale_ip">Địa chỉ IP Tailscale / 4G</string>

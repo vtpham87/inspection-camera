@@ -2,6 +2,8 @@ package com.ttdk1507d.inspectioncamera.util
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.ttdk1507d.inspectioncamera.model.AppConfig
+import com.ttdk1507d.inspectioncamera.model.TimestampConfig
 
 class PrefsManager(private val prefs: SharedPreferences) {
 
@@ -25,6 +27,68 @@ class PrefsManager(private val prefs: SharedPreferences) {
         get() = prefs.getBoolean("vehicle_list_enabled", true)
         set(value) = prefs.edit().putBoolean("vehicle_list_enabled", value).apply()
 
+    var timestampEnabled: Boolean
+        get() = prefs.getBoolean("timestamp_enabled", true)
+        set(value) = prefs.edit().putBoolean("timestamp_enabled", value).apply()
+
+    var timestampFormat: String
+        get() = prefs.getString("timestamp_format", "HH:mm:ss - dd/MM/yyyy") ?: "HH:mm:ss - dd/MM/yyyy"
+        set(value) = prefs.edit().putString("timestamp_format", value).apply()
+
+    var timestampFontSize: Int
+        get() = prefs.getInt("timestamp_font_size", 28)
+        set(value) = prefs.edit().putInt("timestamp_font_size", value).apply()
+
+    var timestampPosition: String
+        get() = prefs.getString("timestamp_position", "bottom_right") ?: "bottom_right"
+        set(value) = prefs.edit().putString("timestamp_position", value).apply()
+
+    var timestampStrokeEnabled: Boolean
+        get() = prefs.getBoolean("timestamp_stroke_enabled", true)
+        set(value) = prefs.edit().putBoolean("timestamp_stroke_enabled", value).apply()
+
+    var photoResolution: String
+        get() = prefs.getString("photo_resolution", "original") ?: "original"
+        set(value) = prefs.edit().putString("photo_resolution", value).apply()
+
+    var jpegQuality: Int
+        get() = prefs.getInt("jpeg_quality", 85)
+        set(value) = prefs.edit().putInt("jpeg_quality", value).apply()
+
+    var plateColorSuffix: Boolean
+        get() = prefs.getBoolean("plate_color_suffix", true)
+        set(value) = prefs.edit().putBoolean("plate_color_suffix", value).apply()
+
     val lanUrl: String get() = "http://$lanIp:$serverPort"
     val tailscaleUrl: String get() = "http://$tailscaleIp:$serverPort"
+
+    fun getAppConfig(): AppConfig {
+        return AppConfig(
+            vehicleListEnabled = vehicleListEnabled,
+            serverPort = serverPort,
+            jpegQuality = jpegQuality,
+            plateColorSuffix = plateColorSuffix,
+            photoResolution = photoResolution,
+            timestamp = TimestampConfig(
+                enabled = timestampEnabled,
+                format = timestampFormat,
+                fontSize = timestampFontSize,
+                fontStrokeEnabled = timestampStrokeEnabled,
+                position = timestampPosition
+            )
+        )
+    }
+
+    fun saveFromAppConfig(config: AppConfig) {
+        vehicleListEnabled = config.vehicleListEnabled
+        serverPort = config.serverPort
+        jpegQuality = config.jpegQuality
+        plateColorSuffix = config.plateColorSuffix
+        photoResolution = config.photoResolution
+        timestampEnabled = config.timestamp.enabled
+        timestampFormat = config.timestamp.format
+        timestampFontSize = config.timestamp.fontSize
+        timestampStrokeEnabled = config.timestamp.fontStrokeEnabled
+        timestampPosition = config.timestamp.position
+    }
 }
