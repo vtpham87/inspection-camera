@@ -1,6 +1,7 @@
 import os
 import sqlite3
 from datetime import datetime
+from unittest.mock import patch, MagicMock
 import pytest
 from vehicle_service import get_vehicles_today, _check_photos_taken, PHOTO_TYPES
 from config import PhotoConfig
@@ -169,3 +170,58 @@ def test_nonexistent_db_returns_empty():
     config = PhotoConfig()
     result = get_vehicles_today("nonexistent_path_xyz.db", "2026-09-27", config)
     assert result == []
+
+
+def test_check_photos_does_not_create_empty_dirs(mock_db, tmp_path):
+    config = PhotoConfig()
+    photo_dir = tmp_path / "photos_empty_check"
+    for pt in config.paths:
+        config.paths[pt] = str(photo_dir / "{date}" / "{plate}")
+
+    assert not photo_dir.exists()
+
+    result = get_vehicles_today(mock_db, "2026-09-27", config)
+    assert result is not None
+    assert len(result) == 2
+    # Verify that querying vehicles did NOT create photo_dir or subdirectories
+    assert not photo_dir.exists()
+
+
+def test_check_photos_taken_helper_does_not_create_empty_dirs(tmp_path):
+    config = PhotoConfig()
+    photo_dir = tmp_path / "check_taken"
+    for pt in config.paths:
+        config.paths[pt] = str(photo_dir / "{date}" / "{plate}")
+
+    assert not photo_dir.exists()
+    taken = _check_photos_taken("15A12345", "T", config, date="2026-09-27")
+    assert taken == []
+    assert not photo_dir.exists()
+
+
+def test_db_connection_closed_finally(mock_db):
+    config = PhotoConfig()
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_conn.cursor.return_value = mock_cursor
+    mock_cursor.fetchall.return_value = []
+
+    with patch("vehicle_service.sqlite3.connect", return_value=mock_conn):
+        get_vehicles_today(mock_db, "2026-09-27", config)
+
+    mock_conn.close.assert_called_once()
+
+
+def test_db_connection_closed_on_query_exception(mock_db):
+    config = PhotoConfig()
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_conn.cursor.return_value = mock_cursor
+    mock_cursor.execute.side_effect = sqlite3.OperationalError("Query failed")
+
+    with patch("vehicle_service.sqlite3.connect", return_value=mock_conn):
+        with pytest.raises(sqlite3.OperationalError):
+            get_vehicles_today(mock_db, "2026-09-27", config)
+
+    mock_conn.close.assert_called_once()
+

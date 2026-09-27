@@ -81,6 +81,24 @@ def test_resolve_save_path(tmp_path):
     assert os.path.exists(resolved)
     assert "15A12345" in resolved
 
+def test_resolve_save_path_no_create_dir(tmp_path):
+    config = PhotoConfig()
+    config.paths["rear_45"] = str(tmp_path / "subdir" / "{date}")
+    resolved = resolve_save_path("rear_45", "15A12345", config, create_dir=False)
+    assert not os.path.exists(resolved)
+    assert "subdir" in resolved
+
+def test_resolve_save_path_custom_date_str(tmp_path):
+    config = PhotoConfig()
+    config.paths["rear_45"] = str(tmp_path / "{date}")
+    resolved = resolve_save_path("rear_45", "15A12345", config, create_dir=False, date_str="20261001")
+    assert "20261001" in resolved
+    assert not os.path.exists(resolved)
+
+    resolved_dashed = resolve_save_path("rear_45", "15A12345", config, create_dir=False, date_str="2026-10-01")
+    assert "20261001" in resolved_dashed
+    assert not os.path.exists(resolved_dashed)
+
 # --- validate_jpeg ---
 def test_validate_real_jpeg():
     # Minimal valid JPEG: FF D8 FF E0 ... FF D9

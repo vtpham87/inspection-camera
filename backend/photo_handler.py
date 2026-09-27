@@ -46,11 +46,18 @@ def build_filename(
         raise ValueError(f"Loại ảnh không hợp lệ: {photo_type}")
 
 
-def resolve_save_path(photo_type: str, plate: str, config: PhotoConfig) -> str:
+def resolve_save_path(
+    photo_type: str,
+    plate: str,
+    config: PhotoConfig,
+    create_dir: bool = True,
+    date_str: str | None = None,
+) -> str:
     template = config.paths.get(photo_type, "D:\\Photos\\{date}")
-    today = datetime.now().strftime("%Y%m%d")
-    path = template.replace("{date}", today).replace("{plate}", plate)
-    os.makedirs(path, exist_ok=True)
+    current_date = date_str.replace("-", "") if date_str is not None else datetime.now().strftime("%Y%m%d")
+    path = template.replace("{date}", current_date).replace("{plate}", plate)
+    if create_dir:
+        os.makedirs(path, exist_ok=True)
     return path
 
 
