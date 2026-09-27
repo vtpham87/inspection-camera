@@ -4,7 +4,6 @@
     <string name="title_main">1507DCamera</string>
     <string name="title_camera">Chụp ảnh kiểm định</string>
     <string name="title_review">Xem lại ảnh</string>
-    <string name="title_settings">Cài đặt kết nối</string>
 
     <!-- Capture Buttons -->
     <string name="photo_rear_45">Góc SAU 45°</string>
