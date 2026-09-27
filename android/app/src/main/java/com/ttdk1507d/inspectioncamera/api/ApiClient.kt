@@ -8,6 +8,7 @@ import java.util.concurrent.TimeUnit
 object ApiClient {
     private var retrofit: Retrofit? = null
     private var currentBaseUrl: String = ""
+    private var apiService: ApiService? = null
 
     @Synchronized
     fun getService(baseUrl: String): ApiService {
@@ -25,7 +26,9 @@ object ApiClient {
                 .client(client)
                 .addConverterFactory(GsonConverterFactory.create())
                 .build()
+
+            apiService = retrofit!!.create(ApiService::class.java)
         }
-        return retrofit!!.create(ApiService::class.java)
+        return apiService!!
     }
 }
