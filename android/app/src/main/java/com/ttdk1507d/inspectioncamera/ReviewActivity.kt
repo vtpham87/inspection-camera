@@ -1,5 +1,6 @@
 package com.ttdk1507d.inspectioncamera
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.ProgressBar
@@ -74,7 +75,14 @@ class ReviewActivity : AppCompatActivity() {
         adapter = PhotoReviewAdapter(
             items = reviewItems,
             onRecaptureClick = { item ->
-                // Return to camera activity
+                // Return to camera activity with focus type
+                val intent = Intent(this, CameraActivity::class.java).apply {
+                    putExtra(CameraActivity.EXTRA_PLATE, plate)
+                    putExtra(CameraActivity.EXTRA_PLATE_COLOR, plateColor)
+                    putExtra(CameraActivity.EXTRA_FOCUS_TYPE, item.photoType.apiName)
+                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+                startActivity(intent)
                 finish()
             },
             onDeleteClick = { item ->
@@ -88,18 +96,10 @@ class ReviewActivity : AppCompatActivity() {
     private fun loadPhotos() {
         reviewItems.clear()
 
-        // 1. Scan review directory for this plate
-        val reviewDir = File(filesDir, "review/$plate")
-        if (reviewDir.exists() && reviewDir.isDirectory) {
-            val files = reviewDir.listFiles { f -> f.extension.equals("jpg", ignoreCase = true) } ?: emptyArray()
-            for (file in files) {
-                val item = parsePhotoReviewItem(file, isPending = false)
-                if (item != null) reviewItems.add(item)
-            }
-        }
-
-        // 2. Scan pending directory for pending uploads of this plate
+        // 1. Scan pending directory to find all pending (type, seq) for this plate
+        val pendingSet = mutableSetOf<Pair<PhotoType, Int?>>()
         val pendingDir = File(filesDir, "pending")
+        val pendingMetaList = mutableListOf<PendingUploadMetadata>()
         if (pendingDir.exists() && pendingDir.isDirectory) {
             val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
             val gson = Gson()
@@ -107,27 +107,48 @@ class ReviewActivity : AppCompatActivity() {
                 try {
                     val meta = gson.fromJson(metaFile.readText(), PendingUploadMetadata::class.java)
                     if (meta.plate.equals(plate, ignoreCase = true)) {
-                        val imgFile = File(pendingDir, meta.imageFileName)
-                        if (imgFile.exists()) {
-                            val photoType = PhotoType.values().firstOrNull { it.apiName == meta.photoType }
-                            if (photoType != null) {
-                                // Add to list if not already present
-                                val alreadyPresent = reviewItems.any { it.photoType == photoType && it.seq == meta.seq }
-                                if (!alreadyPresent) {
-                                    reviewItems.add(
-                                        PhotoReviewItem(
-                                            photoType = photoType,
-                                            seq = meta.seq,
-                                            file = imgFile,
-                                            isPending = true
-                                        )
-                                    )
-                                }
-                            }
+                        val photoType = PhotoType.values().firstOrNull { it.apiName == meta.photoType }
+                        if (photoType != null) {
+                            pendingSet.add(photoType to meta.seq)
+                            pendingMetaList.add(meta)
                         }
                     }
                 } catch (e: Exception) {
                     // Ignore corrupted meta
+                }
+            }
+        }
+
+        // 2. Scan review directory for this plate
+        val reviewDir = File(filesDir, "review/$plate")
+        if (reviewDir.exists() && reviewDir.isDirectory) {
+            val files = reviewDir.listFiles { f -> f.extension.equals("jpg", ignoreCase = true) } ?: emptyArray()
+            for (file in files) {
+                val item = parsePhotoReviewItem(file, isPending = false)
+                if (item != null) {
+                    val isPending = pendingSet.contains(item.photoType to item.seq)
+                    reviewItems.add(item.copy(isPending = isPending))
+                }
+            }
+        }
+
+        // 3. Scan pending directory for any pending uploads not in reviewDir
+        for (meta in pendingMetaList) {
+            val imgFile = File(pendingDir, meta.imageFileName)
+            if (imgFile.exists()) {
+                val photoType = PhotoType.values().firstOrNull { it.apiName == meta.photoType }
+                if (photoType != null) {
+                    val alreadyPresent = reviewItems.any { it.photoType == photoType && it.seq == meta.seq }
+                    if (!alreadyPresent) {
+                        reviewItems.add(
+                            PhotoReviewItem(
+                                photoType = photoType,
+                                seq = meta.seq,
+                                file = imgFile,
+                                isPending = true
+                            )
+                        )
+                    }
                 }
             }
         }

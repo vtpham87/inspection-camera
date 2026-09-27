@@ -66,7 +66,7 @@ class PhotoReviewAdapter(
             tvLabel.text = item.displayTitle
 
             if (item.isPending) {
-                tvStatus.text = "⏳ Đang chờ gửi"
+                tvStatus.text = "⏳ Chờ gửi"
             } else {
                 tvStatus.text = "✅ Đã lưu trên máy tính"
             }

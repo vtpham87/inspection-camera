@@ -13,6 +13,7 @@
         android:label="Chụp ảnh KĐ 15-07D"
         android:theme="@style/Theme.InspectionCamera"
         android:supportsRtl="true"
+        android:largeHeap="true"
         android:usesCleartextTraffic="true">
 
         <activity

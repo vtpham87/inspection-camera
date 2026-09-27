@@ -57,7 +57,10 @@ class CameraActivity : AppCompatActivity() {
         const val EXTRA_PLATE = "extra_plate"
         const val EXTRA_PLATE_COLOR = "extra_plate_color"
         const val EXTRA_FOCUS_TYPE = "extra_focus_type"
+        const val EXTRA_PHOTOS_TAKEN = "photos_taken"
     }
+
+    private data class LocalPhotoInfo(val photoType: PhotoType, val seq: Int?)
 
     private lateinit var prefs: PrefsManager
     private var appConfig: AppConfig = AppConfig()
@@ -102,12 +105,46 @@ class CameraActivity : AppCompatActivity() {
             return
         }
 
+        val initialPhotos = intent.getStringArrayListExtra(EXTRA_PHOTOS_TAKEN)
+        if (initialPhotos != null) {
+            for (name in initialPhotos) {
+                val pt = PhotoType.values().firstOrNull { it.apiName == name }
+                if (pt != null) {
+                    capturedStatus[pt] = true
+                }
+            }
+        }
+
         cameraExecutor = Executors.newSingleThreadExecutor()
 
         initViews()
         setupListeners()
         loadConfigAndState()
         startCamera()
+        intent.getStringExtra(EXTRA_FOCUS_TYPE)?.let { handleFocusType(it) }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        intent?.getStringExtra(EXTRA_FOCUS_TYPE)?.let { handleFocusType(it) }
+    }
+
+    private fun handleFocusType(focusType: String) {
+        val button = when (focusType) {
+            PhotoType.REAR_45.apiName -> btnRear45
+            PhotoType.FRONT_45.apiName -> btnFront45
+            PhotoType.CHASSIS.apiName -> btnChassis
+            PhotoType.PASSENGER.apiName -> btnPassenger
+            PhotoType.NEW_VEHICLE.apiName -> btnNewVehicle
+            else -> null
+        } ?: return
+
+        button.requestFocus()
+        val pt = PhotoType.values().firstOrNull { it.apiName == focusType }
+        if (pt != null) {
+            Toast.makeText(this, "Chụp lại: ${pt.label}", Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onResume() {
@@ -216,27 +253,60 @@ class CameraActivity : AppCompatActivity() {
     }
 
     private fun refreshLocalPhotoStatus() {
+        val reviewPhotos = mutableListOf<LocalPhotoInfo>()
+
         val reviewDir = File(filesDir, "review/$plate")
-        if (reviewDir.exists()) {
-            val files = reviewDir.listFiles() ?: emptyArray()
-            capturedStatus[PhotoType.REAR_45] = files.any { it.name.startsWith(PhotoType.REAR_45.apiName) }
-            capturedStatus[PhotoType.FRONT_45] = files.any { it.name.startsWith(PhotoType.FRONT_45.apiName) }
-            capturedStatus[PhotoType.CHASSIS] = files.any { it.name.startsWith(PhotoType.CHASSIS.apiName) }
-
-            val passengerFiles = files.filter { it.name.startsWith(PhotoType.PASSENGER.apiName) }
-            capturedStatus[PhotoType.PASSENGER] = passengerFiles.isNotEmpty()
-            passengerSeq = (passengerFiles.size + 1).coerceAtLeast(1)
-
-            val newVehicleFiles = files.filter { it.name.startsWith(PhotoType.NEW_VEHICLE.apiName) }
-            capturedStatus[PhotoType.NEW_VEHICLE] = newVehicleFiles.isNotEmpty()
-            newVehicleSeq = (newVehicleFiles.size + 1).coerceAtLeast(1)
+        if (reviewDir.exists() && reviewDir.isDirectory) {
+            val files = reviewDir.listFiles { f -> f.extension.equals("jpg", ignoreCase = true) } ?: emptyArray()
+            for (file in files) {
+                val name = file.nameWithoutExtension
+                for (pt in PhotoType.values()) {
+                    if (name.startsWith(pt.apiName)) {
+                        val rem = name.removePrefix(pt.apiName).removePrefix("_")
+                        val seq = rem.toIntOrNull()
+                        reviewPhotos.add(LocalPhotoInfo(pt, seq))
+                        break
+                    }
+                }
+            }
         }
+
+        val pendingDir = File(filesDir, "pending")
+        if (pendingDir.exists() && pendingDir.isDirectory) {
+            val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
+            val gson = Gson()
+            for (mf in metaFiles) {
+                try {
+                    val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
+                    if (meta.plate.equals(plate, ignoreCase = true)) {
+                        val pt = PhotoType.values().firstOrNull { it.apiName == meta.photoType }
+                        if (pt != null) {
+                            reviewPhotos.add(LocalPhotoInfo(pt, meta.seq))
+                        }
+                    }
+                } catch (e: Exception) {
+                    // Ignore
+                }
+            }
+        }
+
+        val existingPhotos = reviewPhotos
+
+        for (pt in PhotoType.values()) {
+            capturedStatus[pt] = capturedStatus[pt] == true || existingPhotos.any { it.photoType == pt }
+        }
+
+        passengerSeq = (existingPhotos.filter { it.photoType == PhotoType.PASSENGER }.mapNotNull { it.seq }.maxOrNull() ?: 0) + 1
+        newVehicleSeq = (existingPhotos.filter { it.photoType == PhotoType.NEW_VEHICLE }.mapNotNull { it.seq }.maxOrNull() ?: 0) + 1
+
+        val passengerCount = existingPhotos.count { it.photoType == PhotoType.PASSENGER }
+        val newVehicleCount = existingPhotos.count { it.photoType == PhotoType.NEW_VEHICLE }
 
         updateButtonUI(btnRear45, PhotoType.REAR_45, capturedStatus[PhotoType.REAR_45] == true)
         updateButtonUI(btnFront45, PhotoType.FRONT_45, capturedStatus[PhotoType.FRONT_45] == true)
         updateButtonUI(btnChassis, PhotoType.CHASSIS, capturedStatus[PhotoType.CHASSIS] == true)
-        updateButtonUI(btnPassenger, PhotoType.PASSENGER, capturedStatus[PhotoType.PASSENGER] == true, passengerSeq - 1)
-        updateButtonUI(btnNewVehicle, PhotoType.NEW_VEHICLE, capturedStatus[PhotoType.NEW_VEHICLE] == true, newVehicleSeq - 1)
+        updateButtonUI(btnPassenger, PhotoType.PASSENGER, capturedStatus[PhotoType.PASSENGER] == true, passengerCount)
+        updateButtonUI(btnNewVehicle, PhotoType.NEW_VEHICLE, capturedStatus[PhotoType.NEW_VEHICLE] == true, newVehicleCount)
     }
 
     private fun updateButtonUI(button: MaterialButton, type: PhotoType, isDone: Boolean, count: Int = 0) {
@@ -406,7 +476,7 @@ class CameraActivity : AppCompatActivity() {
         }
     }
 
-    private fun saveToOfflineQueue(type: PhotoType, seq: Int?, bytes: ByteArray) {
+    private suspend fun saveToOfflineQueue(type: PhotoType, seq: Int?, bytes: ByteArray) = withContext(Dispatchers.IO) {
         try {
             val pendingDir = File(filesDir, "pending")
             if (!pendingDir.exists()) pendingDir.mkdirs()
@@ -436,7 +506,7 @@ class CameraActivity : AppCompatActivity() {
                         .build()
                 )
                 .build()
-            WorkManager.getInstance(this).enqueue(oneTimeRequest)
+            WorkManager.getInstance(this@CameraActivity).enqueue(oneTimeRequest)
         } catch (e: Exception) {
             // Failed to save to pending queue
         }

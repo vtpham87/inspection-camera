@@ -14,6 +14,7 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import retrofit2.HttpException
 import java.io.File
 
 data class PendingUploadMetadata(
@@ -73,6 +74,17 @@ class PendingUploadWorker(
 
                 if (resp.isSuccessful && resp.body()?.get("ok") == true) {
                     // Uploaded successfully, remove from queue
+                    imgFile.delete()
+                    metaFile.delete()
+                } else if (resp.code() in 400..499) {
+                    // Server returned 4xx client error (do not infinite retry on 400)
+                    imgFile.delete()
+                    metaFile.delete()
+                } else {
+                    anyFailed = true
+                }
+            } catch (e: HttpException) {
+                if (e.code() in 400..499) {
                     imgFile.delete()
                     metaFile.delete()
                 } else {

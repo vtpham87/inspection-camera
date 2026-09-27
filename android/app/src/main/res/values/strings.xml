@@ -21,6 +21,7 @@
     <string name="plate_white">Trắng (T)</string>
     <string name="plate_yellow">Vàng (V)</string>
     <string name="plate_blue">Xanh (X)</string>
+    <string name="plate_none">Biển cũ / Không màu</string>
     <string name="btn_select">CHỌN</string>
     <string name="error_invalid_plate">Biển số không hợp lệ</string>
 

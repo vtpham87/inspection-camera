@@ -96,7 +96,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupRecyclerView() {
         vehicleAdapter = VehicleAdapter { vehicle ->
-            openCamera(vehicle.plateClean, vehicle.plateColor)
+            openCamera(vehicle.plateClean, vehicle.plateColor, vehicle.photosTaken)
         }
         rvVehicles.layoutManager = LinearLayoutManager(this)
         rvVehicles.adapter = vehicleAdapter
@@ -110,6 +110,28 @@ class MainActivity : AppCompatActivity() {
         btnSelectManual.setOnClickListener {
             handleManualSelect()
         }
+
+        etPlate.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                val raw = s?.toString()?.trim().orEmpty()
+                val cleaned = raw.replace(Regex("[.\\-\\s]"), "").uppercase()
+                if (cleaned.isNotEmpty()) {
+                    val (_, color) = PlateUtil.extractColor(cleaned)
+                    when (color) {
+                        "T" -> rgPlateColor.check(R.id.rb_color_white)
+                        "V" -> rgPlateColor.check(R.id.rb_color_yellow)
+                        "X" -> rgPlateColor.check(R.id.rb_color_blue)
+                        else -> {
+                            if (cleaned.last().isDigit() && Regex("^[0-9]{2}[A-Z]{1,2}[0-9]{4}$").matches(cleaned)) {
+                                rgPlateColor.check(R.id.rb_color_none)
+                            }
+                        }
+                    }
+                }
+            }
+        })
 
         swipeRefresh.setOnRefreshListener {
             loadVehicles()
@@ -144,20 +166,41 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        val (basePlate, extractedColor) = PlateUtil.extractColor(cleanPlate)
+
         val selectedColor = when (rgPlateColor.checkedRadioButtonId) {
             R.id.rb_color_white -> "T"
             R.id.rb_color_yellow -> "V"
             R.id.rb_color_blue -> "X"
-            else -> "T"
+            R.id.rb_color_none -> null
+            else -> null
         }
 
-        openCamera(cleanPlate, selectedColor)
+        // Determine final plate and color:
+        // 1. If plate ends with color suffix (T/V/X), use extracted color.
+        // 2. If user selected rb_color_none or didn't specify, plateColor is null.
+        // 3. If entered plate ends with a digit (old plate like 11K2639), do NOT force "T".
+        val finalColor = when {
+            extractedColor != null -> extractedColor
+            rgPlateColor.checkedRadioButtonId == R.id.rb_color_none -> null
+            rgPlateColor.checkedRadioButtonId == -1 -> null
+            selectedColor != null -> selectedColor
+            cleanPlate.last().isDigit() -> null
+            else -> null
+        }
+
+        val finalPlate = if (extractedColor != null) basePlate else cleanPlate
+
+        openCamera(finalPlate, finalColor, null)
     }
 
-    private fun openCamera(plate: String, plateColor: String?) {
+    private fun openCamera(plate: String, plateColor: String?, photosTaken: List<String>? = null) {
         val intent = Intent(this, CameraActivity::class.java).apply {
             putExtra(CameraActivity.EXTRA_PLATE, plate)
             putExtra(CameraActivity.EXTRA_PLATE_COLOR, plateColor)
+            if (photosTaken != null) {
+                putStringArrayListExtra(CameraActivity.EXTRA_PHOTOS_TAKEN, ArrayList(photosTaken))
+            }
         }
         startActivity(intent)
     }

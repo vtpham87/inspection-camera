@@ -105,37 +105,52 @@
                     android:textStyle="bold"
                     android:layout_marginEnd="12dp" />
 
-                <RadioGroup
-                    android:id="@+id/rg_plate_color"
-                    android:layout_width="wrap_content"
+                <HorizontalScrollView
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal">
+                    android:layout_weight="1"
+                    android:scrollbars="none">
 
-                    <RadioButton
-                        android:id="@+id/rb_color_white"
+                    <RadioGroup
+                        android:id="@+id/rg_plate_color"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/plate_white"
-                        android:checked="true"
-                        android:textSize="14sp" />
+                        android:orientation="horizontal">
 
-                    <RadioButton
-                        android:id="@+id/rb_color_yellow"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/plate_yellow"
-                        android:layout_marginStart="8dp"
-                        android:textSize="14sp" />
+                        <RadioButton
+                            android:id="@+id/rb_color_white"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/plate_white"
+                            android:textSize="14sp" />
 
-                    <RadioButton
-                        android:id="@+id/rb_color_blue"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/plate_blue"
-                        android:layout_marginStart="8dp"
-                        android:textSize="14sp" />
+                        <RadioButton
+                            android:id="@+id/rb_color_yellow"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/plate_yellow"
+                            android:layout_marginStart="8dp"
+                            android:textSize="14sp" />
 
-                </RadioGroup>
+                        <RadioButton
+                            android:id="@+id/rb_color_blue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/plate_blue"
+                            android:layout_marginStart="8dp"
+                            android:textSize="14sp" />
+
+                        <RadioButton
+                            android:id="@+id/rb_color_none"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/plate_none"
+                            android:layout_marginStart="8dp"
+                            android:textSize="14sp" />
+
+                    </RadioGroup>
+
+                </HorizontalScrollView>
 
             </LinearLayout>
 
