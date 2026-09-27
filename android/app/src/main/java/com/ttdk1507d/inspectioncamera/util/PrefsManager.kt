@@ -48,7 +48,7 @@ class PrefsManager(private val prefs: SharedPreferences) {
         set(value) { prefs.edit().putBoolean("timestamp_stroke_enabled", value).commit() }
 
     var photoResolution: String
-        get() = prefs.getString("photo_resolution", "original") ?: "original"
+        get() = prefs.getString("photo_resolution", "low") ?: "low"
         set(value) { prefs.edit().putString("photo_resolution", value).commit() }
 
     var jpegQuality: Int

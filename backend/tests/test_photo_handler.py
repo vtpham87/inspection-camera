@@ -77,7 +77,7 @@ def test_filename_invalid_photo_type():
 def test_resolve_save_path(tmp_path):
     config = PhotoConfig()
     config.paths["passenger"] = str(tmp_path / "{date}" / "{plate}")
-    resolved = resolve_save_path("passenger", "15A12345", config)
+    resolved = resolve_save_path("passenger", "15A12345", config, create_dir=True)
     assert os.path.exists(resolved)
     assert "15A12345" in resolved
 

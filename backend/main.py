@@ -106,6 +106,11 @@ def delete_photo(req: DeleteRequest):
             pass
 
     if deleted_path:
+        try:
+            if os.path.exists(save_dir) and os.path.isdir(save_dir) and not os.listdir(save_dir):
+                os.rmdir(save_dir)
+        except Exception:
+            pass
         return {"ok": True, "deleted": deleted_path}
     raise HTTPException(status_code=404, detail="File không tồn tại")
 

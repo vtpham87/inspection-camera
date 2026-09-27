@@ -52,7 +52,7 @@ def resolve_save_path(
     photo_type: str,
     plate: str,
     config: PhotoConfig,
-    create_dir: bool = True,
+    create_dir: bool = False,
     date_str: str | None = None,
 ) -> str:
     template = config.paths.get(photo_type, "D:\\Photos\\{date}")
@@ -69,7 +69,7 @@ def validate_jpeg(file_bytes: bytes) -> bool:
     return file_bytes[:3] == JPEG_MAGIC
 
 
-def sync_new_vehicle_photos(plate: str, config: PhotoConfig) -> None:
+def sync_new_vehicle_photos(plate: str, plate_color: str | None, config: PhotoConfig) -> None:
     if not getattr(config, "sync_new_vehicle_45", True):
         return
 
@@ -77,33 +77,38 @@ def sync_new_vehicle_photos(plate: str, config: PhotoConfig) -> None:
     if not os.path.exists(new_veh_dir) or not os.path.isdir(new_veh_dir):
         return
 
+    # Only sync if new_veh_dir actually contains new_vehicle photos
+    existing_photos = [f for f in os.listdir(new_veh_dir) if f.lower().endswith(".jpg")]
+    has_nv = any(f.startswith(f"{plate}_") for f in existing_photos)
+    if not has_nv:
+        return
+
     rear_dir = resolve_save_path("rear_45", plate, config, create_dir=False)
     front_dir = resolve_save_path("front_45", plate, config, create_dir=False)
 
-    candidate_colors = [None, "T", "V", "X"]
-    # Sync rear_45
+    # Sync matching rear_45 photo
     if os.path.exists(rear_dir):
-        for c in candidate_colors:
-            try:
-                fname = build_filename(plate, c, "rear_45", None, config.plate_color_suffix)
-                src = os.path.join(rear_dir, fname)
-                dst = os.path.join(new_veh_dir, fname)
-                if os.path.exists(src) and not os.path.exists(dst):
+        try:
+            fname = build_filename(plate, plate_color, "rear_45", None, config.plate_color_suffix)
+            src = os.path.join(rear_dir, fname)
+            dst = os.path.join(new_veh_dir, fname)
+            if os.path.exists(src) and os.path.getsize(src) > 10:
+                if not os.path.exists(dst) or os.path.getsize(dst) < 10:
                     shutil.copy2(src, dst)
-            except ValueError:
-                pass
+        except ValueError:
+            pass
 
-    # Sync front_45
+    # Sync matching front_45 photo
     if os.path.exists(front_dir):
-        for c in candidate_colors:
-            try:
-                fname = build_filename(plate, c, "front_45", None, config.plate_color_suffix)
-                src = os.path.join(front_dir, fname)
-                dst = os.path.join(new_veh_dir, fname)
-                if os.path.exists(src) and not os.path.exists(dst):
+        try:
+            fname = build_filename(plate, plate_color, "front_45", None, config.plate_color_suffix)
+            src = os.path.join(front_dir, fname)
+            dst = os.path.join(new_veh_dir, fname)
+            if os.path.exists(src) and os.path.getsize(src) > 10:
+                if not os.path.exists(dst) or os.path.getsize(dst) < 10:
                     shutil.copy2(src, dst)
-            except ValueError:
-                pass
+        except ValueError:
+            pass
 
 
 def save_photo(
@@ -136,7 +141,8 @@ def save_photo(
     if len(file_bytes) > MAX_FILE_SIZE:
         return {"ok": False, "error": f"File vượt quá {MAX_FILE_SIZE // (1024*1024)}MB"}
 
-    save_dir = resolve_save_path(photo_type, plate, config)
+    # Only create directory when actually saving photo
+    save_dir = resolve_save_path(photo_type, plate, config, create_dir=True)
 
     # Auto-increment seq when seq is None for multi-photo types
     if photo_type in ("passenger", "new_vehicle") and seq is None:
@@ -163,6 +169,6 @@ def save_photo(
         f.write(file_bytes)
 
     if photo_type in ("new_vehicle", "rear_45", "front_45"):
-        sync_new_vehicle_photos(plate, config)
+        sync_new_vehicle_photos(plate, plate_color, config)
 
     return {"ok": True, "path": full_path, "filename": filename}

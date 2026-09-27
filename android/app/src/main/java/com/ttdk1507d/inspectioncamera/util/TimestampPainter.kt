@@ -22,28 +22,39 @@ object TimestampPainter {
     }
 
     fun resizeBitmap(bitmap: Bitmap, resolution: String): Bitmap {
-        val (targetWidth, targetHeight) = when (resolution.lowercase()) {
-            "high" -> 3840 to 2160
-            "medium" -> 1920 to 1080
-            "low" -> 1280 to 720
+        val (targetLong, targetShort) = when (resolution.lowercase()) {
+            "high", "4k" -> 3840 to 2160
+            "medium", "fhd" -> 1920 to 1080
+            "low", "hd" -> 1280 to 720
             else -> return bitmap // "original" or unknown
         }
 
         val width = bitmap.width
         val height = bitmap.height
 
-        // Check if resizing is necessary
-        val maxDim = maxOf(width, height)
-        val targetMaxDim = maxOf(targetWidth, targetHeight)
-        if (maxDim <= targetMaxDim) {
-            return bitmap
+        val isLandscape = width >= height
+        val targetWidth = if (isLandscape) targetLong else targetShort
+        val targetHeight = if (isLandscape) targetShort else targetLong
+
+        // First crop to exact target aspect ratio
+        val targetAspect = targetWidth.toFloat() / targetHeight.toFloat()
+        val currentAspect = width.toFloat() / height.toFloat()
+
+        val croppedBitmap = if (Math.abs(currentAspect - targetAspect) > 0.01f) {
+            if (currentAspect > targetAspect) {
+                val cropWidth = (height * targetAspect).roundToInt().coerceAtMost(width)
+                val cropX = (width - cropWidth) / 2
+                Bitmap.createBitmap(bitmap, cropX, 0, cropWidth, height)
+            } else {
+                val cropHeight = (width / targetAspect).roundToInt().coerceAtMost(height)
+                val cropY = (height - cropHeight) / 2
+                Bitmap.createBitmap(bitmap, 0, cropY, width, cropHeight)
+            }
+        } else {
+            bitmap
         }
 
-        val scale = targetMaxDim.toFloat() / maxDim.toFloat()
-        val newWidth = (width * scale).roundToInt()
-        val newHeight = (height * scale).roundToInt()
-
-        return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+        return Bitmap.createScaledBitmap(croppedBitmap, targetWidth, targetHeight, true)
     }
 
     fun paintTimestamp(

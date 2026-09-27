@@ -68,10 +68,10 @@ class SettingsActivity : AppCompatActivity() {
     private val fontSizes = listOf(22, 28, 34, 40)
 
     private val resolutionKeys = listOf(
-        "original",
-        "high",
+        "low",
         "medium",
-        "low"
+        "high",
+        "original"
     )
 
     private val jpegQualities = listOf(75, 85, 90, 95)
@@ -150,10 +150,10 @@ class SettingsActivity : AppCompatActivity() {
         )
 
         val resolutionLabels = listOf(
-            "Gốc camera (original - Tối đa)",
-            "4K (high - 3840×2160)",
-            "Full HD (medium - 1920×1080 - Khuyên dùng)",
-            "HD (low - 1280×720 - Nhẹ nhất)"
+            "HD (1280×720 - Chuẩn Đăng kiểm - Khuyên dùng)",
+            "Full HD (1920×1080)",
+            "4K (3840×2160)",
+            "Gốc camera (original - Tối đa)"
         )
         spinnerResolution.adapter = ArrayAdapter(
             this, android.R.layout.simple_spinner_dropdown_item, resolutionLabels
