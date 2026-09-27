@@ -18,6 +18,7 @@ data class TimestampConfig(
 data class AppConfig(
     @SerializedName("vehicle_list_enabled") val vehicleListEnabled: Boolean = true,
     @SerializedName("server_port") val serverPort: Int = 8095,
+    @SerializedName("photo_save_dir") val photoSaveDir: String = "D:\\Photos",
     val paths: Map<String, String> = mapOf(
         "rear_45" to "D:\\Photos\\{date}",
         "front_45" to "D:\\Photos\\{date}",

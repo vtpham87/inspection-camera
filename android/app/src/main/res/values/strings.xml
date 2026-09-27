@@ -45,6 +45,7 @@
     <string name="setting_jpeg_quality">Chất lượng nén JPEG</string>
     <string name="setting_plate_color_suffix">Thêm hậu tố màu biển (T/V/X)</string>
     <string name="setting_upload_mode">Chế độ tải ảnh lên máy tính</string>
+    <string name="setting_photo_save_dir">Thư mục lưu ảnh trên máy tính</string>
 
     <string name="btn_sync_photos">GỬI TẤT CẢ ẢNH VỀ MÁY TÍNH</string>
     <string name="sync_all_done">✅ Toàn bộ ảnh đã được lưu trên máy tính</string>

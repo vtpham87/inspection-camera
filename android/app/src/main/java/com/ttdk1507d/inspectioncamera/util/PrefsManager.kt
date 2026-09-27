@@ -63,6 +63,10 @@ class PrefsManager(private val prefs: SharedPreferences) {
         get() = prefs.getString("upload_mode", "review") ?: "review"
         set(value) { prefs.edit().putString("upload_mode", value).commit() }
 
+    var photoSaveDir: String
+        get() = prefs.getString("photo_save_dir", "D:\\Photos") ?: "D:\\Photos"
+        set(value) { prefs.edit().putString("photo_save_dir", value).commit() }
+
     val lanUrl: String get() = "http://$lanIp:$serverPort"
     val tailscaleUrl: String get() = "http://$tailscaleIp:$serverPort"
 
@@ -70,6 +74,7 @@ class PrefsManager(private val prefs: SharedPreferences) {
         return AppConfig(
             vehicleListEnabled = vehicleListEnabled,
             serverPort = serverPort,
+            photoSaveDir = photoSaveDir,
             jpegQuality = jpegQuality,
             plateColorSuffix = plateColorSuffix,
             photoResolution = photoResolution,
@@ -86,6 +91,7 @@ class PrefsManager(private val prefs: SharedPreferences) {
     fun saveFromAppConfig(config: AppConfig) {
         vehicleListEnabled = config.vehicleListEnabled
         serverPort = config.serverPort
+        photoSaveDir = config.photoSaveDir
         jpegQuality = config.jpegQuality
         plateColorSuffix = config.plateColorSuffix
         photoResolution = config.photoResolution

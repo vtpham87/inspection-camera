@@ -29,6 +29,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var etLanIp: TextInputEditText
     private lateinit var etTailscaleIp: TextInputEditText
     private lateinit var etPort: TextInputEditText
+    private lateinit var etPhotoSaveDir: TextInputEditText
     private lateinit var switchVehicleList: MaterialSwitch
     private lateinit var btnTest: MaterialButton
     private lateinit var tvTestResult: TextView
@@ -92,6 +93,7 @@ class SettingsActivity : AppCompatActivity() {
         etLanIp = findViewById(R.id.et_settings_lan_ip)
         etTailscaleIp = findViewById(R.id.et_settings_tailscale_ip)
         etPort = findViewById(R.id.et_settings_port)
+        etPhotoSaveDir = findViewById(R.id.et_settings_photo_save_dir)
         switchVehicleList = findViewById(R.id.switch_settings_vehicle_list)
         btnTest = findViewById(R.id.btn_settings_test)
         tvTestResult = findViewById(R.id.tv_settings_test_result)
@@ -176,6 +178,7 @@ class SettingsActivity : AppCompatActivity() {
         etLanIp.setText(prefs.lanIp)
         etTailscaleIp.setText(prefs.tailscaleIp)
         etPort.setText(prefs.serverPort.toString())
+        etPhotoSaveDir.setText(prefs.photoSaveDir)
         switchVehicleList.isChecked = prefs.vehicleListEnabled
 
         switchTimestamp.isChecked = prefs.timestampEnabled
@@ -266,6 +269,7 @@ class SettingsActivity : AppCompatActivity() {
         val lanIp = etLanIp.text?.toString()?.trim().orEmpty()
         val tailscaleIp = etTailscaleIp.text?.toString()?.trim().orEmpty()
         val port = etPort.text?.toString()?.trim()?.toIntOrNull()
+        val saveDir = etPhotoSaveDir.text?.toString()?.trim().orEmpty()
 
         if (lanIp.isEmpty()) {
             etLanIp.error = "IP LAN không được để trống"
@@ -282,10 +286,16 @@ class SettingsActivity : AppCompatActivity() {
             return
         }
 
+        if (saveDir.isEmpty()) {
+            etPhotoSaveDir.error = "Đường dẫn lưu ảnh không được để trống"
+            return
+        }
+
         // Save immediately to local persistent preferences
         prefs.lanIp = lanIp
         prefs.tailscaleIp = tailscaleIp
         prefs.serverPort = port
+        prefs.photoSaveDir = saveDir
         prefs.vehicleListEnabled = switchVehicleList.isChecked
 
         prefs.timestampEnabled = switchTimestamp.isChecked

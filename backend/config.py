@@ -17,6 +17,7 @@ class TimestampConfig(BaseModel):
 class PhotoConfig(BaseModel):
     vehicle_list_enabled: bool = True
     server_port: int = 8095
+    photo_save_dir: str = "D:\\Photos"
     paths: dict[str, str] = {
         "rear_45": "D:\\Photos\\{date}",
         "front_45": "D:\\Photos\\{date}",
@@ -28,6 +29,17 @@ class PhotoConfig(BaseModel):
     plate_color_suffix: bool = True
     timestamp: TimestampConfig = TimestampConfig()
     photo_resolution: str = "original"
+
+    def model_post_init(self, __context):
+        root = self.photo_save_dir.rstrip("\\/")
+        if root != "D:\\Photos" and all(v.startswith("D:\\Photos") for v in self.paths.values()):
+            self.paths = {
+                "rear_45": f"{root}\\{{date}}",
+                "front_45": f"{root}\\{{date}}",
+                "chassis": f"{root}\\{{date}}",
+                "passenger": f"{root}\\{{date}}\\{{plate}}",
+                "new_vehicle": f"{root}\\{{date}}\\{{plate}}",
+            }
 
 CONFIG_DEFAULTS = PhotoConfig()
 
