@@ -46,4 +46,5 @@
     <color name="plate_blue_text">#1565C0</color>
 
     <color name="divider">#E0E0E0</color>
+    <color name="black">#000000</color>
 </resources>
