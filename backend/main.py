@@ -116,12 +116,12 @@ def delete_photo(req: DeleteRequest):
 
 
 @app.get("/api/vehicles/today")
-def vehicles_today(date: str | None = None):
+def vehicles_today(date: str | None = None, waiting_only: bool = True):
     config = load_config(get_config_path())
     if not config.vehicle_list_enabled:
         return []
     query_date = date or datetime.now().strftime("%Y-%m-%d")
-    result = get_vehicles_today(get_db_path(), query_date, config)
+    result = get_vehicles_today(get_db_path(), query_date, config, filter_waiting=waiting_only)
     if result is None:
         return []
     return result

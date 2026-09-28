@@ -178,13 +178,9 @@ class CameraActivity : AppCompatActivity() {
         layoutLoading = findViewById(R.id.layout_camera_loading)
         tvLoadingText = findViewById(R.id.tv_camera_loading_text)
 
-        val colorText = when (plateColor?.uppercase()) {
-            "T" -> " - Biển trắng"
-            "V" -> " - Biển vàng"
-            "X" -> " - Biển xanh"
-            else -> ""
-        }
-        tvPlate.text = "$plate$colorText"
+        // Gộp biển + màu biển ngắn gọn: ví dụ 15A12345T
+        val compactPlate = PlateUtil.formatCompactPlate(plate, plateColor)
+        tvPlate.text = compactPlate
     }
 
     private fun setupListeners() {

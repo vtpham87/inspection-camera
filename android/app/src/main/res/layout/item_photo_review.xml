@@ -14,39 +14,56 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <!-- Thumbnail Image -->
-        <ImageView
-            android:id="@+id/iv_review_thumb"
+        <!-- Full Image Container: 16:9 ratio visible without cropping -->
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="180dp"
-            android:scaleType="centerCrop"
-            android:background="@color/surface_variant"
-            android:contentDescription="Ảnh chụp kiểm định" />
+            android:layout_height="wrap_content"
+            android:background="@color/black">
+
+            <ImageView
+                android:id="@+id/iv_review_thumb"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:adjustViewBounds="true"
+                android:scaleType="fitCenter"
+                android:maxHeight="280dp"
+                android:contentDescription="Ảnh chụp kiểm định" />
+
+        </FrameLayout>
 
         <!-- Info & Actions Container -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="8dp">
+            android:padding="10dp">
 
-            <TextView
-                android:id="@+id/tv_review_type_label"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                android:textColor="@color/text_primary" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
 
-            <TextView
-                android:id="@+id/tv_review_status"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:textSize="12sp"
-                android:textColor="@color/text_secondary" />
+                <TextView
+                    android:id="@+id/tv_review_type_label"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary" />
 
-            <!-- Buttons: Delete & Recapture -->
+                <TextView
+                    android:id="@+id/tv_review_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_secondary" />
+
+            </LinearLayout>
+
+            <!-- Buttons: Recapture & Delete (Equal width & height, balanced) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -56,30 +73,45 @@
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_item_recapture"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="44dp"
                     android:layout_weight="1"
                     android:layout_marginEnd="4dp"
-                    android:minHeight="44dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:paddingHorizontal="6dp"
                     android:text="@string/btn_recapture"
-                    android:textSize="14sp"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
                     android:textColor="@color/primary"
                     app:icon="@drawable/ic_camera"
+                    app:iconGravity="textStart"
+                    app:iconPadding="4dp"
+                    app:iconSize="18dp"
                     app:iconTint="@color/primary"
+                    app:strokeColor="@color/primary"
+                    app:cornerRadius="6dp"
                     style="@style/Widget.Material3.Button.OutlinedButton" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_item_delete"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="44dp"
                     android:layout_weight="1"
                     android:layout_marginStart="4dp"
-                    android:minHeight="44dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:paddingHorizontal="6dp"
                     android:text="@string/btn_delete"
-                    android:textSize="14sp"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
                     android:textColor="@color/error"
                     app:icon="@drawable/ic_delete"
+                    app:iconGravity="textStart"
+                    app:iconPadding="4dp"
+                    app:iconSize="18dp"
                     app:iconTint="@color/error"
                     app:strokeColor="@color/error"
+                    app:cornerRadius="6dp"
                     style="@style/Widget.Material3.Button.OutlinedButton" />
 
             </LinearLayout>

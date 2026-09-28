@@ -30,7 +30,8 @@ data class PhotoReviewItem(
 class PhotoReviewAdapter(
     private var items: List<PhotoReviewItem> = emptyList(),
     private val onRecaptureClick: (PhotoReviewItem) -> Unit,
-    private val onDeleteClick: (PhotoReviewItem) -> Unit
+    private val onDeleteClick: (PhotoReviewItem) -> Unit,
+    private val onPhotoClick: ((PhotoReviewItem) -> Unit)? = null
 ) : RecyclerView.Adapter<PhotoReviewAdapter.PhotoViewHolder>() {
 
     fun updateItems(newItems: List<PhotoReviewItem>) {
@@ -41,7 +42,7 @@ class PhotoReviewAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PhotoViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_photo_review, parent, false)
-        return PhotoViewHolder(view, onRecaptureClick, onDeleteClick)
+        return PhotoViewHolder(view, onRecaptureClick, onDeleteClick, onPhotoClick)
     }
 
     override fun onBindViewHolder(holder: PhotoViewHolder, position: Int) {
@@ -53,7 +54,8 @@ class PhotoReviewAdapter(
     class PhotoViewHolder(
         itemView: View,
         private val onRecaptureClick: (PhotoReviewItem) -> Unit,
-        private val onDeleteClick: (PhotoReviewItem) -> Unit
+        private val onDeleteClick: (PhotoReviewItem) -> Unit,
+        private val onPhotoClick: ((PhotoReviewItem) -> Unit)? = null
     ) : RecyclerView.ViewHolder(itemView) {
 
         private val ivThumb: ImageView = itemView.findViewById(R.id.iv_review_thumb)
@@ -80,6 +82,7 @@ class PhotoReviewAdapter(
                 ivThumb.load(R.drawable.ic_camera)
             }
 
+            ivThumb.setOnClickListener { onPhotoClick?.invoke(item) }
             btnRecapture.setOnClickListener { onRecaptureClick(item) }
             btnDelete.setOnClickListener { onDeleteClick(item) }
         }

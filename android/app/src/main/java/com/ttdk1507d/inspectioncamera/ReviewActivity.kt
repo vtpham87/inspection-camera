@@ -1,8 +1,11 @@
 package com.ttdk1507d.inspectioncamera
 
+import android.app.Dialog
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
 import android.view.View
+import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
@@ -12,6 +15,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import coil.load
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
@@ -126,10 +130,33 @@ class ReviewActivity : AppCompatActivity() {
             },
             onDeleteClick = { item ->
                 confirmDelete(item)
+            },
+            onPhotoClick = { item ->
+                showFullScreenPhoto(item)
             }
         )
-        rvPhotos.layoutManager = GridLayoutManager(this, 2)
+        val isLand = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        rvPhotos.layoutManager = GridLayoutManager(this, if (isLand) 2 else 1)
         rvPhotos.adapter = adapter
+    }
+
+    private fun showFullScreenPhoto(item: PhotoReviewItem) {
+        val file = item.file ?: return
+        if (!file.exists()) return
+
+        val dialog = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        dialog.setContentView(R.layout.dialog_full_photo)
+        val ivFull = dialog.findViewById<ImageView>(R.id.iv_full_photo)
+        val btnClose = dialog.findViewById<View>(R.id.btn_close_full_photo)
+        val tvTitle = dialog.findViewById<TextView>(R.id.tv_full_photo_title)
+
+        tvTitle.text = "${item.displayTitle} • $plate"
+        ivFull.load(file) {
+            crossfade(true)
+        }
+        btnClose.setOnClickListener { dialog.dismiss() }
+        ivFull.setOnClickListener { dialog.dismiss() }
+        dialog.show()
     }
 
     private fun loadPhotos() {

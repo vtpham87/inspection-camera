@@ -29,7 +29,8 @@ def mock_db(tmp_path):
             biendk_id TEXT,
             ngaykd TEXT,
             giokd TEXT,
-            ketluan INTEGER
+            ketluan INTEGER,
+            sotem TEXT
         )
     """)
     cur.execute("""
@@ -42,11 +43,11 @@ def mock_db(tmp_path):
     """)
     cur.execute("""
         INSERT INTO inspections VALUES
-        ('001/26', '15A12345T', '2026-09-27', '08:30', 1)
+        ('001/26', '15A12345T', '2026-09-27', '08:30', 0, '')
     """)
     cur.execute("""
         INSERT INTO inspections VALUES
-        ('002/26', '11K2639', '2026-09-27', '09:15', 0)
+        ('002/26', '11K2639', '2026-09-27', '09:15', 0, '')
     """)
     conn.commit()
     conn.close()
@@ -101,12 +102,12 @@ def test_vehicle_list_disabled_returns_none(mock_db):
     assert result is None
 
 
-def test_vehicles_ordered_by_time_desc(mock_db):
+def test_vehicles_ordered_by_sophieu_asc(mock_db):
     config = PhotoConfig()
     result = get_vehicles_today(mock_db, "2026-09-27", config)
     assert len(result) == 2
-    assert result[0]["time"] == "09:15"
-    assert result[1]["time"] == "08:30"
+    assert result[0]["ticket_num"] == "001/26"
+    assert result[1]["ticket_num"] == "002/26"
 
 
 def test_photos_taken_detects_existing_photos(mock_db, tmp_path):
@@ -154,9 +155,9 @@ def test_date_none_defaults_to_today(tmp_path):
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
     cur.execute("CREATE TABLE vehicles (biendk_id TEXT PRIMARY KEY, biendk TEXT, biendk_clean TEXT, chupt TEXT, nhanhieu TEXT, tenloaipt TEXT)")
-    cur.execute("CREATE TABLE inspections (sophieu TEXT, biendk_id TEXT, ngaykd TEXT, giokd TEXT, ketluan INTEGER)")
+    cur.execute("CREATE TABLE inspections (sophieu TEXT, biendk_id TEXT, ngaykd TEXT, giokd TEXT, ketluan INTEGER, sotem TEXT)")
     cur.execute("INSERT INTO vehicles VALUES ('29A99999T', '29A-999.99T', '29A99999T', 'Owner Today', 'KIA', 'Ô tô con')")
-    cur.execute("INSERT INTO inspections VALUES ('999/26', '29A99999T', ?, '10:00', 1)", (today_str,))
+    cur.execute("INSERT INTO inspections VALUES ('999/26', '29A99999T', ?, '10:00', 0, '')", (today_str,))
     conn.commit()
     conn.close()
 

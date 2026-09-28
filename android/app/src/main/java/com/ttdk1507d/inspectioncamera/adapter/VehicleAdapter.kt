@@ -75,7 +75,8 @@ class VehicleAdapter(
                 }
             }
 
-            tvTime.text = vehicle.time
+            val ticketStr = if (!vehicle.ticketNum.isNullOrBlank()) "Số phiếu: ${vehicle.ticketNum} • " else ""
+            tvTime.text = "$ticketStr${vehicle.time}"
 
             val details = buildString {
                 if (vehicle.vehicleType.isNotBlank()) append(vehicle.vehicleType)

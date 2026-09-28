@@ -26,7 +26,10 @@ interface ApiService {
     suspend fun deletePhoto(@Body body: Map<String, Any?>): Response<Map<String, Any>>
 
     @GET("/api/vehicles/today")
-    suspend fun getVehiclesToday(@Query("date") date: String? = null): Response<List<Vehicle>>
+    suspend fun getVehiclesToday(
+        @Query("date") date: String? = null,
+        @Query("waiting_only") waitingOnly: Boolean = true
+    ): Response<List<Vehicle>>
 
     @GET("/api/config")
     suspend fun getConfig(): Response<Map<String, Any>>

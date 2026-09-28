@@ -1,4 +1,5 @@
 import os
+import re
 import sqlite3
 from datetime import datetime
 from config import PhotoConfig
@@ -34,7 +35,10 @@ def _check_photos_taken(
 
 
 def get_vehicles_today(
-    db_path: str, date: str | None, config: PhotoConfig
+    db_path: str,
+    date: str | None,
+    config: PhotoConfig,
+    filter_waiting: bool = True,
 ) -> list[dict] | None:
     if not config.vehicle_list_enabled:
         return None
@@ -49,14 +53,26 @@ def get_vehicles_today(
     try:
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
+
+        cur.execute("PRAGMA table_info(inspections)")
+        col_names = {r["name"] for r in cur.fetchall()}
+        has_sotem = "sotem" in col_names
+
+        where_clause = "WHERE i.ngaykd = ?"
+        if filter_waiting:
+            # Bỏ qua xe không đạt (ketluan=1) và xe đã xong (sotem đã cấp)
+            where_clause += " AND (i.ketluan != 1 OR i.ketluan IS NULL)"
+            if has_sotem:
+                where_clause += " AND (i.sotem IS NULL OR trim(i.sotem) = '')"
+
+        sotem_select = "i.sotem" if has_sotem else "'' AS sotem"
         cur.execute(
-            """
-            SELECT v.biendk, v.biendk_clean, v.chupt, v.nhanhieu, v.tenloaipt,
-                   i.ngaykd, i.giokd, i.ketluan
+            f"""
+            SELECT i.sophieu, v.biendk, v.biendk_clean, v.chupt, v.nhanhieu, v.tenloaipt,
+                   i.ngaykd, i.giokd, i.ketluan, {sotem_select}
             FROM inspections i
             JOIN vehicles v ON i.biendk_id = v.biendk_id
-            WHERE i.ngaykd = ?
-            ORDER BY i.giokd DESC
+            {where_clause}
             """,
             (date,),
         )
@@ -68,7 +84,15 @@ def get_vehicles_today(
     for row in rows:
         plate_num, plate_color = extract_plate_color(row["biendk_clean"])
         photos_taken = _check_photos_taken(plate_num, plate_color, config, date=date)
+
+        sp = row["sophieu"] or ""
+        m = re.match(r"^(\d+)", sp.strip())
+        ticket_int = int(m.group(1)) if m else 999999
+
         results.append({
+            "ticket_num": sp,
+            "sophieu": sp,
+            "ticket_int": ticket_int,
             "plate": row["biendk"],
             "plate_clean": plate_num,
             "plate_color": plate_color,
@@ -77,6 +101,10 @@ def get_vehicles_today(
             "owner": row["chupt"],
             "time": row["giokd"],
             "result": row["ketluan"],
+            "sotem": row["sotem"],
             "photos_taken": photos_taken,
         })
+
+    # Sắp xếp thứ tự theo số phiếu tăng dần
+    results.sort(key=lambda x: (x["ticket_int"], x.get("time") or ""))
     return results

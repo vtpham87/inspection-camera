@@ -55,6 +55,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnSelectManual: MaterialButton
 
     private lateinit var layoutVehicleListContainer: View
+    private lateinit var btnFilterWaiting: MaterialButton
+    private lateinit var btnFilterAll: MaterialButton
+    private var isFilterWaiting = true
     private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var rvVehicles: RecyclerView
     private lateinit var pbLoading: ProgressBar
@@ -88,6 +91,8 @@ class MainActivity : AppCompatActivity() {
         btnSelectManual = findViewById(R.id.btn_select_manual)
 
         layoutVehicleListContainer = findViewById(R.id.layout_vehicle_list_container)
+        btnFilterWaiting = findViewById(R.id.btn_filter_waiting)
+        btnFilterAll = findViewById(R.id.btn_filter_all)
         swipeRefresh = findViewById(R.id.swipe_refresh)
         rvVehicles = findViewById(R.id.rv_vehicles)
         pbLoading = findViewById(R.id.pb_loading)
@@ -109,6 +114,22 @@ class MainActivity : AppCompatActivity() {
 
         btnSelectManual.setOnClickListener {
             handleManualSelect()
+        }
+
+        btnFilterWaiting.setOnClickListener {
+            if (!isFilterWaiting) {
+                isFilterWaiting = true
+                updateFilterButtons()
+                loadVehicles()
+            }
+        }
+
+        btnFilterAll.setOnClickListener {
+            if (isFilterWaiting) {
+                isFilterWaiting = false
+                updateFilterButtons()
+                loadVehicles()
+            }
         }
 
         etPlate.addTextChangedListener(object : android.text.TextWatcher {
@@ -194,9 +215,28 @@ class MainActivity : AppCompatActivity() {
         openCamera(finalPlate, finalColor, null)
     }
 
+    private fun updateFilterButtons() {
+        if (isFilterWaiting) {
+            btnFilterWaiting.setBackgroundColor(ContextCompat.getColor(this, R.color.primary))
+            btnFilterWaiting.setTextColor(ContextCompat.getColor(this, R.color.text_white))
+            btnFilterAll.setBackgroundColor(ContextCompat.getColor(this, android.R.color.transparent))
+            btnFilterAll.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
+            btnFilterAll.strokeWidth = 2
+            btnFilterAll.setStrokeColorResource(R.color.divider)
+        } else {
+            btnFilterAll.setBackgroundColor(ContextCompat.getColor(this, R.color.primary))
+            btnFilterAll.setTextColor(ContextCompat.getColor(this, R.color.text_white))
+            btnFilterWaiting.setBackgroundColor(ContextCompat.getColor(this, android.R.color.transparent))
+            btnFilterWaiting.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
+            btnFilterWaiting.strokeWidth = 2
+            btnFilterWaiting.setStrokeColorResource(R.color.divider)
+        }
+    }
+
     private fun openCamera(plate: String, plateColor: String?, photosTaken: List<String>? = null) {
+        val compactPlate = PlateUtil.formatCompactPlate(plate, plateColor)
         val intent = Intent(this, CameraActivity::class.java).apply {
-            putExtra(CameraActivity.EXTRA_PLATE, plate)
+            putExtra(CameraActivity.EXTRA_PLATE, compactPlate)
             putExtra(CameraActivity.EXTRA_PLATE_COLOR, plateColor)
             if (photosTaken != null) {
                 putStringArrayListExtra(CameraActivity.EXTRA_PHOTOS_TAKEN, ArrayList(photosTaken))
@@ -230,7 +270,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 val service = ApiClient.getService(baseUrl)
                 val response = withContext(Dispatchers.IO) {
-                    service.getVehiclesToday()
+                    service.getVehiclesToday(waitingOnly = isFilterWaiting)
                 }
 
                 if (response.isSuccessful && response.body() != null) {
@@ -238,7 +278,11 @@ class MainActivity : AppCompatActivity() {
                     vehicleAdapter.updateList(list)
                     if (list.isEmpty()) {
                         tvEmpty.visibility = View.VISIBLE
-                        tvEmpty.text = "Hôm nay chưa có xe kiểm định nào"
+                        tvEmpty.text = if (isFilterWaiting) {
+                            "Không có xe nào đang chờ\n(Đã hoàn thành kiểm định hoặc chưa có xe vào dây chuyền)"
+                        } else {
+                            "Hôm nay chưa có xe kiểm định nào"
+                        }
                     } else {
                         tvEmpty.visibility = View.GONE
                     }

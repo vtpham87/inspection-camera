@@ -18,9 +18,9 @@ def setup_env(tmp_path):
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
     cur.execute("CREATE TABLE vehicles (biendk_id TEXT PRIMARY KEY, biendk TEXT, biendk_clean TEXT, chupt TEXT, nhanhieu TEXT, tenloaipt TEXT)")
-    cur.execute("CREATE TABLE inspections (sophieu TEXT, biendk_id TEXT, ngaykd TEXT, giokd TEXT, ketluan INTEGER)")
+    cur.execute("CREATE TABLE inspections (sophieu TEXT, biendk_id TEXT, ngaykd TEXT, giokd TEXT, ketluan INTEGER, sotem TEXT)")
     cur.execute("INSERT INTO vehicles VALUES ('15A12345T','15A-123.45T','15A12345T','Test Owner','TOYOTA','Ô tô con')")
-    cur.execute("INSERT INTO inspections VALUES ('001/26','15A12345T','2026-09-27','08:30',1)")
+    cur.execute("INSERT INTO inspections VALUES ('001/26','15A12345T','2026-09-27','08:30',0,'')")
     conn.commit()
     conn.close()
 
