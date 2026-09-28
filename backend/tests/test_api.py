@@ -132,8 +132,8 @@ def test_vehicles_today_disabled(setup_env):
     client.post("/api/config", json=cfg)
 
     r2 = client.get("/api/vehicles/today")
-    assert r2.status_code == 404
-    assert r2.json()["detail"] == "Danh sách xe đã tắt"
+    assert r2.status_code == 200
+    assert r2.json() == []
 
 def test_delete_photo_success(setup_env):
     client, _ = setup_env

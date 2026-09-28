@@ -33,70 +33,38 @@
             android:orientation="vertical"
             android:padding="8dp">
 
-            <!-- Top Header inside Buttons Panel: Back, Plate, Rotate -->
+            <!-- Top Header inside Buttons Panel: Back Button + Plate & Color -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
                 android:background="@drawable/bg_plate_badge"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
                 android:padding="6dp"
                 android:layout_marginBottom="8dp">
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                <ImageButton
+                    android:id="@+id/btn_camera_back"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Quay lại"
+                    android:src="@drawable/ic_arrow_back"
+                    app:tint="@color/primary" />
 
-                    <ImageButton
-                        android:id="@+id/btn_camera_back"
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:contentDescription="Quay lại"
-                        android:src="@drawable/ic_arrow_back"
-                        app:tint="@color/text_primary" />
-
-                    <View
-                        android:layout_width="0dp"
-                        android:layout_height="1dp"
-                        android:layout_weight="1" />
-
-                    <!-- Plate Color Chip -->
-                    <TextView
-                        android:id="@+id/tv_camera_plate_color"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:background="@drawable/bg_plate_badge"
-                        android:paddingHorizontal="6dp"
-                        android:paddingVertical="2dp"
-                        android:textColor="@color/text_primary"
-                        android:textSize="11sp"
-                        android:textStyle="bold" />
-
-                    <!-- Rotate Screen Button -->
-                    <ImageButton
-                        android:id="@+id/btn_camera_rotate"
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:layout_marginStart="2dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:contentDescription="Xoay màn hình"
-                        android:src="@drawable/ic_screen_rotation"
-                        app:tint="@color/text_primary" />
-                </LinearLayout>
-
-                <!-- Plate Text: Clean bold monospace right above capture buttons -->
+                <!-- Plate & Color Text -->
                 <TextView
                     android:id="@+id/tv_camera_plate"
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
                     android:gravity="center"
                     android:fontFamily="monospace"
                     android:textColor="@color/primary"
-                    android:textSize="20sp"
+                    android:textSize="17sp"
                     android:textStyle="bold"
-                    android:paddingVertical="2dp" />
+                    android:paddingHorizontal="4dp" />
+
             </LinearLayout>
 
             <!-- Review Button -->

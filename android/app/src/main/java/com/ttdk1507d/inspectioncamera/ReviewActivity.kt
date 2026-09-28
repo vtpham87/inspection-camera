@@ -54,6 +54,7 @@ class ReviewActivity : AppCompatActivity() {
     private lateinit var tvSyncStatus: TextView
     private lateinit var pbSync: ProgressBar
     private lateinit var btnSync: MaterialButton
+    private lateinit var btnDone: MaterialButton
     private var isSyncing = false
 
     private lateinit var adapter: PhotoReviewAdapter
@@ -88,6 +89,7 @@ class ReviewActivity : AppCompatActivity() {
         tvSyncStatus = findViewById(R.id.tv_review_sync_status)
         pbSync = findViewById(R.id.pb_review_sync)
         btnSync = findViewById(R.id.btn_review_sync)
+        btnDone = findViewById(R.id.btn_review_done)
 
         toolbar.setNavigationOnClickListener { finish() }
         tvPlate.text = plate
@@ -95,6 +97,18 @@ class ReviewActivity : AppCompatActivity() {
         btnSync.setOnClickListener {
             uploadPendingPhotos()
         }
+
+        btnDone.setOnClickListener {
+            finishAndGoHome()
+        }
+    }
+
+    private fun finishAndGoHome() {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        startActivity(intent)
+        finish()
     }
 
     private fun setupRecyclerView() {
@@ -250,6 +264,28 @@ class ReviewActivity : AppCompatActivity() {
             }
 
             val service = ApiClient.getService(baseUrl)
+
+            // Ensure server has latest paths from device before saving
+            withContext(Dispatchers.IO) {
+                try {
+                    val cfg = prefs.getAppConfig()
+                    val body = mapOf<String, Any>(
+                        "vehicle_list_enabled" to cfg.vehicleListEnabled,
+                        "server_port" to cfg.serverPort,
+                        "photo_save_dir" to cfg.photoSaveDir,
+                        "passenger_path" to cfg.passengerPath,
+                        "new_vehicle_path" to cfg.newVehiclePath,
+                        "sync_new_vehicle_45" to cfg.syncNewVehicle45,
+                        "jpeg_quality" to cfg.jpegQuality,
+                        "plate_color_suffix" to cfg.plateColorSuffix,
+                        "photo_resolution" to cfg.photoResolution
+                    )
+                    service.postConfig(body)
+                } catch (e: Exception) {
+                    // Non-blocking sync
+                }
+            }
+
             val total = plateMetas.size
             var uploadedCount = 0
 

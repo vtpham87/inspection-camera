@@ -48,6 +48,7 @@ class PendingUploadWorker(
         var anyFailed = false
 
         val baseUrl = NetworkUtil.resolveBaseUrl(prefs.lanUrl, prefs.tailscaleUrl)
+            ?: return@withContext Result.retry()
         val service = ApiClient.getService(baseUrl)
 
         for (metaFile in metaFiles) {

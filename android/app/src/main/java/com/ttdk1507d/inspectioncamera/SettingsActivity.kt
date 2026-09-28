@@ -319,7 +319,7 @@ class SettingsActivity : AppCompatActivity() {
         prefs.plateColorSuffix = switchPlateColorSuffix.isChecked
         prefs.uploadMode = uploadModeKeys[spinnerUploadMode.selectedItemPosition.coerceIn(0, uploadModeKeys.lastIndex)]
 
-        // Sync with server using independent scope so it outlives this activity's finish()
+        // Sync with server — send ALL fields including paths so backend updates correctly
         val currentConfig = prefs.getAppConfig()
         val lanUrl = prefs.lanUrl
         val tailscaleUrl = prefs.tailscaleUrl
@@ -328,10 +328,22 @@ class SettingsActivity : AppCompatActivity() {
                 val baseUrl = NetworkUtil.resolveBaseUrl(lanUrl, tailscaleUrl)
                 if (baseUrl != null) {
                     val service = ApiClient.getService(baseUrl)
-                    service.saveConfig(currentConfig)
+                    // Use postConfig (full PhotoConfig body) so backend persists passenger_path & new_vehicle_path
+                    val body = mapOf<String, Any>(
+                        "vehicle_list_enabled" to currentConfig.vehicleListEnabled,
+                        "server_port" to currentConfig.serverPort,
+                        "photo_save_dir" to currentConfig.photoSaveDir,
+                        "passenger_path" to currentConfig.passengerPath,
+                        "new_vehicle_path" to currentConfig.newVehiclePath,
+                        "sync_new_vehicle_45" to currentConfig.syncNewVehicle45,
+                        "jpeg_quality" to currentConfig.jpegQuality,
+                        "plate_color_suffix" to currentConfig.plateColorSuffix,
+                        "photo_resolution" to currentConfig.photoResolution
+                    )
+                    service.postConfig(body)
                 }
             } catch (e: Exception) {
-                // Config already saved locally
+                // Config already saved locally — will sync next time
             }
         }
 

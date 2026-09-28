@@ -12,6 +12,8 @@
     <string name="photo_passenger">Khoang hành khách</string>
     <string name="photo_new_vehicle">Ảnh xe mới</string>
     <string name="btn_review">XEM LẠI ẢNH</string>
+    <string name="btn_done">HOÀN THÀNH - VỀ TRANG ĐẦU</string>
+    <string name="action_done">Xong</string>
 
     <!-- Plate Selection / Manual Entry -->
     <string name="section_manual_plate">Nhập biển số thủ công</string>

@@ -118,13 +118,29 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_review_sync"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="50dp"
                 android:text="@string/btn_sync_photos"
-                android:textSize="16sp"
+                android:textSize="15sp"
                 android:textStyle="bold"
                 android:textColor="@color/text_white"
                 app:backgroundTint="@color/primary"
-                app:cornerRadius="8dp" />
+                app:cornerRadius="8dp"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Done Button to return straight to MainActivity -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_review_done"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:text="@string/btn_done"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_white"
+                app:backgroundTint="@color/status_done_text"
+                app:cornerRadius="8dp"
+                app:icon="@drawable/ic_check"
+                app:iconGravity="textStart"
+                app:iconTint="@color/text_white" />
 
         </LinearLayout>
 

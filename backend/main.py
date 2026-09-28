@@ -119,11 +119,11 @@ def delete_photo(req: DeleteRequest):
 def vehicles_today(date: str | None = None):
     config = load_config(get_config_path())
     if not config.vehicle_list_enabled:
-        raise HTTPException(status_code=404, detail="Danh sách xe đã tắt")
+        return []
     query_date = date or datetime.now().strftime("%Y-%m-%d")
     result = get_vehicles_today(get_db_path(), query_date, config)
     if result is None:
-        raise HTTPException(status_code=404, detail="Danh sách xe đã tắt")
+        return []
     return result
 
 

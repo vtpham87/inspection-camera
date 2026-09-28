@@ -223,6 +223,11 @@ class MainActivity : AppCompatActivity() {
 
             try {
                 val baseUrl = NetworkUtil.resolveBaseUrl(prefs.lanUrl, prefs.tailscaleUrl)
+                if (baseUrl == null) {
+                    tvEmpty.visibility = View.VISIBLE
+                    tvEmpty.text = "Không kết nối được máy chủ (${prefs.lanIp}:${prefs.serverPort})\nVuốt xuống để thử lại"
+                    return@launch
+                }
                 val service = ApiClient.getService(baseUrl)
                 val response = withContext(Dispatchers.IO) {
                     service.getVehiclesToday()
@@ -233,6 +238,7 @@ class MainActivity : AppCompatActivity() {
                     vehicleAdapter.updateList(list)
                     if (list.isEmpty()) {
                         tvEmpty.visibility = View.VISIBLE
+                        tvEmpty.text = "Hôm nay chưa có xe kiểm định nào"
                     } else {
                         tvEmpty.visibility = View.GONE
                     }
@@ -242,7 +248,7 @@ class MainActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 tvEmpty.visibility = View.VISIBLE
-                tvEmpty.text = getString(R.string.empty_vehicle_list)
+                tvEmpty.text = "Lỗi kết nối: ${e.message}\nVuốt xuống để thử lại"
             } finally {
                 pbLoading.visibility = View.GONE
                 swipeRefresh.isRefreshing = false

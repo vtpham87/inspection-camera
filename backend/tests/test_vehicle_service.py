@@ -115,7 +115,7 @@ def test_photos_taken_detects_existing_photos(mock_db, tmp_path):
     for pt in config.paths:
         config.paths[pt] = str(photo_dir / "{date}")
 
-    today = datetime.now().strftime("%Y%m%d")
+    today = "20260927"
     target_dir = photo_dir / today
     target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -137,7 +137,7 @@ def test_photos_taken_passenger_with_seq(mock_db, tmp_path):
     photo_dir = tmp_path / "photos"
     config.paths["passenger"] = str(photo_dir / "{date}" / "{plate}")
 
-    today = datetime.now().strftime("%Y%m%d")
+    today = "20260927"
     target_dir = photo_dir / today / "15A12345"
     target_dir.mkdir(parents=True, exist_ok=True)
 

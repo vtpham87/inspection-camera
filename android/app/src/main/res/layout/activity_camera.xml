@@ -32,7 +32,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- Plate Header Row: Back + Plate + Color + Rotate -->
+            <!-- Plate Header Row: Back + Plate & Color -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -50,9 +50,9 @@
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="Quay lại"
                     android:src="@drawable/ic_arrow_back"
-                    app:tint="@color/text_primary" />
+                    app:tint="@color/primary" />
 
-                <!-- Plate Text -->
+                <!-- Plate & Color Text -->
                 <TextView
                     android:id="@+id/tv_camera_plate"
                     android:layout_width="0dp"
@@ -61,31 +61,9 @@
                     android:gravity="center"
                     android:fontFamily="monospace"
                     android:textColor="@color/primary"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
-
-                <!-- Plate Color Chip -->
-                <TextView
-                    android:id="@+id/tv_camera_plate_color"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/bg_plate_badge"
-                    android:paddingHorizontal="8dp"
-                    android:paddingVertical="2dp"
-                    android:textColor="@color/text_primary"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
-
-                <!-- Rotate Screen Button -->
-                <ImageButton
-                    android:id="@+id/btn_camera_rotate"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
-                    android:layout_marginStart="4dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Xoay màn hình"
-                    android:src="@drawable/ic_screen_rotation"
-                    app:tint="@color/text_primary" />
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:paddingHorizontal="4dp" />
 
             </LinearLayout>
 

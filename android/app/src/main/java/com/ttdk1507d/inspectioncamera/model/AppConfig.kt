@@ -22,15 +22,9 @@ data class AppConfig(
     @SerializedName("passenger_path") val passengerPath: String = "D:\\Photos\\{date}\\{plate}",
     @SerializedName("new_vehicle_path") val newVehiclePath: String = "D:\\Photos\\{date}\\{plate}",
     @SerializedName("sync_new_vehicle_45") val syncNewVehicle45: Boolean = true,
-    val paths: Map<String, String> = mapOf(
-        "rear_45" to "D:\\Photos\\{date}",
-        "front_45" to "D:\\Photos\\{date}",
-        "chassis" to "D:\\Photos\\{date}",
-        "passenger" to "D:\\Photos\\{date}\\{plate}",
-        "new_vehicle" to "D:\\Photos\\{date}\\{plate}"
-    ),
+    val paths: Map<String, String>? = null,
     @SerializedName("jpeg_quality") val jpegQuality: Int = 85,
     @SerializedName("plate_color_suffix") val plateColorSuffix: Boolean = true,
     val timestamp: TimestampConfig = TimestampConfig(),
-    @SerializedName("photo_resolution") val photoResolution: String = "original"
+    @SerializedName("photo_resolution") val photoResolution: String = "low"
 )

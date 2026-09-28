@@ -76,9 +76,7 @@ class CameraActivity : AppCompatActivity() {
 
     private lateinit var previewView: PreviewView
     private lateinit var tvPlate: TextView
-    private lateinit var tvPlateColor: TextView
     private lateinit var btnBack: ImageButton
-    private lateinit var btnRotate: ImageButton
 
     private lateinit var btnRear45: MaterialButton
     private lateinit var btnFront45: MaterialButton
@@ -169,9 +167,7 @@ class CameraActivity : AppCompatActivity() {
     private fun initViews() {
         previewView = findViewById(R.id.preview_view)
         tvPlate = findViewById(R.id.tv_camera_plate)
-        tvPlateColor = findViewById(R.id.tv_camera_plate_color)
         btnBack = findViewById(R.id.btn_camera_back)
-        btnRotate = findViewById(R.id.btn_camera_rotate)
 
         btnRear45 = findViewById(R.id.btn_rear_45)
         btnFront45 = findViewById(R.id.btn_front_45)
@@ -182,37 +178,17 @@ class CameraActivity : AppCompatActivity() {
         layoutLoading = findViewById(R.id.layout_camera_loading)
         tvLoadingText = findViewById(R.id.tv_camera_loading_text)
 
-        tvPlate.text = plate
-        when (plateColor?.uppercase()) {
-            "T" -> {
-                tvPlateColor.visibility = View.VISIBLE
-                tvPlateColor.text = "Trắng (T)"
-            }
-            "V" -> {
-                tvPlateColor.visibility = View.VISIBLE
-                tvPlateColor.text = "Vàng (V)"
-            }
-            "X" -> {
-                tvPlateColor.visibility = View.VISIBLE
-                tvPlateColor.text = "Xanh (X)"
-            }
-            else -> {
-                tvPlateColor.visibility = View.GONE
-            }
+        val colorText = when (plateColor?.uppercase()) {
+            "T" -> " - Biển trắng"
+            "V" -> " - Biển vàng"
+            "X" -> " - Biển xanh"
+            else -> ""
         }
+        tvPlate.text = "$plate$colorText"
     }
 
     private fun setupListeners() {
         btnBack.setOnClickListener { finish() }
-
-        btnRotate.setOnClickListener {
-            val isLand = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-            requestedOrientation = if (isLand) {
-                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-            } else {
-                ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-            }
-        }
 
         btnRear45.setOnClickListener { takePhoto(PhotoType.REAR_45, null) }
         btnFront45.setOnClickListener { takePhoto(PhotoType.FRONT_45, null) }
