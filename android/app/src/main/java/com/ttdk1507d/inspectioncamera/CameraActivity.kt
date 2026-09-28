@@ -12,16 +12,22 @@ import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.view.OrientationEventListener
+import android.view.ScaleGestureDetector
 import android.view.Surface
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.AspectRatio
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
@@ -43,6 +49,7 @@ import com.ttdk1507d.inspectioncamera.model.AppConfig
 import com.ttdk1507d.inspectioncamera.model.PhotoType
 import com.ttdk1507d.inspectioncamera.util.NetworkUtil
 import com.ttdk1507d.inspectioncamera.util.PrefsManager
+import java.util.concurrent.TimeUnit
 import com.ttdk1507d.inspectioncamera.util.TimestampPainter
 import com.ttdk1507d.inspectioncamera.worker.PendingUploadMetadata
 import com.ttdk1507d.inspectioncamera.worker.PendingUploadWorker
@@ -78,6 +85,13 @@ class CameraActivity : AppCompatActivity() {
     private lateinit var previewView: PreviewView
     private lateinit var tvPlate: TextView
     private lateinit var btnBack: ImageButton
+
+    // AE/AF Views & State
+    private var camera: Camera? = null
+    private lateinit var ivFocusRing: ImageView
+    private lateinit var tvAeAfLock: TextView
+    private var isAeAfLocked = false
+    private lateinit var scaleGestureDetector: ScaleGestureDetector
 
     private lateinit var btnRear45: MaterialButton
     private lateinit var btnFront45: MaterialButton
@@ -170,6 +184,9 @@ class CameraActivity : AppCompatActivity() {
         tvPlate = findViewById(R.id.tv_camera_plate)
         btnBack = findViewById(R.id.btn_camera_back)
 
+        ivFocusRing = findViewById(R.id.iv_camera_focus)
+        tvAeAfLock = findViewById(R.id.tv_camera_ae_af_lock)
+
         btnRear45 = findViewById(R.id.btn_rear_45)
         btnFront45 = findViewById(R.id.btn_front_45)
         btnPassenger = findViewById(R.id.btn_passenger)
@@ -228,13 +245,136 @@ class CameraActivity : AppCompatActivity() {
                 val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture)
+                camera = cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture)
 
+                setupTouchToFocus()
                 setupOrientationListener()
             } catch (e: Exception) {
                 Toast.makeText(this, "Lỗi mở camera: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }, ContextCompat.getMainExecutor(this))
+    }
+
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
+    private fun setupTouchToFocus() {
+        val gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onSingleTapUp(e: MotionEvent): Boolean {
+                if (isAeAfLocked) {
+                    unlockAeAf()
+                } else {
+                    triggerFocusAndMetering(e.x, e.y, false)
+                }
+                return true
+            }
+
+            override fun onLongPress(e: MotionEvent) {
+                // Long press to LOCK AE/AF
+                triggerFocusAndMetering(e.x, e.y, true)
+            }
+        })
+
+        scaleGestureDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                val currentZoom = camera?.cameraInfo?.zoomState?.value?.zoomRatio ?: 1f
+                val delta = detector.scaleFactor
+                camera?.cameraControl?.setZoomRatio(currentZoom * delta)
+                return true
+            }
+        })
+
+        previewView.setOnTouchListener { v, event ->
+            scaleGestureDetector.onTouchEvent(event)
+            gestureDetector.onTouchEvent(event)
+            v.performClick()
+            true
+        }
+    }
+
+    private fun triggerFocusAndMetering(x: Float, y: Float, lock: Boolean) {
+        val cam = camera ?: return
+        val factory = previewView.meteringPointFactory
+        val point = factory.createPoint(x, y)
+
+        val builder = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE)
+        if (lock) {
+            builder.disableAutoCancel()
+            isAeAfLocked = true
+            tvAeAfLock.visibility = View.VISIBLE
+        } else {
+            builder.setAutoCancelDuration(3, TimeUnit.SECONDS)
+            isAeAfLocked = false
+            tvAeAfLock.visibility = View.GONE
+        }
+
+        vibrateTick()
+        showFocusRing(x, y, lock)
+
+        val action = builder.build()
+        val future = cam.cameraControl.startFocusAndMetering(action)
+        future.addListener({
+            try {
+                val result = future.get()
+                runOnUiThread {
+                    if (result.isFocusSuccessful) {
+                        ivFocusRing.setColorFilter(ContextCompat.getColor(this, R.color.status_done_text))
+                    }
+                }
+            } catch (e: Exception) {
+                // Ignore
+            }
+        }, ContextCompat.getMainExecutor(this))
+    }
+
+    private fun unlockAeAf() {
+        isAeAfLocked = false
+        tvAeAfLock.visibility = View.GONE
+        camera?.cameraControl?.cancelFocusAndMetering()
+        vibrateTick()
+        Toast.makeText(this, "Đã mở khóa AE/AF", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun showFocusRing(x: Float, y: Float, lock: Boolean) {
+        ivFocusRing.clearAnimation()
+        ivFocusRing.clearColorFilter()
+        ivFocusRing.x = x - (ivFocusRing.width / 2)
+        ivFocusRing.y = y - (ivFocusRing.height / 2)
+        ivFocusRing.visibility = View.VISIBLE
+        ivFocusRing.alpha = 1.0f
+        ivFocusRing.scaleX = 1.4f
+        ivFocusRing.scaleY = 1.4f
+
+        ivFocusRing.animate()
+            .scaleX(1.0f)
+            .scaleY(1.0f)
+            .setDuration(200)
+            .withEndAction {
+                if (!lock) {
+                    ivFocusRing.animate()
+                        .alpha(0f)
+                        .setStartDelay(1500)
+                        .setDuration(300)
+                        .withEndAction {
+                            ivFocusRing.visibility = View.GONE
+                        }
+                        .start()
+                }
+            }
+            .start()
+    }
+
+    private fun vibrateTick() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                vm?.defaultVibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+            } else {
+                @Suppress("DEPRECATION")
+                val v = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                v?.vibrate(30)
+            }
+        } catch (e: Exception) {
+            // Ignore
+        }
     }
 
     private fun setupOrientationListener() {

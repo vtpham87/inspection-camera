@@ -5,15 +5,47 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <!-- Camera Preview: 100% Unobstructed Full Screen on Left Side -->
-    <androidx.camera.view.PreviewView
-        android:id="@+id/preview_view"
+    <!-- Camera Preview Container: 100% Unobstructed Full Screen on Left Side -->
+    <FrameLayout
+        android:id="@+id/layout_preview_container"
         android:layout_width="0dp"
         android:layout_height="match_parent"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toStartOf="@id/bottom_control_panel" />
+        app:layout_constraintEnd_toStartOf="@id/bottom_control_panel">
+
+        <androidx.camera.view.PreviewView
+            android:id="@+id/preview_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- AE/AF Focus Ring Indicator -->
+        <ImageView
+            android:id="@+id/iv_camera_focus"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:src="@drawable/bg_focus_ring"
+            android:visibility="gone"
+            android:contentDescription="Điểm lấy nét" />
+
+        <!-- AE/AF Lock Badge -->
+        <TextView
+            android:id="@+id/tv_camera_ae_af_lock"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|center_horizontal"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_plate_badge"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="4dp"
+            android:text="🔒 ĐÃ KHÓA AE/AF"
+            android:textColor="@color/primary"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+    </FrameLayout>
 
     <!-- Side Control Panel: On the Right Side -->
     <androidx.core.widget.NestedScrollView

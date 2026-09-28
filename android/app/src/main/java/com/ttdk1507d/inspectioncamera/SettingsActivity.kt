@@ -1,18 +1,26 @@
 package com.ttdk1507d.inspectioncamera
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.view.View
 import android.widget.ArrayAdapter
+import android.widget.ProgressBar
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.textfield.TextInputEditText
+import com.google.gson.Gson
 import com.ttdk1507d.inspectioncamera.api.ApiClient
 import com.ttdk1507d.inspectioncamera.util.NetworkUtil
 import com.ttdk1507d.inspectioncamera.util.PrefsManager
@@ -20,6 +28,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -50,6 +62,12 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var spinnerUploadMode: Spinner
 
     private lateinit var btnSave: MaterialButton
+
+    // Version & GitHub Update
+    private lateinit var tvCurrentVersion: TextView
+    private lateinit var tvUpdateStatus: TextView
+    private lateinit var pbUpdate: ProgressBar
+    private lateinit var btnCheckUpdate: MaterialButton
 
     private val formatKeys = listOf(
         "HH:mm:ss - dd/MM/yyyy",
@@ -114,6 +132,18 @@ class SettingsActivity : AppCompatActivity() {
         spinnerUploadMode = findViewById(R.id.spinner_settings_upload_mode)
 
         btnSave = findViewById(R.id.btn_settings_save)
+
+        tvCurrentVersion = findViewById(R.id.tv_settings_current_version)
+        tvUpdateStatus = findViewById(R.id.tv_settings_update_status)
+        pbUpdate = findViewById(R.id.pb_settings_update)
+        btnCheckUpdate = findViewById(R.id.btn_settings_check_update)
+
+        val versionName = try {
+            packageManager.getPackageInfo(packageName, 0).versionName
+        } catch (e: Exception) {
+            "1.0.9"
+        }
+        tvCurrentVersion.text = "Phiên bản hiện tại: v$versionName"
 
         toolbar.setNavigationOnClickListener { finish() }
     }
@@ -219,6 +249,10 @@ class SettingsActivity : AppCompatActivity() {
 
         btnSave.setOnClickListener {
             saveSettings()
+        }
+
+        btnCheckUpdate.setOnClickListener {
+            checkForGitHubUpdates()
         }
     }
 
@@ -349,5 +383,200 @@ class SettingsActivity : AppCompatActivity() {
 
         Toast.makeText(this, getString(R.string.settings_saved), Toast.LENGTH_SHORT).show()
         finish()
+    }
+
+    private data class GitHubRelease(
+        val tag_name: String? = null,
+        val name: String? = null,
+        val body: String? = null,
+        val assets: List<GitHubAsset>? = null
+    )
+
+    private data class GitHubAsset(
+        val name: String? = null,
+        val browser_download_url: String? = null,
+        val size: Long = 0
+    )
+
+    private fun checkForGitHubUpdates() {
+        btnCheckUpdate.isEnabled = false
+        pbUpdate.visibility = View.VISIBLE
+        tvUpdateStatus.visibility = View.VISIBLE
+        tvUpdateStatus.text = "Đang kiểm tra bản phát hành trên GitHub..."
+        tvUpdateStatus.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
+
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                try {
+                    val url = URL("https://api.github.com/repos/vtpham87/inspection-camera/releases/latest")
+                    val conn = url.openConnection() as HttpURLConnection
+                    conn.connectTimeout = 8000
+                    conn.readTimeout = 8000
+                    conn.setRequestProperty("User-Agent", "1507DCamera-App")
+                    conn.requestMethod = "GET"
+                    val code = conn.responseCode
+                    if (code == 200) {
+                        val json = conn.inputStream.bufferedReader().use { it.readText() }
+                        Gson().fromJson(json, GitHubRelease::class.java)
+                    } else {
+                        null
+                    }
+                } catch (e: Exception) {
+                    null
+                }
+            }
+
+            btnCheckUpdate.isEnabled = true
+            pbUpdate.visibility = View.GONE
+
+            if (result == null || result.tag_name.isNullOrEmpty()) {
+                tvUpdateStatus.text = "Không thể kiểm tra cập nhật (Kiểm tra kết nối Internet)"
+                tvUpdateStatus.setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.error))
+                return@launch
+            }
+
+            val remoteTag = result.tag_name.trim()
+            val remoteVer = remoteTag.removePrefix("v").trim()
+            val localVer = try {
+                packageManager.getPackageInfo(packageName, 0).versionName ?: "1.0.0"
+            } catch (e: Exception) {
+                "1.0.0"
+            }
+
+            val apkAsset = result.assets?.firstOrNull { it.name?.endsWith(".apk", ignoreCase = true) == true }
+
+            if (isNewerVersion(remoteVer, localVer) && apkAsset?.browser_download_url != null) {
+                tvUpdateStatus.text = "Đã có bản cập nhật mới: $remoteTag"
+                tvUpdateStatus.setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.status_done_text))
+
+                AlertDialog.Builder(this@SettingsActivity)
+                    .setTitle("Cập nhật phiên bản mới")
+                    .setMessage("Phát hiện phiên bản mới: $remoteTag (Hiện tại: v$localVer)\n\n${result.body ?: ""}\n\nBạn có muốn tải và cài đặt ngay không?")
+                    .setPositiveButton("Tải & Cài đặt") { _, _ ->
+                        downloadAndInstallApk(apkAsset.browser_download_url, remoteTag)
+                    }
+                    .setNegativeButton("Để sau", null)
+                    .show()
+            } else {
+                tvUpdateStatus.text = "Bạn đang sử dụng phiên bản mới nhất ($remoteTag)"
+                tvUpdateStatus.setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.status_done_text))
+                Toast.makeText(this@SettingsActivity, "Ứng dụng đang ở phiên bản mới nhất!", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun isNewerVersion(remote: String, local: String): Boolean {
+        val rParts = remote.split(".").mapNotNull { it.toIntOrNull() }
+        val lParts = local.split(".").mapNotNull { it.toIntOrNull() }
+        val maxLen = maxOf(rParts.size, lParts.size)
+        for (i in 0 until maxLen) {
+            val r = rParts.getOrElse(i) { 0 }
+            val l = lParts.getOrElse(i) { 0 }
+            if (r > l) return true
+            if (r < l) return false
+        }
+        return false
+    }
+
+    private fun downloadAndInstallApk(downloadUrl: String, newTag: String) {
+        btnCheckUpdate.isEnabled = false
+        pbUpdate.visibility = View.VISIBLE
+        tvUpdateStatus.visibility = View.VISIBLE
+        tvUpdateStatus.text = "Đang tải xuống $newTag..."
+        tvUpdateStatus.setTextColor(ContextCompat.getColor(this, R.color.primary))
+
+        lifecycleScope.launch {
+            val apkFile = withContext(Dispatchers.IO) {
+                try {
+                    val destDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: cacheDir
+                    val targetFile = File(destDir, "1507DCamera_${newTag}.apk")
+                    if (targetFile.exists()) targetFile.delete()
+
+                    var curUrl = downloadUrl
+                    var redirects = 0
+                    var conn: HttpURLConnection
+                    while (true) {
+                        val u = URL(curUrl)
+                        conn = u.openConnection() as HttpURLConnection
+                        conn.instanceFollowRedirects = false
+                        conn.connectTimeout = 15000
+                        conn.readTimeout = 30000
+                        conn.setRequestProperty("User-Agent", "1507DCamera-App")
+                        conn.connect()
+                        val code = conn.responseCode
+                        if (code in 300..399) {
+                            val loc = conn.getHeaderField("Location")
+                            conn.disconnect()
+                            if (loc == null || redirects++ >= 5) return@withContext null
+                            curUrl = loc
+                        } else if (code == 200) {
+                            break
+                        } else {
+                            conn.disconnect()
+                            return@withContext null
+                        }
+                    }
+
+                    conn.inputStream.use { input ->
+                        targetFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    conn.disconnect()
+
+                    if (targetFile.exists() && targetFile.length() > 1_000_000) {
+                        targetFile
+                    } else {
+                        targetFile.delete()
+                        null
+                    }
+                } catch (e: Exception) {
+                    null
+                }
+            }
+
+            btnCheckUpdate.isEnabled = true
+            pbUpdate.visibility = View.GONE
+
+            if (apkFile != null) {
+                tvUpdateStatus.text = "Tải thành công! Đang mở cài đặt..."
+                tvUpdateStatus.setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.status_done_text))
+                installApk(apkFile)
+            } else {
+                tvUpdateStatus.text = "Tải cập nhật thất bại. Vui lòng thử lại sau."
+                tvUpdateStatus.setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.error))
+                Toast.makeText(this@SettingsActivity, "Lỗi khi tải file APK cập nhật", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun installApk(file: File) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (!packageManager.canRequestPackageInstalls()) {
+                    val manageIntent = Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                    startActivity(manageIntent)
+                    Toast.makeText(this, "Vui lòng cho phép cài đặt ứng dụng từ nguồn này rồi mở lại để cài đặt", Toast.LENGTH_LONG).show()
+                    return
+                }
+            }
+
+            val apkUri = FileProvider.getUriForFile(
+                this,
+                "${applicationContext.packageName}.fileprovider",
+                file
+            )
+
+            val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(apkUri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(installIntent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Lỗi khởi chạy cài đặt: ${e.message}", Toast.LENGTH_LONG).show()
+        }
     }
 }
