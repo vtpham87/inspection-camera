@@ -38,36 +38,37 @@ class VehicleAdapter(
 
         private val tvPlate: TextView = itemView.findViewById(R.id.tv_item_plate)
         private val tvPlateColor: TextView = itemView.findViewById(R.id.tv_item_plate_color)
-        private val tvTime: TextView = itemView.findViewById(R.id.tv_item_time)
-        private val tvDetails: TextView = itemView.findViewById(R.id.tv_item_details)
-
-        private val statusRear45: TextView = itemView.findViewById(R.id.status_rear_45)
-        private val statusFront45: TextView = itemView.findViewById(R.id.status_front_45)
-        private val statusChassis: TextView = itemView.findViewById(R.id.status_chassis)
-        private val statusPassenger: TextView = itemView.findViewById(R.id.status_passenger)
-        private val statusNewVehicle: TextView = itemView.findViewById(R.id.status_new_vehicle)
+        private val tvStatus: TextView = itemView.findViewById(R.id.tv_item_status)
+        private val tvTicket: TextView = itemView.findViewById(R.id.tv_item_ticket)
 
         fun bind(vehicle: Vehicle) {
-            tvPlate.text = vehicle.plate
+            // Hiển thị biển số sạch: nếu có hậu tố màu dính liền (15C-442.34T) thì bỏ chữ T/V/X để tránh lặp với badge
+            val rawPlate = vehicle.plate.trim()
+            val displayPlate = if (rawPlate.length > 5 && (rawPlate.endsWith("T", true) || rawPlate.endsWith("V", true) || rawPlate.endsWith("X", true))) {
+                rawPlate.dropLast(1)
+            } else {
+                rawPlate
+            }
+            tvPlate.text = displayPlate
 
-            // Plate color badge
+            // Badge màu biển trực quan
             when (vehicle.plateColor?.uppercase()) {
                 "T" -> {
                     tvPlateColor.visibility = View.VISIBLE
-                    tvPlateColor.text = "Trắng"
-                    tvPlateColor.setBackgroundResource(R.drawable.bg_plate_badge)
+                    tvPlateColor.text = "TRẮNG"
+                    tvPlateColor.setBackgroundResource(R.drawable.bg_plate_badge_white)
                     tvPlateColor.setTextColor(ContextCompat.getColor(itemView.context, R.color.text_primary))
                 }
                 "V" -> {
                     tvPlateColor.visibility = View.VISIBLE
-                    tvPlateColor.text = "Vàng"
-                    tvPlateColor.setBackgroundResource(R.drawable.bg_plate_badge)
+                    tvPlateColor.text = "VÀNG"
+                    tvPlateColor.setBackgroundResource(R.drawable.bg_plate_badge_yellow)
                     tvPlateColor.setTextColor(ContextCompat.getColor(itemView.context, R.color.plate_yellow_text))
                 }
                 "X" -> {
                     tvPlateColor.visibility = View.VISIBLE
-                    tvPlateColor.text = "Xanh"
-                    tvPlateColor.setBackgroundResource(R.drawable.bg_plate_badge)
+                    tvPlateColor.text = "XANH"
+                    tvPlateColor.setBackgroundResource(R.drawable.bg_plate_badge_blue)
                     tvPlateColor.setTextColor(ContextCompat.getColor(itemView.context, R.color.plate_blue_text))
                 }
                 else -> {
@@ -75,43 +76,25 @@ class VehicleAdapter(
                 }
             }
 
-            val ticketStr = if (!vehicle.ticketNum.isNullOrBlank()) "Số phiếu: ${vehicle.ticketNum} • " else ""
-            tvTime.text = "$ticketStr${vehicle.time}"
-
-            val details = buildString {
-                if (vehicle.vehicleType.isNotBlank()) append(vehicle.vehicleType)
-                if (vehicle.brand.isNotBlank()) {
-                    if (isNotEmpty()) append(" • ")
-                    append(vehicle.brand)
-                }
-                if (vehicle.owner.isNotBlank()) {
-                    if (isNotEmpty()) append(" • ")
-                    append(vehicle.owner)
-                }
+            // Trạng thái ảnh đã chụp (nếu đã có ảnh)
+            val photoCount = vehicle.photosTaken.size
+            if (photoCount > 0) {
+                tvStatus.visibility = View.VISIBLE
+                tvStatus.text = "✓ $photoCount ảnh"
+            } else {
+                tvStatus.visibility = View.GONE
             }
-            tvDetails.text = details
 
-            // Update photo status chips
-            updateChip(statusRear45, "rear_45", "Sau", vehicle.photosTaken)
-            updateChip(statusFront45, "front_45", "Trước", vehicle.photosTaken)
-            updateChip(statusChassis, "chassis", "Khung", vehicle.photosTaken)
-            updateChip(statusPassenger, "passenger", "Khách", vehicle.photosTaken)
-            updateChip(statusNewVehicle, "new_vehicle", "Mới", vehicle.photosTaken)
+            // Số phiếu ngắn gọn
+            if (!vehicle.ticketNum.isNullOrBlank()) {
+                val shortTicket = if (vehicle.ticketNum.contains("/")) vehicle.ticketNum.split("/")[0] else vehicle.ticketNum
+                tvTicket.visibility = View.VISIBLE
+                tvTicket.text = "#$shortTicket"
+            } else {
+                tvTicket.visibility = View.GONE
+            }
 
             itemView.setOnClickListener { onItemClick(vehicle) }
-        }
-
-        private fun updateChip(chip: TextView, typeKey: String, baseLabel: String, takenList: List<String>) {
-            val isTaken = takenList.contains(typeKey)
-            if (isTaken) {
-                chip.setBackgroundResource(R.drawable.bg_status_done)
-                chip.setTextColor(ContextCompat.getColor(itemView.context, R.color.status_done_text))
-                chip.text = "✓ $baseLabel"
-            } else {
-                chip.setBackgroundResource(R.drawable.bg_status_empty)
-                chip.setTextColor(ContextCompat.getColor(itemView.context, R.color.status_empty_text))
-                chip.text = baseLabel
-            }
         }
     }
 }

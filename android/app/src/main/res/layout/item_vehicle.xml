@@ -3,9 +3,10 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginVertical="6dp"
-    app:cardCornerRadius="10dp"
-    app:cardElevation="2dp"
+    android:layout_marginHorizontal="8dp"
+    android:layout_marginVertical="3dp"
+    app:cardCornerRadius="8dp"
+    app:cardElevation="1dp"
     app:strokeWidth="1dp"
     app:strokeColor="@color/divider"
     android:clickable="true"
@@ -15,135 +16,66 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="12dp">
+        android:minHeight="54dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="10dp">
 
-        <!-- Header: Plate (24sp Bold Monospace) + Time -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <TextView
-                android:id="@+id/tv_item_plate"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:fontFamily="monospace"
-                android:textSize="24sp"
-                android:textStyle="bold"
-                android:textColor="@color/text_primary" />
-
-            <TextView
-                android:id="@+id/tv_item_plate_color"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingHorizontal="8dp"
-                android:paddingVertical="2dp"
-                android:background="@drawable/bg_plate_badge"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:textColor="@color/text_primary"
-                android:layout_marginEnd="8dp" />
-
-            <TextView
-                android:id="@+id/tv_item_time"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="@color/text_secondary"
-                android:textSize="14sp" />
-
-        </LinearLayout>
-
-        <!-- Vehicle Details: Brand, Type, Owner -->
+        <!-- Biển số: to rõ nét, monospace đậm -->
         <TextView
-            android:id="@+id/tv_item_details"
-            android:layout_width="match_parent"
+            android:id="@+id/tv_item_plate"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
+            android:fontFamily="monospace"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary" />
+
+        <!-- Màu biển: badge trực quan nổi bật -->
+        <TextView
+            android:id="@+id/tv_item_plate_color"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="4dp"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <!-- Spacer đẩy thông tin trạng thái sang mép phải -->
+        <View
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <!-- Trạng thái ảnh đã chụp (nếu có) -->
+        <TextView
+            android:id="@+id/tv_item_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textColor="@color/status_done_text" />
+
+        <!-- Số phiếu nhỏ -->
+        <TextView
+            android:id="@+id/tv_item_ticket"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
             android:textColor="@color/text_secondary"
-            android:textSize="14sp"
-            android:maxLines="2"
-            android:ellipsize="end" />
+            android:textSize="12sp" />
 
-        <!-- Photo Status Indicators (5 types) -->
-        <LinearLayout
-            android:layout_width="match_parent"
+        <!-- Mũi tên điều hướng thao tác -->
+        <TextView
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/status_rear_45"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="4dp"
-                android:background="@drawable/bg_status_empty"
-                android:gravity="center"
-                android:paddingVertical="4dp"
-                android:text="Sau"
-                android:textColor="@color/status_empty_text"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/status_front_45"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="4dp"
-                android:background="@drawable/bg_status_empty"
-                android:gravity="center"
-                android:paddingVertical="4dp"
-                android:text="Trước"
-                android:textColor="@color/status_empty_text"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/status_chassis"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="4dp"
-                android:background="@drawable/bg_status_empty"
-                android:gravity="center"
-                android:paddingVertical="4dp"
-                android:text="Khung"
-                android:textColor="@color/status_empty_text"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/status_passenger"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="4dp"
-                android:background="@drawable/bg_status_empty"
-                android:gravity="center"
-                android:paddingVertical="4dp"
-                android:text="Khách"
-                android:textColor="@color/status_empty_text"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/status_new_vehicle"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:background="@drawable/bg_status_empty"
-                android:gravity="center"
-                android:paddingVertical="4dp"
-                android:text="Mới"
-                android:textColor="@color/status_empty_text"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-
-        </LinearLayout>
+            android:layout_marginStart="6dp"
+            android:text="›"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_secondary" />
 
     </LinearLayout>
 
