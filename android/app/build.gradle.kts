@@ -11,8 +11,8 @@ android {
         applicationId = "com.ttdk1507d.inspectioncamera"
         minSdk = 24
         targetSdk = 34
-        versionCode = 16
-        versionName = "1.2.3"
+        versionCode = 17
+        versionName = "1.2.4"
     }
 
     buildFeatures {

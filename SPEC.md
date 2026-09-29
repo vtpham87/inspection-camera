@@ -522,8 +522,11 @@ Có thể đăng ký Windows Service hoặc thêm vào Task Scheduler khởi đ�
 - ✅ Hỗ trợ LAN + Tailscale
 - ✅ Retry tự động khi mất mạng
 
-### v1.1.0 (Dự kiến mở rộng)
-- 🔲 Watermark bổ sung (biển số, GPS lên góc ảnh)
-- 🔲 Quét biển số bằng OCR camera (tự nhận dạng, không cần gõ)
-- 🔲 Thông báo đẩy khi có xe mới vào dây chuyền
-- 🔲 Đồng bộ ảnh với hệ thống gcn-uploader (tự đẩy lên Cục ĐKVN)
+### v1.1.0
+- ✅ Watermark bổ sung, kiểm tra cập nhật in-app từ GitHub Release
+- ✅ Bổ sung bộ lọc xe đang chờ và sắp xếp số phiếu tăng dần
+
+### v1.2.0 - v1.2.4
+- ✅ Tối ưu danh sách xe 1 dòng duy nhất (biển to + badge màu + badge Lần 2)
+- ✅ Sắp xếp lại trang chọn biển: Thu gọn khối nhập thủ công (ô nhập + nút Chụp cùng hàng; màu biển + lần khám cùng hàng dưới), tối ưu 80% diện tích cho danh sách xe chờ
+- ✅ Cập nhật GitHub Release: Chỉ tải về APK vào máy, không tự động mở cài đặt ngay, cho phép cài đặt chủ động khi sẵn sàng

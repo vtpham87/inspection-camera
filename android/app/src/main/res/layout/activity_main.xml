@@ -41,12 +41,14 @@
         android:gravity="center"
         android:visibility="gone" />
 
-    <!-- Manual Plate Entry Section -->
+    <!-- Manual Plate Entry Section (Compact) -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="12dp"
-        app:cardCornerRadius="12dp"
+        android:layout_marginHorizontal="10dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="6dp"
+        app:cardCornerRadius="10dp"
         app:cardElevation="2dp"
         app:strokeWidth="1dp"
         app:strokeColor="@color/divider">
@@ -55,162 +57,168 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:paddingHorizontal="10dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/section_manual_plate"
-                android:textColor="@color/text_primary"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
-            <!-- Plate Input with 24sp Bold Monospace -->
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/til_plate"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:hint="@string/hint_plate"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/et_plate"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:fontFamily="monospace"
-                    android:textSize="24sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/text_primary"
-                    android:textAllCaps="true"
-                    android:maxLines="1"
-                    android:inputType="textCapCharacters" />
-
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <!-- Plate Color Radio Group -->
+            <!-- Row 1: Plate Input + Select/Camera Button -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginTop="8dp">
+                android:gravity="center_vertical">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/plate_color_label"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:layout_marginEnd="12dp" />
-
-                <HorizontalScrollView
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/til_plate"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:scrollbars="none">
+                    android:hint="@string/hint_plate"
+                    app:boxCornerRadiusTopStart="8dp"
+                    app:boxCornerRadiusBottomStart="8dp"
+                    app:boxCornerRadiusTopEnd="8dp"
+                    app:boxCornerRadiusBottomEnd="8dp"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/et_plate"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:textSize="22sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text_primary"
+                        android:textAllCaps="true"
+                        android:maxLines="1"
+                        android:inputType="textCapCharacters" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_select_manual"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minHeight="54dp"
+                    android:layout_marginStart="8dp"
+                    android:paddingHorizontal="16dp"
+                    android:text="VÀO CHỤP"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:backgroundTint="@color/primary"
+                    android:textColor="@color/text_white"
+                    app:cornerRadius="8dp"
+                    app:icon="@drawable/ic_camera"
+                    app:iconGravity="textStart"
+                    app:iconTint="@color/text_white" />
+
+            </LinearLayout>
+
+            <!-- Row 2: Plate Color & Lần khám (Single line with horizontal scroll) -->
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Màu:"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:layout_marginEnd="4dp" />
 
                     <RadioGroup
                         android:id="@+id/rg_plate_color"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal">
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
 
                         <RadioButton
                             android:id="@+id/rb_color_white"
                             android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
+                            android:layout_height="36dp"
                             android:text="@string/plate_white"
                             android:checked="true"
-                            android:textSize="14sp" />
+                            android:textSize="13sp" />
 
                         <RadioButton
                             android:id="@+id/rb_color_yellow"
                             android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
+                            android:layout_height="36dp"
                             android:text="@string/plate_yellow"
-                            android:layout_marginStart="8dp"
-                            android:textSize="14sp" />
+                            android:layout_marginStart="4dp"
+                            android:textSize="13sp" />
 
                         <RadioButton
                             android:id="@+id/rb_color_blue"
                             android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
+                            android:layout_height="36dp"
                             android:text="@string/plate_blue"
-                            android:layout_marginStart="8dp"
-                            android:textSize="14sp" />
+                            android:layout_marginStart="4dp"
+                            android:textSize="13sp" />
 
                         <RadioButton
                             android:id="@+id/rb_color_none"
                             android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
+                            android:layout_height="36dp"
                             android:text="@string/plate_none"
-                            android:layout_marginStart="8dp"
-                            android:textSize="14sp" />
+                            android:layout_marginStart="4dp"
+                            android:textSize="13sp" />
 
                     </RadioGroup>
 
-                </HorizontalScrollView>
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="18dp"
+                        android:layout_marginHorizontal="10dp"
+                        android:background="@color/divider" />
 
-            </LinearLayout>
-
-            <!-- Lần kiểm định (Lần 1 / Lần 2) Toggle -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginTop="8dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Lần khám:"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:layout_marginEnd="12dp" />
-
-                <RadioGroup
-                    android:id="@+id/rg_lan_kd"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal">
-
-                    <RadioButton
-                        android:id="@+id/rb_lan_1"
+                    <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:checked="true"
-                        android:text="Lần 1"
-                        android:textSize="14sp" />
+                        android:text="Khám:"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:layout_marginEnd="4dp" />
 
-                    <RadioButton
-                        android:id="@+id/rb_lan_2"
+                    <RadioGroup
+                        android:id="@+id/rg_lan_kd"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Lần 2"
-                        android:layout_marginStart="16dp"
-                        android:textSize="14sp" />
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
 
-                </RadioGroup>
+                        <RadioButton
+                            android:id="@+id/rb_lan_1"
+                            android:layout_width="wrap_content"
+                            android:layout_height="36dp"
+                            android:checked="true"
+                            android:text="Lần 1"
+                            android:textSize="13sp" />
 
-            </LinearLayout>
+                        <RadioButton
+                            android:id="@+id/rb_lan_2"
+                            android:layout_width="wrap_content"
+                            android:layout_height="36dp"
+                            android:text="Lần 2"
+                            android:layout_marginStart="4dp"
+                            android:textSize="13sp" />
 
-            <!-- Select button: min height 56dp, font 18sp -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_select_manual"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:minHeight="56dp"
-                android:layout_marginTop="12dp"
-                android:text="@string/btn_select"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:backgroundTint="@color/primary"
-                android:textColor="@color/text_white"
-                app:cornerRadius="8dp" />
+                    </RadioGroup>
+
+                </LinearLayout>
+
+            </HorizontalScrollView>
 
         </LinearLayout>
 

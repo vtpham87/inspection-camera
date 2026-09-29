@@ -73,6 +73,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var tvUpdateStatus: TextView
     private lateinit var pbUpdate: ProgressBar
     private lateinit var btnCheckUpdate: MaterialButton
+    private lateinit var btnInstallNow: MaterialButton
 
     private val createDocumentLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -156,6 +157,17 @@ class SettingsActivity : AppCompatActivity() {
         tvUpdateStatus = findViewById(R.id.tv_settings_update_status)
         pbUpdate = findViewById(R.id.pb_settings_update)
         btnCheckUpdate = findViewById(R.id.btn_settings_check_update)
+        btnInstallNow = findViewById(R.id.btn_settings_install_now)
+
+        val destDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: cacheDir
+        val existingApk = destDir.listFiles { file -> file.name.startsWith("1507DCamera_") && file.name.endsWith(".apk") }?.maxByOrNull { it.lastModified() }
+        if (existingApk != null && existingApk.length() > 1_000_000) {
+            btnInstallNow.visibility = View.VISIBLE
+            btnInstallNow.text = "CÀI ĐẶT BẢN ĐÃ TẢI (${existingApk.name})"
+            btnInstallNow.setOnClickListener {
+                installApk(existingApk)
+            }
+        }
 
         val versionName = try {
             packageManager.getPackageInfo(packageName, 0).versionName
@@ -522,9 +534,9 @@ class SettingsActivity : AppCompatActivity() {
 
                 AlertDialog.Builder(this@SettingsActivity)
                     .setTitle("Cập nhật phiên bản mới")
-                    .setMessage("Phát hiện phiên bản mới: $remoteTag (Hiện tại: v$localVer)\n\n${result.body ?: ""}\n\nBạn có muốn tải và cài đặt ngay không?")
-                    .setPositiveButton("Tải & Cài đặt") { _, _ ->
-                        downloadAndInstallApk(apkAsset.browser_download_url, remoteTag)
+                    .setMessage("Phát hiện phiên bản mới: $remoteTag (Hiện tại: v$localVer)\n\n${result.body ?: ""}\n\nBạn có muốn tải bản cập nhật về máy không?")
+                    .setPositiveButton("Tải về") { _, _ ->
+                        downloadApk(apkAsset.browser_download_url, remoteTag)
                     }
                     .setNegativeButton("Để sau", null)
                     .show()
@@ -549,12 +561,13 @@ class SettingsActivity : AppCompatActivity() {
         return false
     }
 
-    private fun downloadAndInstallApk(downloadUrl: String, newTag: String) {
+    private fun downloadApk(downloadUrl: String, newTag: String) {
         btnCheckUpdate.isEnabled = false
         pbUpdate.visibility = View.VISIBLE
         tvUpdateStatus.visibility = View.VISIBLE
         tvUpdateStatus.text = "Đang tải xuống $newTag..."
         tvUpdateStatus.setTextColor(ContextCompat.getColor(this, R.color.primary))
+        btnInstallNow.visibility = View.GONE
 
         lifecycleScope.launch {
             val apkFile = withContext(Dispatchers.IO) {
@@ -610,11 +623,16 @@ class SettingsActivity : AppCompatActivity() {
             pbUpdate.visibility = View.GONE
 
             if (apkFile != null) {
-                tvUpdateStatus.text = "Tải thành công! Đang mở cài đặt..."
+                tvUpdateStatus.text = "Đã tải về thành công ($newTag)!\nFile: ${apkFile.name}"
                 tvUpdateStatus.setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.status_done_text))
-                installApk(apkFile)
+                btnInstallNow.visibility = View.VISIBLE
+                btnInstallNow.text = "CÀI ĐẶT BẢN $newTag"
+                btnInstallNow.setOnClickListener {
+                    installApk(apkFile)
+                }
+                Toast.makeText(this@SettingsActivity, "Đã tải về bản $newTag thành công!", Toast.LENGTH_SHORT).show()
             } else {
-                tvUpdateStatus.text = "Tải cập nhật thất bại. Vui lòng thử lại sau."
+                tvUpdateStatus.text = "Tải bản cập nhật thất bại. Vui lòng thử lại sau."
                 tvUpdateStatus.setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.error))
                 Toast.makeText(this@SettingsActivity, "Lỗi khi tải file APK cập nhật", Toast.LENGTH_LONG).show()
             }

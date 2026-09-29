@@ -267,7 +267,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val selectedLan = if (rbLan2.isChecked) 2 else 1
-        val finalLan = if (selectedLan > 1) selectedLan else parsed.lanKd
+        val finalLan = selectedLan
 
         openCamera(basePlate, finalColor, null, lanKd = finalLan)
     }

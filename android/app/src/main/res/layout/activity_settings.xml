@@ -507,6 +507,22 @@
                         app:iconTint="@color/primary"
                         style="@style/Widget.Material3.Button.OutlinedButton" />
 
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_settings_install_now"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginTop="8dp"
+                        android:text="CÀI ĐẶT BẢN CẬP NHẬT"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text_white"
+                        app:backgroundTint="@color/status_done_text"
+                        app:cornerRadius="8dp"
+                        app:icon="@drawable/ic_check"
+                        app:iconGravity="textStart"
+                        app:iconTint="@color/text_white"
+                        android:visibility="gone" />
+
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
