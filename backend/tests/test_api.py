@@ -60,7 +60,7 @@ def test_upload_success(setup_env):
     )
     assert r.status_code == 200
     assert r.json()["ok"] is True
-    assert r.json()["filename"] == "15A12345T.jpg"
+    assert r.json()["filename"] == "15A12345.jpg"
 
 def test_upload_non_jpeg_rejected(setup_env):
     client, _ = setup_env

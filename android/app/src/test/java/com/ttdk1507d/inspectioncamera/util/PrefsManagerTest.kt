@@ -73,6 +73,68 @@ class PrefsManagerTest {
         assertEquals("http://100.64.0.1:8080", prefsManager.tailscaleUrl)
     }
 
+    @Test
+    fun testPlateColorSuffixDefaultFalse() {
+        assertFalse(prefsManager.plateColorSuffix)
+    }
+
+    @Test
+    fun testBackupAndRestore() {
+        prefsManager.lanIp = "192.168.1.99"
+        prefsManager.tailscaleIp = "100.81.1.99"
+        prefsManager.serverPort = 8096
+        prefsManager.photoSaveDir = "E:\\CustomPhotos"
+        prefsManager.passengerPath = "E:\\CustomPhotos\\{plate}"
+        prefsManager.newVehiclePath = "E:\\CustomPhotos\\NV\\{plate}"
+        prefsManager.photoResolution = "high"
+        prefsManager.jpegQuality = 90
+        prefsManager.uploadMode = "immediate"
+
+        val backup = prefsManager.exportBackupConfig()
+        assertEquals("192.168.1.99", backup.lanIp)
+        assertEquals("100.81.1.99", backup.tailscaleIp)
+        assertEquals(8096, backup.serverPort)
+        assertEquals("E:\\CustomPhotos", backup.photoSaveDir)
+
+        // Reset to default
+        val newPrefs = PrefsManager(FakeSharedPreferences())
+        assertEquals("192.168.193.11", newPrefs.lanIp)
+
+        // Restore via backup object
+        newPrefs.restoreBackupConfig(backup)
+        assertEquals("192.168.1.99", newPrefs.lanIp)
+        assertEquals("100.81.1.99", newPrefs.tailscaleIp)
+        assertEquals(8096, newPrefs.serverPort)
+        assertEquals("E:\\CustomPhotos", newPrefs.photoSaveDir)
+        assertEquals("high", newPrefs.photoResolution)
+        assertEquals(90, newPrefs.jpegQuality)
+        assertEquals("immediate", newPrefs.uploadMode)
+    }
+
+    @Test
+    fun testRestoreFromJson() {
+        val json = """
+            {
+                "lan_ip": "192.168.1.200",
+                "tailscale_ip": "100.81.2.200",
+                "server_port": 8888,
+                "photo_save_dir": "D:\\TestPhotos",
+                "photo_resolution": "medium",
+                "jpeg_quality": 95,
+                "upload_mode": "review"
+            }
+        """.trimIndent()
+
+        val success = prefsManager.restoreFromJson(json)
+        assertTrue(success)
+        assertEquals("192.168.1.200", prefsManager.lanIp)
+        assertEquals("100.81.2.200", prefsManager.tailscaleIp)
+        assertEquals(8888, prefsManager.serverPort)
+        assertEquals("D:\\TestPhotos", prefsManager.photoSaveDir)
+        assertEquals("medium", prefsManager.photoResolution)
+        assertEquals(95, prefsManager.jpegQuality)
+    }
+
     /**
      * In-memory FakeSharedPreferences implementation for JVM unit tests.
      */

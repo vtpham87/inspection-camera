@@ -2,8 +2,14 @@ package com.ttdk1507d.inspectioncamera.util
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.google.gson.Gson
+import com.google.gson.JsonObject
 import com.ttdk1507d.inspectioncamera.model.AppConfig
+import com.ttdk1507d.inspectioncamera.model.BackupConfig
 import com.ttdk1507d.inspectioncamera.model.TimestampConfig
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class PrefsManager(private val prefs: SharedPreferences) {
 
@@ -56,7 +62,7 @@ class PrefsManager(private val prefs: SharedPreferences) {
         set(value) { prefs.edit().putInt("jpeg_quality", value).commit() }
 
     var plateColorSuffix: Boolean
-        get() = prefs.getBoolean("plate_color_suffix", true)
+        get() = prefs.getBoolean("plate_color_suffix", false)
         set(value) { prefs.edit().putBoolean("plate_color_suffix", value).commit() }
 
     var uploadMode: String
@@ -113,5 +119,68 @@ class PrefsManager(private val prefs: SharedPreferences) {
         timestampFontSize = config.timestamp.fontSize
         timestampStrokeEnabled = config.timestamp.fontStrokeEnabled
         timestampPosition = config.timestamp.position
+    }
+
+    fun exportBackupConfig(): BackupConfig {
+        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        return BackupConfig(
+            exportTime = sdf.format(Date()),
+            lanIp = lanIp,
+            tailscaleIp = tailscaleIp,
+            serverPort = serverPort,
+            vehicleListEnabled = vehicleListEnabled,
+            photoSaveDir = photoSaveDir,
+            passengerPath = passengerPath,
+            newVehiclePath = newVehiclePath,
+            timestampEnabled = timestampEnabled,
+            timestampFormat = timestampFormat,
+            timestampPosition = timestampPosition,
+            timestampFontSize = timestampFontSize,
+            timestampStrokeEnabled = timestampStrokeEnabled,
+            photoResolution = photoResolution,
+            jpegQuality = jpegQuality,
+            uploadMode = uploadMode
+        )
+    }
+
+    fun restoreBackupConfig(config: BackupConfig) {
+        lanIp = config.lanIp
+        tailscaleIp = config.tailscaleIp
+        serverPort = config.serverPort
+        vehicleListEnabled = config.vehicleListEnabled
+        photoSaveDir = config.photoSaveDir
+        passengerPath = config.passengerPath
+        newVehiclePath = config.newVehiclePath
+        timestampEnabled = config.timestampEnabled
+        timestampFormat = config.timestampFormat
+        timestampPosition = config.timestampPosition
+        timestampFontSize = config.timestampFontSize
+        timestampStrokeEnabled = config.timestampStrokeEnabled
+        photoResolution = config.photoResolution
+        jpegQuality = config.jpegQuality
+        uploadMode = config.uploadMode
+    }
+
+    fun restoreFromJson(json: String): Boolean {
+        return try {
+            val gson = Gson()
+            val jsonObj = gson.fromJson(json, JsonObject::class.java) ?: return false
+            if (jsonObj.has("lan_ip")) {
+                val backup = gson.fromJson(jsonObj, BackupConfig::class.java)
+                restoreBackupConfig(backup)
+                true
+            } else if (jsonObj.has("photo_save_dir")) {
+                val appConfig = gson.fromJson(jsonObj, AppConfig::class.java)
+                saveFromAppConfig(appConfig)
+                if (jsonObj.has("server_port")) {
+                    serverPort = jsonObj.get("server_port").asInt
+                }
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            false
+        }
     }
 }

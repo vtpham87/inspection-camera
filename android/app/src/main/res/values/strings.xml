@@ -46,8 +46,24 @@
 
     <string name="setting_photo_resolution">Độ phân giải ảnh</string>
     <string name="setting_jpeg_quality">Chất lượng nén JPEG</string>
-    <string name="setting_plate_color_suffix">Thêm hậu tố màu biển (T/V/X)</string>
     <string name="setting_upload_mode">Chế độ tải ảnh lên máy tính</string>
+
+    <!-- Section 5: Backup & Restore -->
+    <string name="header_backup_restore">5. SAO LƯU &amp; KHÔI PHỤC CẤU HÌNH</string>
+    <string name="desc_backup_restore">Lưu trữ hoặc khôi phục toàn bộ cài đặt (máy chủ, đường dẫn, thông số ảnh) sang tệp JSON.</string>
+    <string name="btn_backup_config">SAO LƯU CẤU HÌNH (XUẤT JSON)</string>
+    <string name="btn_restore_config">KHÔI PHỤC CẤU HÌNH (NHẬP JSON)</string>
+    <string name="backup_success">Đã sao lưu cấu hình thành công</string>
+    <string name="restore_success">Đã khôi phục và áp dụng cấu hình thành công</string>
+    <string name="restore_confirm_title">Xác nhận khôi phục cấu hình</string>
+    <string name="restore_confirm_msg">Toàn bộ cài đặt hiện tại sẽ được thay thế bằng cấu hình từ tệp đã chọn. Bạn có chắc chắn muốn tiếp tục?</string>
+    <string name="restore_error_invalid">Tệp sao lưu không hợp lệ hoặc sai định dạng</string>
+    <string name="restore_error_read">Không thể đọc dữ liệu từ tệp sao lưu</string>
+    <string name="backup_error_write">Không thể ghi tệp sao lưu</string>
+
+    <!-- Section 6: Version & Update -->
+    <string name="header_version_settings">6. PHIÊN BẢN &amp; CẬP NHẬT GITHUB</string>
+    <string name="btn_check_update">KIỂM TRA CẬP NHẬT TỪ GITHUB</string>
 
     <!-- Paths Settings -->
     <string name="setting_photo_save_dir">Đường dẫn ảnh góc chụp 45°</string>

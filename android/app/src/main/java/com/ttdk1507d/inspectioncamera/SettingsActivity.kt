@@ -11,6 +11,7 @@ import android.widget.ProgressBar
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -21,6 +22,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.textfield.TextInputEditText
 import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import com.ttdk1507d.inspectioncamera.api.ApiClient
 import com.ttdk1507d.inspectioncamera.util.NetworkUtil
 import com.ttdk1507d.inspectioncamera.util.PrefsManager
@@ -58,8 +60,11 @@ class SettingsActivity : AppCompatActivity() {
     // Photo & Resolution
     private lateinit var spinnerResolution: Spinner
     private lateinit var spinnerJpegQuality: Spinner
-    private lateinit var switchPlateColorSuffix: MaterialSwitch
     private lateinit var spinnerUploadMode: Spinner
+
+    // Backup & Restore
+    private lateinit var btnBackup: MaterialButton
+    private lateinit var btnRestore: MaterialButton
 
     private lateinit var btnSave: MaterialButton
 
@@ -68,6 +73,18 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var tvUpdateStatus: TextView
     private lateinit var pbUpdate: ProgressBar
     private lateinit var btnCheckUpdate: MaterialButton
+
+    private val createDocumentLauncher = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        uri?.let { saveBackupToUri(it) }
+    }
+
+    private val openDocumentLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let { confirmAndRestoreFromUri(it) }
+    }
 
     private val formatKeys = listOf(
         "HH:mm:ss - dd/MM/yyyy",
@@ -128,8 +145,10 @@ class SettingsActivity : AppCompatActivity() {
 
         spinnerResolution = findViewById(R.id.spinner_settings_resolution)
         spinnerJpegQuality = findViewById(R.id.spinner_settings_jpeg_quality)
-        switchPlateColorSuffix = findViewById(R.id.switch_settings_plate_color_suffix)
         spinnerUploadMode = findViewById(R.id.spinner_settings_upload_mode)
+
+        btnBackup = findViewById(R.id.btn_settings_backup)
+        btnRestore = findViewById(R.id.btn_settings_restore)
 
         btnSave = findViewById(R.id.btn_settings_save)
 
@@ -141,7 +160,7 @@ class SettingsActivity : AppCompatActivity() {
         val versionName = try {
             packageManager.getPackageInfo(packageName, 0).versionName
         } catch (e: Exception) {
-            "1.1.0"
+            "1.1.2"
         }
         tvCurrentVersion.text = "Phiên bản hiện tại: v$versionName"
 
@@ -236,8 +255,6 @@ class SettingsActivity : AppCompatActivity() {
         val qualIdx = jpegQualities.indexOf(prefs.jpegQuality)
         spinnerJpegQuality.setSelection(if (qualIdx >= 0) qualIdx else 1)
 
-        switchPlateColorSuffix.isChecked = prefs.plateColorSuffix
-
         val upIdx = uploadModeKeys.indexOf(prefs.uploadMode)
         spinnerUploadMode.setSelection(if (upIdx >= 0) upIdx else 0)
     }
@@ -245,6 +262,14 @@ class SettingsActivity : AppCompatActivity() {
     private fun setupListeners() {
         btnTest.setOnClickListener {
             testConnections()
+        }
+
+        btnBackup.setOnClickListener {
+            createDocumentLauncher.launch("1507DCamera_config.json")
+        }
+
+        btnRestore.setOnClickListener {
+            openDocumentLauncher.launch(arrayOf("application/json", "*/*"))
         }
 
         btnSave.setOnClickListener {
@@ -350,10 +375,60 @@ class SettingsActivity : AppCompatActivity() {
 
         prefs.photoResolution = resolutionKeys[spinnerResolution.selectedItemPosition.coerceIn(0, resolutionKeys.lastIndex)]
         prefs.jpegQuality = jpegQualities[spinnerJpegQuality.selectedItemPosition.coerceIn(0, jpegQualities.lastIndex)]
-        prefs.plateColorSuffix = switchPlateColorSuffix.isChecked
+        prefs.plateColorSuffix = false
         prefs.uploadMode = uploadModeKeys[spinnerUploadMode.selectedItemPosition.coerceIn(0, uploadModeKeys.lastIndex)]
 
         // Sync with server — send ALL fields including paths so backend updates correctly
+        syncConfigToServer()
+
+        Toast.makeText(this, getString(R.string.settings_saved), Toast.LENGTH_SHORT).show()
+        finish()
+    }
+
+    private fun saveBackupToUri(uri: Uri) {
+        try {
+            val backupConfig = prefs.exportBackupConfig()
+            val gson = GsonBuilder().setPrettyPrinting().create()
+            val json = gson.toJson(backupConfig)
+            contentResolver.openOutputStream(uri)?.use { os ->
+                os.write(json.toByteArray(Charsets.UTF_8))
+            }
+            Toast.makeText(this, getString(R.string.backup_success), Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "${getString(R.string.backup_error_write)}: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun confirmAndRestoreFromUri(uri: Uri) {
+        try {
+            val json = contentResolver.openInputStream(uri)?.use { inputStream ->
+                inputStream.bufferedReader(Charsets.UTF_8).readText()
+            } ?: run {
+                Toast.makeText(this, getString(R.string.restore_error_read), Toast.LENGTH_SHORT).show()
+                return
+            }
+
+            AlertDialog.Builder(this)
+                .setTitle(R.string.restore_confirm_title)
+                .setMessage(R.string.restore_confirm_msg)
+                .setPositiveButton("Khôi phục") { _, _ ->
+                    val success = prefs.restoreFromJson(json)
+                    if (success) {
+                        loadCurrentSettings()
+                        syncConfigToServer()
+                        Toast.makeText(this, getString(R.string.restore_success), Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this, getString(R.string.restore_error_invalid), Toast.LENGTH_LONG).show()
+                    }
+                }
+                .setNegativeButton("Huỷ", null)
+                .show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "${getString(R.string.restore_error_read)}: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun syncConfigToServer() {
         val currentConfig = prefs.getAppConfig()
         val lanUrl = prefs.lanUrl
         val tailscaleUrl = prefs.tailscaleUrl
@@ -362,7 +437,6 @@ class SettingsActivity : AppCompatActivity() {
                 val baseUrl = NetworkUtil.resolveBaseUrl(lanUrl, tailscaleUrl)
                 if (baseUrl != null) {
                     val service = ApiClient.getService(baseUrl)
-                    // Use postConfig (full PhotoConfig body) so backend persists passenger_path & new_vehicle_path
                     val body = mapOf<String, Any>(
                         "vehicle_list_enabled" to currentConfig.vehicleListEnabled,
                         "server_port" to currentConfig.serverPort,
@@ -371,7 +445,7 @@ class SettingsActivity : AppCompatActivity() {
                         "new_vehicle_path" to currentConfig.newVehiclePath,
                         "sync_new_vehicle_45" to currentConfig.syncNewVehicle45,
                         "jpeg_quality" to currentConfig.jpegQuality,
-                        "plate_color_suffix" to currentConfig.plateColorSuffix,
+                        "plate_color_suffix" to false,
                         "photo_resolution" to currentConfig.photoResolution
                     )
                     service.postConfig(body)
@@ -380,9 +454,6 @@ class SettingsActivity : AppCompatActivity() {
                 // Config already saved locally — will sync next time
             }
         }
-
-        Toast.makeText(this, getString(R.string.settings_saved), Toast.LENGTH_SHORT).show()
-        finish()
     }
 
     private data class GitHubRelease(

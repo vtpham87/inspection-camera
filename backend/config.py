@@ -29,7 +29,7 @@ class PhotoConfig(BaseModel):
         "new_vehicle": "D:\\Photos\\{date}\\{plate}",
     }
     jpeg_quality: int = 85
-    plate_color_suffix: bool = True
+    plate_color_suffix: bool = False
     timestamp: TimestampConfig = TimestampConfig()
     photo_resolution: str = "original"
 

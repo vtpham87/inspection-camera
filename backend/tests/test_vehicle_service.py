@@ -120,8 +120,8 @@ def test_photos_taken_detects_existing_photos(mock_db, tmp_path):
     target_dir = photo_dir / today
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    (target_dir / "15A12345T.jpg").write_bytes(b"dummy")
-    (target_dir / "bs15A12345T.jpg").write_bytes(b"dummy")
+    (target_dir / "15A12345.jpg").write_bytes(b"dummy")
+    (target_dir / "bs15A12345.jpg").write_bytes(b"dummy")
 
     result = get_vehicles_today(mock_db, "2026-09-27", config)
     v15 = [v for v in result if v["plate_clean"] == "15A12345"][0]

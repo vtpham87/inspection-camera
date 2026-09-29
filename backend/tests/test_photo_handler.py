@@ -225,8 +225,8 @@ def test_sync_new_vehicle_copies_front_and_rear(tmp_path):
 
     # Check that new_vehicle subfolder now contains rear_45 and front_45 copies!
     nv_dir = os.path.dirname(res_nv["path"])
-    assert os.path.exists(os.path.join(nv_dir, "15A12345T.jpg"))
-    assert os.path.exists(os.path.join(nv_dir, "bs15A12345T.jpg"))
+    assert os.path.exists(os.path.join(nv_dir, "15A12345.jpg"))
+    assert os.path.exists(os.path.join(nv_dir, "bs15A12345.jpg"))
     assert os.path.exists(os.path.join(nv_dir, "15A12345_1.jpg"))
 
 def test_save_photo_45_directly_in_chosen_dir_without_date(tmp_path):
@@ -235,8 +235,8 @@ def test_save_photo_45_directly_in_chosen_dir_without_date(tmp_path):
     jpeg = b"\xff\xd8\xff\xe0" + b"\x00" * 100 + b"\xff\xd9"
     result = save_photo(jpeg, "15A12345", "T", "rear_45", None, config)
     assert result["ok"] is True
-    expected_path = os.path.join(str(chosen_dir), "15A12345T.jpg")
+    expected_path = os.path.join(str(chosen_dir), "15A12345.jpg")
     assert result["path"] == expected_path
     assert os.path.exists(expected_path)
     # Ensure no subdirectories were created inside chosen_dir
-    assert os.listdir(str(chosen_dir)) == ["15A12345T.jpg"]
+    assert os.listdir(str(chosen_dir)) == ["15A12345.jpg"]
