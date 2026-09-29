@@ -74,8 +74,8 @@ class PrefsManagerTest {
     }
 
     @Test
-    fun testPlateColorSuffixDefaultFalse() {
-        assertFalse(prefsManager.plateColorSuffix)
+    fun testPlateColorSuffixDefaultTrue() {
+        assertTrue(prefsManager.plateColorSuffix)
     }
 
     @Test

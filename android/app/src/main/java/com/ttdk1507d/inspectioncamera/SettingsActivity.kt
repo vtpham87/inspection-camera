@@ -375,7 +375,7 @@ class SettingsActivity : AppCompatActivity() {
 
         prefs.photoResolution = resolutionKeys[spinnerResolution.selectedItemPosition.coerceIn(0, resolutionKeys.lastIndex)]
         prefs.jpegQuality = jpegQualities[spinnerJpegQuality.selectedItemPosition.coerceIn(0, jpegQualities.lastIndex)]
-        prefs.plateColorSuffix = false
+        prefs.plateColorSuffix = true
         prefs.uploadMode = uploadModeKeys[spinnerUploadMode.selectedItemPosition.coerceIn(0, uploadModeKeys.lastIndex)]
 
         // Sync with server — send ALL fields including paths so backend updates correctly
@@ -445,7 +445,7 @@ class SettingsActivity : AppCompatActivity() {
                         "new_vehicle_path" to currentConfig.newVehiclePath,
                         "sync_new_vehicle_45" to currentConfig.syncNewVehicle45,
                         "jpeg_quality" to currentConfig.jpegQuality,
-                        "plate_color_suffix" to false,
+                        "plate_color_suffix" to true,
                         "photo_resolution" to currentConfig.photoResolution
                     )
                     service.postConfig(body)

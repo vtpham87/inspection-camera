@@ -79,7 +79,29 @@ def test_resolve_save_path(tmp_path):
     config.paths["passenger"] = str(tmp_path / "{date}" / "{plate}")
     resolved = resolve_save_path("passenger", "15A12345", config, create_dir=True)
     assert os.path.exists(resolved)
-    assert "15A12345" in resolved
+    assert resolved.endswith("15A12345T")
+
+def test_resolve_save_path_color_formats(tmp_path):
+    config = PhotoConfig()
+    config.paths["passenger"] = str(tmp_path / "{date}" / "{plate}")
+    # 5-digit with explicit T
+    r1 = resolve_save_path("passenger", "15A12345", config, plate_color="T")
+    assert r1.endswith("15A12345T")
+    # 5-digit already with T suffix in plate string
+    r2 = resolve_save_path("passenger", "15A12345T", config)
+    assert r2.endswith("15A12345T")
+    # 5-digit without color defaults to T
+    r3 = resolve_save_path("passenger", "15A12345", config)
+    assert r3.endswith("15A12345T")
+    # Yellow plate V
+    r4 = resolve_save_path("passenger", "15C12345", config, plate_color="V")
+    assert r4.endswith("15C12345V")
+    # Blue plate X
+    r5 = resolve_save_path("passenger", "15A00123", config, plate_color="X")
+    assert r5.endswith("15A00123X")
+    # Old 4-digit plate (no color)
+    r6 = resolve_save_path("passenger", "11K2639", config)
+    assert r6.endswith("11K2639")
 
 def test_resolve_save_path_no_create_dir(tmp_path):
     config = PhotoConfig()
@@ -173,30 +195,31 @@ def test_save_photo_auto_increments_seq(tmp_path):
     # First save with seq=None
     res1 = save_photo(jpeg, "15A12345", None, "passenger", None, config)
     assert res1["ok"] is True
-    assert res1["filename"] == "15A12345_1.jpg"
+    assert res1["filename"] == "15A12345T_1.jpg"
     assert os.path.exists(res1["path"])
+    assert "15A12345T" in res1["path"]
 
     # Second save with seq=None
     res2 = save_photo(jpeg, "15A12345", None, "passenger", None, config)
     assert res2["ok"] is True
-    assert res2["filename"] == "15A12345_2.jpg"
+    assert res2["filename"] == "15A12345T_2.jpg"
     assert os.path.exists(res2["path"])
 
     # Third save with seq=None
     res3 = save_photo(jpeg, "15A12345", None, "passenger", None, config)
     assert res3["ok"] is True
-    assert res3["filename"] == "15A12345_3.jpg"
+    assert res3["filename"] == "15A12345T_3.jpg"
     assert os.path.exists(res3["path"])
 
     # Explicit seq is preserved
     res_explicit = save_photo(jpeg, "15A12345", None, "passenger", 10, config)
     assert res_explicit["ok"] is True
-    assert res_explicit["filename"] == "15A12345_10.jpg"
+    assert res_explicit["filename"] == "15A12345T_10.jpg"
 
     # Next auto seq picks up max + 1
     res4 = save_photo(jpeg, "15A12345", None, "passenger", None, config)
     assert res4["ok"] is True
-    assert res4["filename"] == "15A12345_11.jpg"
+    assert res4["filename"] == "15A12345T_11.jpg"
 
 
 def test_sync_new_vehicle_copies_front_and_rear(tmp_path):

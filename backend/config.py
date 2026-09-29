@@ -34,6 +34,7 @@ class PhotoConfig(BaseModel):
     photo_resolution: str = "original"
 
     def model_post_init(self, __context):
+        self.plate_color_suffix = True
         root = self.photo_save_dir.rstrip("\\/")
         # Ảnh góc 45° lưu trực tiếp vào thư mục chọn, không tạo thư mục con theo ngày
         self.paths["rear_45"] = root

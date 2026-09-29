@@ -62,7 +62,7 @@ class PrefsManager(private val prefs: SharedPreferences) {
         set(value) { prefs.edit().putInt("jpeg_quality", value).commit() }
 
     var plateColorSuffix: Boolean
-        get() = prefs.getBoolean("plate_color_suffix", false)
+        get() = prefs.getBoolean("plate_color_suffix", true)
         set(value) { prefs.edit().putBoolean("plate_color_suffix", value).commit() }
 
     var uploadMode: String

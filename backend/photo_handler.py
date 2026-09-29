@@ -64,6 +64,8 @@ def build_filename(
     lan_kd: int | None = 1,
 ) -> str:
     plate, plate_color, lan_kd = clean_plate_and_color(plate, plate_color, lan_kd)
+    if not plate_color and re.search(r"\d{5}$", plate):
+        plate_color = "T"
     if lan_kd and lan_kd > 1:
         suffix = f"{plate_color or ''}L{lan_kd}"
         if photo_type == "rear_45":
@@ -103,7 +105,11 @@ def resolve_save_path(
 ) -> str:
     template = config.paths.get(photo_type, config.photo_save_dir)
     current_date = date_str.replace("-", "") if date_str is not None else datetime.now().strftime("%Y%m%d")
-    folder_plate = f"{plate}{plate_color}" if (plate_color and config.plate_color_suffix) else plate
+    clean_p, det_c, _ = clean_plate_and_color(plate, plate_color)
+    final_color = plate_color or det_c
+    if not final_color and re.search(r"\d{5}$", clean_p):
+        final_color = "T"
+    folder_plate = f"{clean_p}{final_color}" if (final_color and getattr(config, "plate_color_suffix", True)) else clean_p
     path = template.replace("{date}", current_date).replace("{plate}", folder_plate)
     if create_dir:
         os.makedirs(path, exist_ok=True)
@@ -123,6 +129,8 @@ def sync_new_vehicle_photos(
     lan_kd: int | None = 1,
 ) -> None:
     plate, plate_color, lan_kd = clean_plate_and_color(plate, plate_color, lan_kd)
+    if not plate_color and re.search(r"\d{5}$", plate):
+        plate_color = "T"
     if not getattr(config, "sync_new_vehicle_45", True):
         return
 
@@ -185,6 +193,9 @@ def save_photo(
     # Validate plate color
     if plate_color not in (None, "", "T", "V", "X"):
         return {"ok": False, "error": "Màu biển không hợp lệ"}
+
+    if not plate_color and re.search(r"\d{5}$", plate):
+        plate_color = "T"
 
     # Validate photo type
     if photo_type not in VALID_PHOTO_TYPES:

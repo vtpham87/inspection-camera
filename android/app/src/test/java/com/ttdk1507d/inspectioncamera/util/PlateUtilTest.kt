@@ -61,4 +61,15 @@ class PlateUtilTest {
         assertEquals("15A12345A", plate)
         assertNull(color)
     }
+
+    @Test
+    fun testFormatCompactPlate() {
+        assertEquals("15A12345T", PlateUtil.formatCompactPlate("15A12345", "T"))
+        assertEquals("15A12345T", PlateUtil.formatCompactPlate("15A12345T", null))
+        assertEquals("15A12345T", PlateUtil.formatCompactPlate("15A12345", null))
+        assertEquals("15C12345V", PlateUtil.formatCompactPlate("15C12345", "V"))
+        assertEquals("15A00123X", PlateUtil.formatCompactPlate("15A00123", "X"))
+        assertEquals("11K2639", PlateUtil.formatCompactPlate("11K2639", null))
+        assertEquals("15A12345TL2", PlateUtil.formatCompactPlate("15A12345", "T", lanKd = 2))
+    }
 }

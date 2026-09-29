@@ -90,7 +90,7 @@ def test_upload_with_seq(setup_env):
     )
     assert r.status_code == 200
     assert r.json()["ok"] is True
-    assert r.json()["filename"] == "15A12345_2.jpg"
+    assert r.json()["filename"] == "15A12345T_2.jpg"
 
 def test_get_config(setup_env):
     client, _ = setup_env
@@ -272,7 +272,7 @@ def test_upload_auto_seq_passenger(setup_env):
         files={"file": ("test1.jpg", FAKE_JPEG, "image/jpeg")},
     )
     assert r1.status_code == 200
-    assert r1.json()["filename"] == "15A12345_1.jpg"
+    assert r1.json()["filename"] == "15A12345T_1.jpg"
 
     r2 = client.post(
         "/api/upload",
@@ -280,5 +280,5 @@ def test_upload_auto_seq_passenger(setup_env):
         files={"file": ("test2.jpg", FAKE_JPEG, "image/jpeg")},
     )
     assert r2.status_code == 200
-    assert r2.json()["filename"] == "15A12345_2.jpg"
+    assert r2.json()["filename"] == "15A12345T_2.jpg"
 

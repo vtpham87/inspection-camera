@@ -184,6 +184,10 @@ class MainActivity : AppCompatActivity() {
                         else -> {
                             if (cleaned.last().isDigit() && Regex("^[0-9]{2}[A-Z]{1,2}[0-9]{4}$").matches(cleaned)) {
                                 rgPlateColor.check(R.id.rb_color_none)
+                            } else if (cleaned.isNotEmpty() && Regex("\\d{5}$").containsMatchIn(cleaned)) {
+                                if (rgPlateColor.checkedRadioButtonId == R.id.rb_color_none || rgPlateColor.checkedRadioButtonId == -1) {
+                                    rgPlateColor.check(R.id.rb_color_white)
+                                }
                             }
                         }
                     }
@@ -256,10 +260,9 @@ class MainActivity : AppCompatActivity() {
         // 3. If entered plate ends with a digit (old plate like 11K2639), do NOT force "T".
         val finalColor = when {
             extractedColor != null -> extractedColor
-            rgPlateColor.checkedRadioButtonId == R.id.rb_color_none -> null
-            rgPlateColor.checkedRadioButtonId == -1 -> null
             selectedColor != null -> selectedColor
-            basePlate.isNotEmpty() && basePlate.last().isDigit() -> null
+            rgPlateColor.checkedRadioButtonId == R.id.rb_color_none -> null
+            basePlate.isNotEmpty() && Regex("\\d{5}$").containsMatchIn(basePlate) -> "T"
             else -> null
         }
 
@@ -290,7 +293,10 @@ class MainActivity : AppCompatActivity() {
     private fun openCamera(plate: String, plateColor: String?, photosTaken: List<String>? = null, lanKd: Int = 1) {
         val parsed = PlateUtil.parsePlate(plate)
         val basePlate = parsed.basePlate
-        val color = plateColor ?: parsed.color
+        var color = plateColor ?: parsed.color
+        if (color == null && Regex("\\d{5}$").containsMatchIn(basePlate)) {
+            color = "T"
+        }
         val effectiveLan = if (lanKd > 1) lanKd else parsed.lanKd
 
         val intent = Intent(this, CameraActivity::class.java).apply {

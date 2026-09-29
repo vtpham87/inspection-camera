@@ -93,16 +93,17 @@ def delete_photo(req: DeleteRequest):
         color = req.plate_color
 
     candidate_colors = [color] if color else [None, "T", "V", "X"]
-    save_dir = resolve_save_path(req.photo_type, plate_num, config, create_dir=False, plate_color=color)
-
     deleted_path = None
+    matched_save_dir = None
     for c in candidate_colors:
         try:
+            cur_save_dir = resolve_save_path(req.photo_type, plate_num, config, create_dir=False, plate_color=c)
             filename = build_filename(plate_num, c, req.photo_type, req.seq, config.plate_color_suffix, lan_kd=req.lan_kd)
-            full_path = os.path.join(save_dir, filename)
+            full_path = os.path.join(cur_save_dir, filename)
             if os.path.exists(full_path):
                 os.remove(full_path)
                 deleted_path = full_path
+                matched_save_dir = cur_save_dir
                 break
         except ValueError:
             pass
@@ -111,12 +112,13 @@ def delete_photo(req: DeleteRequest):
         try:
             root_save_dir = os.path.realpath(config.photo_save_dir)
             if (
-                os.path.realpath(save_dir) != root_save_dir
-                and os.path.exists(save_dir)
-                and os.path.isdir(save_dir)
-                and not os.listdir(save_dir)
+                matched_save_dir
+                and os.path.realpath(matched_save_dir) != root_save_dir
+                and os.path.exists(matched_save_dir)
+                and os.path.isdir(matched_save_dir)
+                and not os.listdir(matched_save_dir)
             ):
-                os.rmdir(save_dir)
+                os.rmdir(matched_save_dir)
         except Exception:
             pass
         return {"ok": True, "deleted": deleted_path}

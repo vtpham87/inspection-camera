@@ -75,6 +75,9 @@ class ReviewActivity : AppCompatActivity() {
         val parsed = com.ttdk1507d.inspectioncamera.util.PlateUtil.parsePlate(rawPlate)
         plate = parsed.basePlate
         plateColor = intent.getStringExtra(EXTRA_PLATE_COLOR) ?: parsed.color
+        if (plateColor == null && Regex("\\d{5}$").containsMatchIn(plate)) {
+            plateColor = "T"
+        }
         lanKd = intent.getIntExtra(EXTRA_LAN_KD, parsed.lanKd)
 
         initViews()
@@ -311,7 +314,7 @@ class ReviewActivity : AppCompatActivity() {
                         "new_vehicle_path" to cfg.newVehiclePath,
                         "sync_new_vehicle_45" to cfg.syncNewVehicle45,
                         "jpeg_quality" to cfg.jpegQuality,
-                        "plate_color_suffix" to cfg.plateColorSuffix,
+                        "plate_color_suffix" to true,
                         "photo_resolution" to cfg.photoResolution
                     )
                     service.postConfig(body)

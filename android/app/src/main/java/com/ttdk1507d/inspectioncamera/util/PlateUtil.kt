@@ -63,7 +63,10 @@ object PlateUtil {
     fun formatCompactPlate(rawPlate: String, rawColor: String?, lanKd: Int = 1): String {
         val parsed = parsePlate(rawPlate)
         val base = parsed.basePlate
-        val color = (rawColor?.uppercase() ?: parsed.color)?.trim()
+        var color = (rawColor?.uppercase() ?: parsed.color)?.trim()
+        if (color.isNullOrEmpty() && Regex("\\d{5}$").containsMatchIn(base)) {
+            color = "T"
+        }
         val effectiveLan = if (lanKd > 1) lanKd else 1
         val baseWithColor = if (!color.isNullOrEmpty() && color in listOf("T", "V", "X")) {
             "$base$color"

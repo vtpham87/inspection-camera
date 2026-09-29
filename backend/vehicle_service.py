@@ -148,6 +148,8 @@ def check_plate_status(
 
     clean_plate, detected_color = extract_plate_color(plate)
     final_color = plate_color or detected_color
+    if not final_color and re.search(r"\d{5}$", clean_plate):
+        final_color = "T"
     biendk_id = f"{clean_plate}{final_color}" if final_color else clean_plate
 
     has_failed_today = False

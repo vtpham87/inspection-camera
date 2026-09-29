@@ -124,6 +124,9 @@ class CameraActivity : AppCompatActivity() {
         val parsed = PlateUtil.parsePlate(rawPlate)
         plate = parsed.basePlate
         plateColor = intent.getStringExtra(EXTRA_PLATE_COLOR) ?: parsed.color
+        if (plateColor == null && Regex("\\d{5}$").containsMatchIn(plate)) {
+            plateColor = "T"
+        }
         lanKd = intent.getIntExtra(EXTRA_LAN_KD, parsed.lanKd)
 
         if (plate.isEmpty()) {

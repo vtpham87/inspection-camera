@@ -24,7 +24,7 @@ data class AppConfig(
     @SerializedName("sync_new_vehicle_45") val syncNewVehicle45: Boolean = true,
     val paths: Map<String, String>? = null,
     @SerializedName("jpeg_quality") val jpegQuality: Int = 85,
-    @SerializedName("plate_color_suffix") val plateColorSuffix: Boolean = false,
+    @SerializedName("plate_color_suffix") val plateColorSuffix: Boolean = true,
     val timestamp: TimestampConfig = TimestampConfig(),
     @SerializedName("photo_resolution") val photoResolution: String = "low"
 )
