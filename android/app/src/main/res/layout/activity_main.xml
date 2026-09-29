@@ -113,7 +113,7 @@
 
             </LinearLayout>
 
-            <!-- Row 2: Plate Color & Lần khám (Single line with horizontal scroll) -->
+            <!-- Row 2: Plate Color -->
             <HorizontalScrollView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -176,49 +176,53 @@
 
                     </RadioGroup>
 
-                    <View
-                        android:layout_width="1dp"
-                        android:layout_height="18dp"
-                        android:layout_marginHorizontal="10dp"
-                        android:background="@color/divider" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Khám:"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="13sp"
-                        android:textStyle="bold"
-                        android:layout_marginEnd="4dp" />
-
-                    <RadioGroup
-                        android:id="@+id/rg_lan_kd"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
-
-                        <RadioButton
-                            android:id="@+id/rb_lan_1"
-                            android:layout_width="wrap_content"
-                            android:layout_height="36dp"
-                            android:checked="true"
-                            android:text="Lần 1"
-                            android:textSize="13sp" />
-
-                        <RadioButton
-                            android:id="@+id/rb_lan_2"
-                            android:layout_width="wrap_content"
-                            android:layout_height="36dp"
-                            android:text="Lần 2"
-                            android:layout_marginStart="4dp"
-                            android:textSize="13sp" />
-
-                    </RadioGroup>
-
                 </LinearLayout>
 
             </HorizontalScrollView>
+
+            <!-- Row 3: Lần khám -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Khám:"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:layout_marginEnd="6dp" />
+
+                <RadioGroup
+                    android:id="@+id/rg_lan_kd"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <RadioButton
+                        android:id="@+id/rb_lan_1"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:checked="true"
+                        android:text="Lần 1"
+                        android:textSize="13sp" />
+
+                    <RadioButton
+                        android:id="@+id/rb_lan_2"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:text="Lần 2"
+                        android:layout_marginStart="12dp"
+                        android:textSize="13sp" />
+
+                </RadioGroup>
+
+            </LinearLayout>
 
         </LinearLayout>
 

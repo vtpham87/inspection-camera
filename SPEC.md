@@ -530,3 +530,6 @@ Có thể đăng ký Windows Service hoặc thêm vào Task Scheduler khởi đ�
 - ✅ Tối ưu danh sách xe 1 dòng duy nhất (biển to + badge màu + badge Lần 2)
 - ✅ Sắp xếp lại trang chọn biển: Thu gọn khối nhập thủ công (ô nhập + nút Chụp cùng hàng; màu biển + lần khám cùng hàng dưới), tối ưu 80% diện tích cho danh sách xe chờ
 - ✅ Cập nhật GitHub Release: Chỉ tải về APK vào máy, không tự động mở cài đặt ngay, cho phép cài đặt chủ động khi sẵn sàng
+
+### v1.2.5
+- ✅ Khám: Lần 1 / Lần 2 tách xuống dòng kế tiếp độc lập với dòng chọn màu biển, tăng khoảng cách thao tác bấm trên điện thoại
