@@ -64,10 +64,10 @@ def test_filename_chassis():
     assert build_filename("15A12345", "T", "chassis", None, True) == "sk_15A12345.jpg"
 
 def test_filename_passenger_seq():
-    assert build_filename("15A12345", "T", "passenger", 2, True) == "15A12345_2.jpg"
+    assert build_filename("15A12345", "T", "passenger", 2, True) == "15A12345T_2.jpg"
 
 def test_filename_new_vehicle_seq():
-    assert build_filename("15A12345", "T", "new_vehicle", 1, True) == "15A12345_1.jpg"
+    assert build_filename("15A12345", "T", "new_vehicle", 1, True) == "15A12345T_1.jpg"
 
 def test_filename_invalid_photo_type():
     with pytest.raises(ValueError, match="Loại ảnh không hợp lệ"):
@@ -226,9 +226,9 @@ def test_sync_new_vehicle_copies_front_and_rear(tmp_path):
 
     # Check that new_vehicle subfolder now contains rear_45 and front_45 copies!
     nv_dir = os.path.dirname(res_nv["path"])
-    assert os.path.exists(os.path.join(nv_dir, "15A12345.jpg"))
-    assert os.path.exists(os.path.join(nv_dir, "bs15A12345.jpg"))
-    assert os.path.exists(os.path.join(nv_dir, "15A12345_1.jpg"))
+    assert os.path.exists(os.path.join(nv_dir, "15A12345T.jpg"))
+    assert os.path.exists(os.path.join(nv_dir, "bs15A12345T.jpg"))
+    assert os.path.exists(os.path.join(nv_dir, "15A12345T_1.jpg"))
 
 def test_save_photo_45_directly_in_chosen_dir_without_date(tmp_path):
     chosen_dir = tmp_path / "AnhPhuongTien"
@@ -236,11 +236,11 @@ def test_save_photo_45_directly_in_chosen_dir_without_date(tmp_path):
     jpeg = b"\xff\xd8\xff\xe0" + b"\x00" * 100 + b"\xff\xd9"
     result = save_photo(jpeg, "15A12345", "T", "rear_45", None, config)
     assert result["ok"] is True
-    expected_path = os.path.join(str(chosen_dir), "15A12345.jpg")
+    expected_path = os.path.join(str(chosen_dir), "15A12345T.jpg")
     assert result["path"] == expected_path
     assert os.path.exists(expected_path)
     # Ensure no subdirectories were created inside chosen_dir
-    assert os.listdir(str(chosen_dir)) == ["15A12345.jpg"]
+    assert os.listdir(str(chosen_dir)) == ["15A12345T.jpg"]
 
 
 # --- lan_kd (Lần 2) tests ---

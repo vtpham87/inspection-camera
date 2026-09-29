@@ -78,9 +78,7 @@ def build_filename(
         else:
             raise ValueError(f"Loại ảnh không hợp lệ: {photo_type}")
 
-    suffix = ""
-    if color_suffix_enabled and plate_color:
-        suffix = plate_color
+    suffix = plate_color if (color_suffix_enabled and plate_color) else ""
 
     if photo_type == "rear_45":
         return f"{plate}{suffix}.jpg"
@@ -90,7 +88,7 @@ def build_filename(
         return f"sk_{plate}.jpg"
     elif photo_type in ("passenger", "new_vehicle"):
         s = seq if seq else 1
-        return f"{plate}_{s}.jpg"
+        return f"{plate}{suffix}_{s}.jpg"
     else:
         raise ValueError(f"Loại ảnh không hợp lệ: {photo_type}")
 
@@ -101,10 +99,12 @@ def resolve_save_path(
     config: PhotoConfig,
     create_dir: bool = False,
     date_str: str | None = None,
+    plate_color: str | None = None,
 ) -> str:
     template = config.paths.get(photo_type, config.photo_save_dir)
     current_date = date_str.replace("-", "") if date_str is not None else datetime.now().strftime("%Y%m%d")
-    path = template.replace("{date}", current_date).replace("{plate}", plate)
+    folder_plate = f"{plate}{plate_color}" if (plate_color and config.plate_color_suffix) else plate
+    path = template.replace("{date}", current_date).replace("{plate}", folder_plate)
     if create_dir:
         os.makedirs(path, exist_ok=True)
     return path
@@ -126,19 +126,20 @@ def sync_new_vehicle_photos(
     if not getattr(config, "sync_new_vehicle_45", True):
         return
 
-    new_veh_dir = resolve_save_path("new_vehicle", plate, config, create_dir=False)
+    new_veh_dir = resolve_save_path("new_vehicle", plate, config, create_dir=False, plate_color=plate_color)
     if not os.path.exists(new_veh_dir) or not os.path.isdir(new_veh_dir):
         return
 
     # Only sync if new_veh_dir actually contains new_vehicle photos
-    prefix = f"{plate}{plate_color or ''}L{lan_kd}" if (lan_kd and lan_kd > 1) else plate
+    color_part = plate_color if (plate_color and config.plate_color_suffix) else ""
+    prefix = f"{plate}{plate_color or ''}L{lan_kd}" if (lan_kd and lan_kd > 1) else f"{plate}{color_part}"
     existing_photos = [f for f in os.listdir(new_veh_dir) if f.lower().endswith(".jpg")]
     has_nv = any(f.startswith(f"{prefix}_") for f in existing_photos)
     if not has_nv:
         return
 
-    rear_dir = resolve_save_path("rear_45", plate, config, create_dir=False)
-    front_dir = resolve_save_path("front_45", plate, config, create_dir=False)
+    rear_dir = resolve_save_path("rear_45", plate, config, create_dir=False, plate_color=plate_color)
+    front_dir = resolve_save_path("front_45", plate, config, create_dir=False, plate_color=plate_color)
 
     # Sync matching rear_45 photo
     if os.path.exists(rear_dir):
@@ -198,11 +199,12 @@ def save_photo(
         return {"ok": False, "error": f"File vượt quá {MAX_FILE_SIZE // (1024*1024)}MB"}
 
     # Only create directory when actually saving photo
-    save_dir = resolve_save_path(photo_type, plate, config, create_dir=True)
+    save_dir = resolve_save_path(photo_type, plate, config, create_dir=True, plate_color=plate_color)
 
     # Auto-increment seq when seq is None for multi-photo types
     if photo_type in ("passenger", "new_vehicle") and seq is None:
-        prefix = f"{plate}{plate_color or ''}L{lan_kd}" if (lan_kd and lan_kd > 1) else plate
+        color_part = plate_color if (plate_color and config.plate_color_suffix) else ""
+        prefix = f"{plate}{plate_color or ''}L{lan_kd}" if (lan_kd and lan_kd > 1) else f"{plate}{color_part}"
         pattern = re.compile(rf"^{re.escape(prefix)}_(\d+)\.jpg$", re.IGNORECASE)
         existing = []
         if os.path.exists(save_dir) and os.path.isdir(save_dir):

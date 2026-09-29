@@ -93,7 +93,7 @@ def delete_photo(req: DeleteRequest):
         color = req.plate_color
 
     candidate_colors = [color] if color else [None, "T", "V", "X"]
-    save_dir = resolve_save_path(req.photo_type, plate_num, config, create_dir=False)
+    save_dir = resolve_save_path(req.photo_type, plate_num, config, create_dir=False, plate_color=color)
 
     deleted_path = None
     for c in candidate_colors:

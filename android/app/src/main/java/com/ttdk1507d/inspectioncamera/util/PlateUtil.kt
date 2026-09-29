@@ -64,7 +64,7 @@ object PlateUtil {
         val parsed = parsePlate(rawPlate)
         val base = parsed.basePlate
         val color = (rawColor?.uppercase() ?: parsed.color)?.trim()
-        val effectiveLan = if (lanKd > 1) lanKd else parsed.lanKd
+        val effectiveLan = if (lanKd > 1) lanKd else 1
         val baseWithColor = if (!color.isNullOrEmpty() && color in listOf("T", "V", "X")) {
             "$base$color"
         } else {

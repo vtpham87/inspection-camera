@@ -122,8 +122,8 @@ def test_photos_taken_detects_existing_photos(mock_db, tmp_path):
     target_dir = photo_dir / today
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    (target_dir / "15A12345.jpg").write_bytes(b"dummy")
-    (target_dir / "bs15A12345.jpg").write_bytes(b"dummy")
+    (target_dir / "15A12345T.jpg").write_bytes(b"dummy")
+    (target_dir / "bs15A12345T.jpg").write_bytes(b"dummy")
 
     result = get_vehicles_today(mock_db, "2026-09-27", config)
     v15 = [v for v in result if v["plate_clean"] == "15A12345"][0]
@@ -141,10 +141,10 @@ def test_photos_taken_passenger_with_seq(mock_db, tmp_path):
     config.paths["passenger"] = str(photo_dir / "{date}" / "{plate}")
 
     today = "20260927"
-    target_dir = photo_dir / today / "15A12345"
+    target_dir = photo_dir / today / "15A12345T"
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    (target_dir / "15A12345_1.jpg").write_bytes(b"dummy")
+    (target_dir / "15A12345T_1.jpg").write_bytes(b"dummy")
 
     result = get_vehicles_today(mock_db, "2026-09-27", config)
     v15 = [v for v in result if v["plate_clean"] == "15A12345"][0]
@@ -307,12 +307,38 @@ def test_check_plate_status_detects_failure_and_l1(tmp_path):
     for pt in config.paths:
         config.paths[pt] = str(photo_dir)
     photo_dir.mkdir(parents=True, exist_ok=True)
-    (photo_dir / "15A12345.jpg").write_bytes(b"dummy")
+    (photo_dir / "15A12345T.jpg").write_bytes(b"dummy")
 
     status = check_plate_status(db_path, "15A12345", "T", config, date="2026-09-27")
     assert status["has_failed_today"] is True
     assert status["has_l1_photos"] is True
     assert status["suggest_lan_2"] is True
+
+
+def test_suggest_lan_2_is_false_when_not_failed_even_with_l1_photos(tmp_path):
+    from vehicle_service import check_plate_status
+    db_path = str(tmp_path / "test_check_plate2.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("CREATE TABLE inspections (sophieu TEXT, biendk_id TEXT, ngaykd TEXT, giokd TEXT, ketluan INTEGER, sotem TEXT, lankd INTEGER)")
+    # Vehicle passed (ketluan = 0) or no failure recorded
+    cur.execute("INSERT INTO inspections VALUES ('091/26', '15A12345T', '2026-09-27', '08:00', 0, '123456', 1)")
+    conn.commit()
+    conn.close()
+
+    config = PhotoConfig()
+    photo_dir = tmp_path / "photos"
+    for pt in config.paths:
+        config.paths[pt] = str(photo_dir)
+    photo_dir.mkdir(parents=True, exist_ok=True)
+    (photo_dir / "15A12345T.jpg").write_bytes(b"dummy")
+
+    status = check_plate_status(db_path, "15A12345", "T", config, date="2026-09-27")
+    assert status["has_failed_today"] is False
+    assert status["has_l1_photos"] is True
+    # MUST NOT suggest L2 simply because L1 photos exist!
+    assert status["suggest_lan_2"] is False
+
 
 
 

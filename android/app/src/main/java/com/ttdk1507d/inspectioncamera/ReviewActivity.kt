@@ -75,8 +75,7 @@ class ReviewActivity : AppCompatActivity() {
         val parsed = com.ttdk1507d.inspectioncamera.util.PlateUtil.parsePlate(rawPlate)
         plate = parsed.basePlate
         plateColor = intent.getStringExtra(EXTRA_PLATE_COLOR) ?: parsed.color
-        val passedLan = intent.getIntExtra(EXTRA_LAN_KD, 1)
-        lanKd = if (passedLan > 1) passedLan else parsed.lanKd
+        lanKd = intent.getIntExtra(EXTRA_LAN_KD, parsed.lanKd)
 
         initViews()
         setupRecyclerView()

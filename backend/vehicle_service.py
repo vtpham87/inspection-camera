@@ -114,7 +114,7 @@ def _check_photos_taken(
     for pt in PHOTO_TYPES:
         try:
             save_dir = resolve_save_path(
-                pt, plate, config, create_dir=False, date_str=date
+                pt, plate, config, create_dir=False, date_str=date, plate_color=plate_color
             )
             filename = build_filename(
                 plate,
@@ -173,13 +173,13 @@ def check_plate_status(
         finally:
             conn.close()
 
-    l1_photos = _check_photos_taken(clean_plate, plate_color, config, date=date, lan_kd=1)
+    l1_photos = _check_photos_taken(clean_plate, final_color, config, date=date, lan_kd=1)
     has_l1 = len(l1_photos) > 0
-    suggest_lan_2 = (lan_kd >= 2) or has_failed_today or has_l1
+    suggest_lan_2 = (lan_kd >= 2) or has_failed_today
 
     return {
         "plate": clean_plate,
-        "plate_color": plate_color,
+        "plate_color": final_color,
         "lan_kd": lan_kd,
         "suggest_lan_2": suggest_lan_2,
         "has_failed_today": has_failed_today,
@@ -255,7 +255,7 @@ def get_vehicles_today(
 
                 has_l1 = len(_check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=1)) > 0
                 is_failed_earlier = (biendk_id in failed_biendk_ids) or (plate_num in failed_biendk_ids)
-                suggest_lan_2 = (lan_kd_val >= 2) or is_failed_earlier or has_l1
+                suggest_lan_2 = (lan_kd_val >= 2) or is_failed_earlier
 
                 if lan_kd_val >= 2:
                     photos_taken = _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=lan_kd_val)
@@ -344,7 +344,7 @@ def get_vehicles_today(
 
                 has_l1 = len(_check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=1)) > 0
                 is_failed_earlier = (biendk_id in failed_biendk_ids) or (plate_num in failed_biendk_ids)
-                suggest_lan_2 = (lan_kd_val >= 2) or is_failed_earlier or has_l1
+                suggest_lan_2 = (lan_kd_val >= 2) or is_failed_earlier
 
                 if lan_kd_val >= 2:
                     photos_taken = _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=lan_kd_val)
