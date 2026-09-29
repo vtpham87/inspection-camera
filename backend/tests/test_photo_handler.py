@@ -271,3 +271,26 @@ def test_save_photo_lan2(tmp_path):
     assert result["path"] == expected_path
     assert os.path.exists(expected_path)
 
+
+def test_filename_lan2_no_duplicate_tl2():
+    # Verify that passing already-suffixed plates does NOT result in duplicate suffixes (e.g. TL2TL2)
+    assert build_filename("15A12345TL2", "T", "rear_45", None, False, lan_kd=2) == "15A12345TL2.jpg"
+    assert build_filename("15A12345TL2", "T", "front_45", None, False, lan_kd=2) == "bs15A12345TL2.jpg"
+    assert build_filename("15A12345TL2TL2", "T", "rear_45", None, False, lan_kd=2) == "15A12345TL2.jpg"
+    assert build_filename("15A12345T", "T", "rear_45", None, False, lan_kd=2) == "15A12345TL2.jpg"
+    assert build_filename("15A12345TT", "T", "rear_45", None, False, lan_kd=2) == "15A12345TL2.jpg"
+    assert build_filename("11K2639L2", None, "rear_45", None, False, lan_kd=2) == "11K2639L2.jpg"
+    assert build_filename("15A12345TL2", "T", "passenger", 1, False, lan_kd=2) == "15A12345TL2_1.jpg"
+
+
+def test_save_photo_lan2_no_duplicate_tl2(tmp_path):
+    chosen_dir = tmp_path / "Photos"
+    config = PhotoConfig(photo_save_dir=str(chosen_dir))
+    jpeg = b"\xff\xd8\xff\xe0" + b"\x00" * 100 + b"\xff\xd9"
+    # Even if client sends plate="15A12345TL2", the saved file must be 15A12345TL2.jpg, NOT 15A12345TL2TL2.jpg
+    result = save_photo(jpeg, "15A12345TL2", "T", "rear_45", None, config, lan_kd=2)
+    assert result["ok"] is True
+    assert result["filename"] == "15A12345TL2.jpg"
+    assert os.path.exists(os.path.join(str(chosen_dir), "15A12345TL2.jpg"))
+
+

@@ -146,8 +146,9 @@ def check_plate_status(
     if date is None:
         date = today_str
 
-    clean_plate = re.sub(r"[.\-\s]", "", plate).upper()
-    biendk_id = f"{clean_plate}{plate_color}" if plate_color else clean_plate
+    clean_plate, detected_color = extract_plate_color(plate)
+    final_color = plate_color or detected_color
+    biendk_id = f"{clean_plate}{final_color}" if final_color else clean_plate
 
     has_failed_today = False
     lan_kd = 1

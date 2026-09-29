@@ -238,7 +238,9 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        val (basePlate, extractedColor) = PlateUtil.extractColor(cleanPlate)
+        val parsed = PlateUtil.parsePlate(cleanPlate)
+        val basePlate = parsed.basePlate
+        val extractedColor = parsed.color
 
         val selectedColor = when (rgPlateColor.checkedRadioButtonId) {
             R.id.rb_color_white -> "T"
@@ -257,14 +259,14 @@ class MainActivity : AppCompatActivity() {
             rgPlateColor.checkedRadioButtonId == R.id.rb_color_none -> null
             rgPlateColor.checkedRadioButtonId == -1 -> null
             selectedColor != null -> selectedColor
-            cleanPlate.last().isDigit() -> null
+            basePlate.isNotEmpty() && basePlate.last().isDigit() -> null
             else -> null
         }
 
-        val finalPlate = if (extractedColor != null) basePlate else cleanPlate
-        val lanKd = if (rbLan2.isChecked) 2 else 1
+        val selectedLan = if (rbLan2.isChecked) 2 else 1
+        val finalLan = if (selectedLan > 1) selectedLan else parsed.lanKd
 
-        openCamera(finalPlate, finalColor, null, lanKd = lanKd)
+        openCamera(basePlate, finalColor, null, lanKd = finalLan)
     }
 
     private fun updateFilterButtons() {
@@ -286,11 +288,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openCamera(plate: String, plateColor: String?, photosTaken: List<String>? = null, lanKd: Int = 1) {
-        val compactPlate = PlateUtil.formatCompactPlate(plate, plateColor, lanKd = lanKd)
+        val parsed = PlateUtil.parsePlate(plate)
+        val basePlate = parsed.basePlate
+        val color = plateColor ?: parsed.color
+        val effectiveLan = if (lanKd > 1) lanKd else parsed.lanKd
+
         val intent = Intent(this, CameraActivity::class.java).apply {
-            putExtra(CameraActivity.EXTRA_PLATE, compactPlate)
-            putExtra(CameraActivity.EXTRA_PLATE_COLOR, plateColor)
-            putExtra(CameraActivity.EXTRA_LAN_KD, lanKd)
+            putExtra(CameraActivity.EXTRA_PLATE, basePlate)
+            putExtra(CameraActivity.EXTRA_PLATE_COLOR, color)
+            putExtra(CameraActivity.EXTRA_LAN_KD, effectiveLan)
             if (photosTaken != null) {
                 putStringArrayListExtra(CameraActivity.EXTRA_PHOTOS_TAKEN, ArrayList(photosTaken))
             }

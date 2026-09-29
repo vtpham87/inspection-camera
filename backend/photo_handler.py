@@ -18,10 +18,41 @@ def normalize_plate(raw: str) -> str:
     return cleaned
 
 
+def clean_plate_and_color(
+    plate: str,
+    plate_color: str | None = None,
+    lan_kd: int | None = 1,
+) -> tuple[str, str | None, int]:
+    cleaned = re.sub(r"[.\-\s]", "", plate).upper()
+    s = cleaned
+    detected_color = None
+    detected_lan = 1
+    while True:
+        m = re.search(r"([TVX])?L(\d+)$", s)
+        if m:
+            if m.group(1):
+                detected_color = m.group(1)
+            l = int(m.group(2))
+            if l > 1:
+                detected_lan = l
+            s = s[:m.start()]
+            continue
+        m2 = re.search(r"([TVX])+$", s)
+        if m2:
+            prefix = s[:m2.start()]
+            if prefix and prefix[-1].isdigit():
+                detected_color = m2.group(0)[-1]
+                s = prefix
+                continue
+        break
+    color = plate_color or detected_color
+    lan = lan_kd if (lan_kd and lan_kd > 1) else detected_lan
+    return s, color, lan
+
+
 def extract_plate_color(biendk_clean: str) -> tuple[str, str | None]:
-    if biendk_clean and biendk_clean[-1] in ("T", "V", "X"):
-        return biendk_clean[:-1], biendk_clean[-1]
-    return biendk_clean, None
+    plate, color, _ = clean_plate_and_color(biendk_clean)
+    return plate, color
 
 
 def build_filename(
@@ -32,6 +63,7 @@ def build_filename(
     color_suffix_enabled: bool,
     lan_kd: int | None = 1,
 ) -> str:
+    plate, plate_color, lan_kd = clean_plate_and_color(plate, plate_color, lan_kd)
     if lan_kd and lan_kd > 1:
         suffix = f"{plate_color or ''}L{lan_kd}"
         if photo_type == "rear_45":
@@ -90,6 +122,7 @@ def sync_new_vehicle_photos(
     config: PhotoConfig,
     lan_kd: int | None = 1,
 ) -> None:
+    plate, plate_color, lan_kd = clean_plate_and_color(plate, plate_color, lan_kd)
     if not getattr(config, "sync_new_vehicle_45", True):
         return
 
@@ -141,6 +174,7 @@ def save_photo(
     config: PhotoConfig,
     lan_kd: int | None = 1,
 ) -> dict:
+    plate, plate_color, lan_kd = clean_plate_and_color(plate, plate_color, lan_kd)
     # Validate plate
     try:
         plate = normalize_plate(plate)

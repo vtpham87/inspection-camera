@@ -71,9 +71,12 @@ class ReviewActivity : AppCompatActivity() {
         setContentView(R.layout.activity_review)
 
         prefs = PrefsManager(this)
-        plate = intent.getStringExtra(EXTRA_PLATE) ?: ""
-        plateColor = intent.getStringExtra(EXTRA_PLATE_COLOR)
-        lanKd = intent.getIntExtra(EXTRA_LAN_KD, 1)
+        val rawPlate = intent.getStringExtra(EXTRA_PLATE) ?: ""
+        val parsed = com.ttdk1507d.inspectioncamera.util.PlateUtil.parsePlate(rawPlate)
+        plate = parsed.basePlate
+        plateColor = intent.getStringExtra(EXTRA_PLATE_COLOR) ?: parsed.color
+        val passedLan = intent.getIntExtra(EXTRA_LAN_KD, 1)
+        lanKd = if (passedLan > 1) passedLan else parsed.lanKd
 
         initViews()
         setupRecyclerView()

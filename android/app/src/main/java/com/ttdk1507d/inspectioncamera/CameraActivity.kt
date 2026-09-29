@@ -120,9 +120,12 @@ class CameraActivity : AppCompatActivity() {
         setContentView(R.layout.activity_camera)
 
         prefs = PrefsManager(this)
-        plate = intent.getStringExtra(EXTRA_PLATE) ?: ""
-        plateColor = intent.getStringExtra(EXTRA_PLATE_COLOR)
-        lanKd = intent.getIntExtra(EXTRA_LAN_KD, 1)
+        val rawPlate = intent.getStringExtra(EXTRA_PLATE) ?: ""
+        val parsed = PlateUtil.parsePlate(rawPlate)
+        plate = parsed.basePlate
+        plateColor = intent.getStringExtra(EXTRA_PLATE_COLOR) ?: parsed.color
+        val passedLan = intent.getIntExtra(EXTRA_LAN_KD, 1)
+        lanKd = if (passedLan > 1) passedLan else parsed.lanKd
 
         if (plate.isEmpty()) {
             Toast.makeText(this, "Thiếu thông tin biển số", Toast.LENGTH_SHORT).show()
