@@ -154,6 +154,49 @@
 
             </LinearLayout>
 
+            <!-- Lần kiểm định (Lần 1 / Lần 2) Toggle -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="8dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Lần khám:"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:layout_marginEnd="12dp" />
+
+                <RadioGroup
+                    android:id="@+id/rg_lan_kd"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <RadioButton
+                        android:id="@+id/rb_lan_1"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:text="Lần 1"
+                        android:textSize="14sp" />
+
+                    <RadioButton
+                        android:id="@+id/rb_lan_2"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Lần 2"
+                        android:layout_marginStart="16dp"
+                        android:textSize="14sp" />
+
+                </RadioGroup>
+
+            </LinearLayout>
+
             <!-- Select button: min height 56dp, font 18sp -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_select_manual"

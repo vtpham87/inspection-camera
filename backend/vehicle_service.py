@@ -53,12 +53,13 @@ $conn = New-Object System.Data.Odbc.OdbcConnection($connStr)
 try {{
     $conn.Open()
     $cmd = $conn.CreateCommand()
-    $cmd.CommandText = @"
-SELECT t.SoPhieuKD, t.BienDK_ID, t.GioKD, t.KetLuan, t.CD1, t.CD2, t.CD3, t.CD4, t.CD5,
+    $ps_cmd = @"
+SELECT t.SoPhieuKD, t.BienDK_ID, t.GioKD, t.KetLuan, t.LanKD, t.CD1, t.CD2, t.CD3, t.CD4, t.CD5,
        p.BienDK, p.TenLoaiPT, p.NhanHieu, p.ChuPT
 FROM tmp_DangKyKD t LEFT JOIN PT_PhuongTien p ON t.BienDK_ID = p.BienDK_ID
 ORDER BY t.SoPhieuKD ASC
 "@
+    $cmd.CommandText = $ps_cmd
     $reader = $cmd.ExecuteReader()
     $list = @()
     while ($reader.Read()) {{
@@ -67,6 +68,7 @@ ORDER BY t.SoPhieuKD ASC
             BienDK_ID = $reader['BienDK_ID']
             GioKD     = if ($reader['GioKD'] -ne [DBNull]::Value) {{ $reader['GioKD'].ToString('HH:mm:ss') }} else {{ '' }}
             KetLuan   = $reader['KetLuan']
+            LanKD     = if ($reader['LanKD'] -ne [DBNull]::Value) {{ [int]$reader['LanKD'] }} else {{ 1 }}
             BienDK    = if ($reader['BienDK'] -ne [DBNull]::Value) {{ $reader['BienDK'].ToString() }} else {{ '' }}
             TenLoaiPT = if ($reader['TenLoaiPT'] -ne [DBNull]::Value) {{ $reader['TenLoaiPT'].ToString() }} else {{ '' }}
             NhanHieu  = if ($reader['NhanHieu'] -ne [DBNull]::Value) {{ $reader['NhanHieu'].ToString() }} else {{ '' }}
@@ -106,6 +108,7 @@ def _check_photos_taken(
     plate_color: str | None,
     config: PhotoConfig,
     date: str | None = None,
+    lan_kd: int = 1,
 ) -> list[str]:
     taken = []
     for pt in PHOTO_TYPES:
@@ -119,6 +122,7 @@ def _check_photos_taken(
                 pt,
                 1 if pt in ("passenger", "new_vehicle") else None,
                 config.plate_color_suffix,
+                lan_kd=lan_kd,
             )
             if os.path.exists(os.path.join(save_dir, filename)):
                 taken.append(pt)
@@ -129,6 +133,58 @@ def _check_photos_taken(
         except Exception:
             pass
     return taken
+
+
+def check_plate_status(
+    db_path: str,
+    plate: str,
+    plate_color: str | None,
+    config: PhotoConfig,
+    date: str | None = None,
+) -> dict:
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    if date is None:
+        date = today_str
+
+    clean_plate = re.sub(r"[.\-\s]", "", plate).upper()
+    biendk_id = f"{clean_plate}{plate_color}" if plate_color else clean_plate
+
+    has_failed_today = False
+    lan_kd = 1
+    if os.path.exists(db_path):
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        try:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cur.execute("PRAGMA table_info(inspections)")
+            cols = {r["name"] for r in cur.fetchall()}
+            lankd_col = ", lankd" if "lankd" in cols else ""
+            cur.execute(
+                f"SELECT ketluan{lankd_col} FROM inspections WHERE (biendk_id = ? OR biendk_id LIKE ?) AND ngaykd = ? ORDER BY giokd DESC",
+                (biendk_id, f"{clean_plate}%", date),
+            )
+            rows = cur.fetchall()
+            for r in rows:
+                if r["ketluan"] == 1:
+                    has_failed_today = True
+                if "lankd" in r.keys() and r["lankd"] and r["lankd"] > lan_kd:
+                    lan_kd = int(r["lankd"])
+        finally:
+            conn.close()
+
+    l1_photos = _check_photos_taken(clean_plate, plate_color, config, date=date, lan_kd=1)
+    has_l1 = len(l1_photos) > 0
+    suggest_lan_2 = (lan_kd >= 2) or has_failed_today or has_l1
+
+    return {
+        "plate": clean_plate,
+        "plate_color": plate_color,
+        "lan_kd": lan_kd,
+        "suggest_lan_2": suggest_lan_2,
+        "has_failed_today": has_failed_today,
+        "has_l1_photos": has_l1,
+        "photos_taken_l1": l1_photos,
+    }
 
 
 def get_vehicles_today(
@@ -155,6 +211,16 @@ def get_vehicles_today(
         cur.execute("PRAGMA table_info(inspections)")
         col_names = {r["name"] for r in cur.fetchall()}
         has_sotem = "sotem" in col_names
+        has_lankd = "lankd" in col_names
+
+        failed_biendk_ids = set()
+        cur.execute("SELECT DISTINCT biendk_id FROM inspections WHERE ngaykd = ? AND ketluan = 1", (date,))
+        for fr in cur.fetchall():
+            bid = fr[0]
+            if bid:
+                failed_biendk_ids.add(bid)
+                p_clean, _ = extract_plate_color(bid)
+                failed_biendk_ids.add(p_clean)
 
         is_today = (date == today_str)
         is_production_db = os.path.normpath(db_path).endswith("ptcgdb.db")
@@ -172,13 +238,32 @@ def get_vehicles_today(
                 biendk_id = r.get("BienDK_ID") or ""
                 ketluan = r.get("KetLuan")
                 giokd = r.get("GioKD") or ""
+                raw_lankd = r.get("LanKD")
+                try:
+                    lan_kd_val = int(raw_lankd) if raw_lankd is not None else 1
+                except (ValueError, TypeError):
+                    lan_kd_val = 1
+                if lan_kd_val <= 0:
+                    lan_kd_val = 1
 
                 if filter_waiting and ketluan == 1:
                     continue
 
                 seen_tickets.add(sp)
                 plate_num, plate_color = extract_plate_color(biendk_id)
-                photos_taken = _check_photos_taken(plate_num, plate_color, config, date=date)
+
+                has_l1 = len(_check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=1)) > 0
+                is_failed_earlier = (biendk_id in failed_biendk_ids) or (plate_num in failed_biendk_ids)
+                suggest_lan_2 = (lan_kd_val >= 2) or is_failed_earlier or has_l1
+
+                if lan_kd_val >= 2:
+                    photos_taken = _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=lan_kd_val)
+                else:
+                    l2_photos = _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=2)
+                    if l2_photos and suggest_lan_2:
+                        photos_taken = l2_photos
+                    else:
+                        photos_taken = _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=1)
 
                 cur.execute(
                     "SELECT biendk, nhanhieu, tenloaipt, chupt FROM vehicles WHERE biendk_clean = ? OR biendk_id = ?",
@@ -213,6 +298,8 @@ def get_vehicles_today(
                     "result": ketluan,
                     "sotem": "",
                     "photos_taken": photos_taken,
+                    "lan_kd": lan_kd_val,
+                    "suggest_lan_2": suggest_lan_2,
                 })
 
         # 2. Truy vấn bổ sung từ SQLite inspections (hoặc làm nguồn chính khi không có Access/lịch sử)
@@ -224,10 +311,11 @@ def get_vehicles_today(
                     where_clause += " AND (i.sotem IS NULL OR trim(i.sotem) = '')"
 
             sotem_select = "i.sotem" if has_sotem else "'' AS sotem"
+            lankd_select = "i.lankd" if has_lankd else "1 AS lankd"
             cur.execute(
                 f"""
                 SELECT i.sophieu, v.biendk, v.biendk_clean, v.chupt, v.nhanhieu, v.tenloaipt,
-                       i.ngaykd, i.giokd, i.ketluan, {sotem_select}
+                       i.ngaykd, i.giokd, i.ketluan, {sotem_select}, {lankd_select}
                 FROM inspections i
                 JOIN vehicles v ON i.biendk_id = v.biendk_id
                 {where_clause}
@@ -242,8 +330,29 @@ def get_vehicles_today(
                     continue
                 seen_tickets.add(sp)
 
+                raw_lankd = row["lankd"] if has_lankd else 1
+                try:
+                    lan_kd_val = int(raw_lankd) if raw_lankd is not None else 1
+                except (ValueError, TypeError):
+                    lan_kd_val = 1
+                if lan_kd_val <= 0:
+                    lan_kd_val = 1
+
                 plate_num, plate_color = extract_plate_color(row["biendk_clean"])
-                photos_taken = _check_photos_taken(plate_num, plate_color, config, date=date)
+                biendk_id = row["biendk_clean"]
+
+                has_l1 = len(_check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=1)) > 0
+                is_failed_earlier = (biendk_id in failed_biendk_ids) or (plate_num in failed_biendk_ids)
+                suggest_lan_2 = (lan_kd_val >= 2) or is_failed_earlier or has_l1
+
+                if lan_kd_val >= 2:
+                    photos_taken = _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=lan_kd_val)
+                else:
+                    l2_photos = _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=2)
+                    if l2_photos and suggest_lan_2:
+                        photos_taken = l2_photos
+                    else:
+                        photos_taken = _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=1)
 
                 m = re.match(r"^(\d+)", sp.strip())
                 ticket_int = int(m.group(1)) if m else 999999
@@ -262,6 +371,8 @@ def get_vehicles_today(
                     "result": row["ketluan"],
                     "sotem": row["sotem"],
                     "photos_taken": photos_taken,
+                    "lan_kd": lan_kd_val,
+                    "suggest_lan_2": suggest_lan_2,
                 })
     finally:
         conn.close()

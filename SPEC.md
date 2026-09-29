@@ -56,18 +56,26 @@ D:\inspection-camera\
 | `plate_color` | string | ❌ | Màu biển: `T` (mặc định) / `V` / `X` |
 | `photo_type` | string | ✅ | Loại ảnh: `rear_45` / `front_45` / `chassis` / `passenger` / `new_vehicle` |
 | `seq` | int | ❌ | Số thứ tự cho loại chụp nhiều ảnh (mặc định: auto-increment) |
+| `lan_kd` | int | ❌ | Lần kiểm định trong ngày: `1` (mặc định) hoặc `2` (kiểm tra lại) |
 
 > **Lưu ý:** Timestamp được in trực tiếp lên ảnh (burn-in) tại phía App Android trước khi upload, đảm bảo ảnh lưu trên máy tính trạm luôn có dấu thời gian.
 
 **Quy tắc đặt tên file:**
 
-| photo_type | Tên file | Thư mục |
-|---|---|---|
-| `rear_45` | `{plate}.jpg` hoặc `{plate}{color}.jpg` | Cấu hình `paths.rear_45` (lưu trực tiếp thư mục chọn, không tạo thư mục ngày) |
-| `front_45` | `bs{plate}.jpg` hoặc `bs{plate}{color}.jpg` | Cấu hình `paths.front_45` (lưu trực tiếp thư mục chọn, không tạo thư mục ngày) |
-| `chassis` | `sk_{plate}.jpg` | Cấu hình `paths.chassis` (lưu trực tiếp thư mục chọn, không tạo thư mục ngày) |
-| `passenger` | `{plate}_1.jpg`, `{plate}_2.jpg`, ... | Cấu hình `paths.passenger` (thư mục con `{plate}\`) |
-| `new_vehicle` | `{plate}_1.jpg`, `{plate}_2.jpg`, ... | Cấu hình `paths.new_vehicle` (thư mục con `{plate}\`) |
+| photo_type | Tên file (Lần 1) | Tên file (Lần 2 - `lan_kd=2`) | Thư mục |
+|---|---|---|---|
+| `rear_45` | `{plate}.jpg` | `{plate}{color}L2.jpg` (VD: `15A12345TL2.jpg`) | Cấu hình `paths.rear_45` (lưu trực tiếp thư mục chọn) |
+| `front_45` | `bs{plate}.jpg` | `bs{plate}{color}L2.jpg` (VD: `bs15A12345TL2.jpg`) | Cấu hình `paths.front_45` (lưu trực tiếp thư mục chọn) |
+| `chassis` | `sk_{plate}.jpg` | `sk_{plate}{color}L2.jpg` (VD: `sk_15A12345TL2.jpg`) | Cấu hình `paths.chassis` (lưu trực tiếp thư mục chọn) |
+| `passenger` | `{plate}_1.jpg`, ... | `{plate}{color}L2_1.jpg`, ... | Cấu hình `paths.passenger` (thư mục con `{plate}\`) |
+| `new_vehicle` | `{plate}_1.jpg`, ... | `{plate}{color}L2_1.jpg`, ... | Cấu hình `paths.new_vehicle` (thư mục con `{plate}\`) |
+
+> **Quy tắc kiểm tra Lần 2 (`lan_kd=2`):**
+> - Nối trực tiếp mã màu biển (T/V/X) và ký hiệu `L2` ngay sau biển số: `{plate}{color}L2.jpg`. Ví dụ: `15A12345TL2.jpg`, `bs15A12345TL2.jpg`.
+> - Biển cũ 4 số (không màu): Bỏ mã màu, nối trực tiếp `L2`: `{plate}L2.jpg`. Ví dụ: `11K2639L2.jpg`, `bs11K2639L2.jpg`.
+> - Không ghi đè ảnh lần 1 đã chụp trong cùng thư mục `D:\Photos`.
+> - App Android tự động nhận diện xe đã có ảnh lần 1 hoặc trượt lần 1 trong ngày để gợi ý/chuyển sẵn `[Lần 2]`. ĐKV có thể đổi linh hoạt `Lần 1 ⇄ Lần 2` ngay tại màn hình Camera hoặc màn hình chính.
+> - Danh sách xe trên Android tự động quét ngầm làm mới định kỳ mỗi 2 phút.
 
 > **Quy tắc hậu tố màu biển:**
 > - Khi `plate_color_suffix = true` VÀ `plate_color` có giá trị (T/V/X): thêm hậu tố vào tên file (VD: `15A12345T.jpg`, `bs15A12345T.jpg`)

@@ -38,6 +38,7 @@ class VehicleAdapter(
 
         private val tvPlate: TextView = itemView.findViewById(R.id.tv_item_plate)
         private val tvPlateColor: TextView = itemView.findViewById(R.id.tv_item_plate_color)
+        private val tvLanKd: TextView = itemView.findViewById(R.id.tv_item_lan_kd)
         private val tvStatus: TextView = itemView.findViewById(R.id.tv_item_status)
         private val tvTicket: TextView = itemView.findViewById(R.id.tv_item_ticket)
 
@@ -74,6 +75,15 @@ class VehicleAdapter(
                 else -> {
                     tvPlateColor.visibility = View.GONE
                 }
+            }
+
+            // Badge Lần 2 nổi bật
+            if (vehicle.lanKd >= 2 || vehicle.suggestLan2) {
+                val num = if (vehicle.lanKd >= 2) vehicle.lanKd else 2
+                tvLanKd.visibility = View.VISIBLE
+                tvLanKd.text = "LẦN $num"
+            } else {
+                tvLanKd.visibility = View.GONE
             }
 
             // Trạng thái ảnh đã chụp (nếu đã có ảnh)

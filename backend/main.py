@@ -18,7 +18,7 @@ from photo_handler import (
     resolve_save_path,
     VALID_PHOTO_TYPES,
 )
-from vehicle_service import get_vehicles_today
+from vehicle_service import get_vehicles_today, check_plate_status
 
 CONFIG_PATH = os.environ.get("PHOTO_CONFIG_PATH") or os.path.join(PROJECT_DIR, "photo_config.json")
 DB_PATH = os.environ.get("PTCGDB_PATH") or "C:\\PTCGDB_Online\\ptcgdb.db"
@@ -59,11 +59,12 @@ async def upload_photo(
     plate_color: str | None = Form(None),
     photo_type: str = Form(...),
     seq: int | None = Form(None),
+    lan_kd: int | None = Form(1),
 ):
     config = load_config(get_config_path())
     file_bytes = await file.read()
 
-    result = save_photo(file_bytes, plate, plate_color, photo_type, seq, config)
+    result = save_photo(file_bytes, plate, plate_color, photo_type, seq, config, lan_kd=lan_kd)
     if not result["ok"]:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
@@ -74,6 +75,7 @@ class DeleteRequest(BaseModel):
     photo_type: str
     seq: int | None = None
     plate_color: str | None = None
+    lan_kd: int | None = 1
 
 
 @app.delete("/api/photos")
@@ -96,7 +98,7 @@ def delete_photo(req: DeleteRequest):
     deleted_path = None
     for c in candidate_colors:
         try:
-            filename = build_filename(plate_num, c, req.photo_type, req.seq, config.plate_color_suffix)
+            filename = build_filename(plate_num, c, req.photo_type, req.seq, config.plate_color_suffix, lan_kd=req.lan_kd)
             full_path = os.path.join(save_dir, filename)
             if os.path.exists(full_path):
                 os.remove(full_path)
@@ -131,6 +133,14 @@ def vehicles_today(date: str | None = None, waiting_only: bool = True):
     if result is None:
         return []
     return result
+
+
+@app.get("/api/vehicles/check-plate")
+def check_plate(plate: str, plate_color: str | None = None, date: str | None = None):
+    config = load_config(get_config_path())
+    query_date = date or datetime.now().strftime("%Y-%m-%d")
+    return check_plate_status(get_db_path(), plate, plate_color, config, date=query_date)
+
 
 
 @app.get("/api/config")

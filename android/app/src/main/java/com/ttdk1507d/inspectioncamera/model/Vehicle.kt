@@ -13,5 +13,7 @@ data class Vehicle(
     val owner: String,
     val time: String,
     val result: Int,
-    @SerializedName("photos_taken") val photosTaken: List<String> = emptyList()
+    @SerializedName("photos_taken") val photosTaken: List<String> = emptyList(),
+    @SerializedName("lan_kd") val lanKd: Int = 1,
+    @SerializedName("suggest_lan_2") val suggestLan2: Boolean = false
 )

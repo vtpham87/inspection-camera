@@ -97,6 +97,23 @@
                     android:textStyle="bold"
                     android:paddingHorizontal="4dp" />
 
+                <!-- Toggle Lan 1 / Lan 2 Button -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_toggle_lan_kd"
+                    android:layout_width="wrap_content"
+                    android:layout_height="34dp"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="0dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:text="Lần 1"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_white"
+                    app:backgroundTint="@color/primary"
+                    app:cornerRadius="6dp" />
+
             </LinearLayout>
 
             <!-- Review Button -->

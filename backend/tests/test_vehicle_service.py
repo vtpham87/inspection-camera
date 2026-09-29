@@ -73,6 +73,8 @@ def test_vehicle_has_required_fields(mock_db):
     assert "time" in v
     assert "result" in v
     assert "photos_taken" in v
+    assert "lan_kd" in v
+    assert "suggest_lan_2" in v
 
 
 def test_old_plate_has_null_color(mock_db):
@@ -225,4 +227,92 @@ def test_db_connection_closed_on_query_exception(mock_db):
             get_vehicles_today(mock_db, "2026-09-27", config)
 
     mock_conn.close.assert_called_once()
+
+
+def test_vehicle_lan_kd_from_sqlite(tmp_path):
+    db_path = str(tmp_path / "test_lankd.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("CREATE TABLE vehicles (biendk_id TEXT PRIMARY KEY, biendk TEXT, biendk_clean TEXT, chupt TEXT, nhanhieu TEXT, tenloaipt TEXT)")
+    cur.execute("CREATE TABLE inspections (sophieu TEXT, biendk_id TEXT, ngaykd TEXT, giokd TEXT, ketluan INTEGER, sotem TEXT, lankd INTEGER)")
+    cur.execute("INSERT INTO vehicles VALUES ('15A12345T', '15A-123.45', '15A12345T', 'Owner', 'TOYOTA', 'Ô tô con')")
+    cur.execute("INSERT INTO inspections VALUES ('100/26', '15A12345T', '2026-09-27', '09:00', 0, '', 2)")
+    conn.commit()
+    conn.close()
+
+    config = PhotoConfig()
+    result = get_vehicles_today(db_path, "2026-09-27", config)
+    assert len(result) == 1
+    assert result[0]["lan_kd"] == 2
+
+
+def test_vehicle_lan_kd_photos_taken_detects_l2(tmp_path):
+    db_path = str(tmp_path / "test_lankd_photos.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("CREATE TABLE vehicles (biendk_id TEXT PRIMARY KEY, biendk TEXT, biendk_clean TEXT, chupt TEXT, nhanhieu TEXT, tenloaipt TEXT)")
+    cur.execute("CREATE TABLE inspections (sophieu TEXT, biendk_id TEXT, ngaykd TEXT, giokd TEXT, ketluan INTEGER, sotem TEXT, lankd INTEGER)")
+    cur.execute("INSERT INTO vehicles VALUES ('15A12345T', '15A-123.45', '15A12345T', 'Owner', 'TOYOTA', 'Ô tô con')")
+    cur.execute("INSERT INTO inspections VALUES ('100/26', '15A12345T', '2026-09-27', '09:00', 0, '', 2)")
+    conn.commit()
+    conn.close()
+
+    config = PhotoConfig()
+    photo_dir = tmp_path / "photos"
+    for pt in config.paths:
+        config.paths[pt] = str(photo_dir)
+    photo_dir.mkdir(parents=True, exist_ok=True)
+    # Write Lần 2 photos
+    (photo_dir / "15A12345TL2.jpg").write_bytes(b"dummy")
+    (photo_dir / "bs15A12345TL2.jpg").write_bytes(b"dummy")
+
+    result = get_vehicles_today(db_path, "2026-09-27", config)
+    assert len(result) == 1
+    assert "rear_45" in result[0]["photos_taken"]
+    assert "front_45" in result[0]["photos_taken"]
+
+
+def test_suggest_lan_2_when_failed_earlier(tmp_path):
+    db_path = str(tmp_path / "test_failed_earlier.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("CREATE TABLE vehicles (biendk_id TEXT PRIMARY KEY, biendk TEXT, biendk_clean TEXT, chupt TEXT, nhanhieu TEXT, tenloaipt TEXT)")
+    cur.execute("CREATE TABLE inspections (sophieu TEXT, biendk_id TEXT, ngaykd TEXT, giokd TEXT, ketluan INTEGER, sotem TEXT, lankd INTEGER)")
+    cur.execute("INSERT INTO vehicles VALUES ('15A12345T', '15A-123.45', '15A12345T', 'Owner', 'TOYOTA', 'Ô tô con')")
+    # First inspection failed: ketluan = 1, lankd = 1
+    cur.execute("INSERT INTO inspections VALUES ('090/26', '15A12345T', '2026-09-27', '08:00', 1, '', 1)")
+    # Second inspection is waiting: ketluan != 1 (None or -1), but lankd might not be 2 yet
+    cur.execute("INSERT INTO inspections VALUES ('100/26', '15A12345T', '2026-09-27', '09:00', -1, '', 1)")
+    conn.commit()
+    conn.close()
+
+    config = PhotoConfig()
+    result = get_vehicles_today(db_path, "2026-09-27", config)
+    v = [x for x in result if x["ticket_num"] == "100/26"][0]
+    assert v["suggest_lan_2"] is True
+
+
+def test_check_plate_status_detects_failure_and_l1(tmp_path):
+    from vehicle_service import check_plate_status
+    db_path = str(tmp_path / "test_check_plate.db")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("CREATE TABLE inspections (sophieu TEXT, biendk_id TEXT, ngaykd TEXT, giokd TEXT, ketluan INTEGER, sotem TEXT, lankd INTEGER)")
+    cur.execute("INSERT INTO inspections VALUES ('090/26', '15A12345T', '2026-09-27', '08:00', 1, '', 1)")
+    conn.commit()
+    conn.close()
+
+    config = PhotoConfig()
+    photo_dir = tmp_path / "photos"
+    for pt in config.paths:
+        config.paths[pt] = str(photo_dir)
+    photo_dir.mkdir(parents=True, exist_ok=True)
+    (photo_dir / "15A12345.jpg").write_bytes(b"dummy")
+
+    status = check_plate_status(db_path, "15A12345", "T", config, date="2026-09-27")
+    assert status["has_failed_today"] is True
+    assert status["has_l1_photos"] is True
+    assert status["suggest_lan_2"] is True
+
+
 

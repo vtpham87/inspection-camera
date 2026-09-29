@@ -23,6 +23,7 @@ data class PendingUploadMetadata(
     @SerializedName("plate_color") val plateColor: String?,
     @SerializedName("photo_type") val photoType: String,
     val seq: Int? = null,
+    @SerializedName("lan_kd") val lanKd: Int = 1,
     val timestamp: Long = System.currentTimeMillis()
 )
 
@@ -71,8 +72,9 @@ class PendingUploadWorker(
                 val photoTypeReq = meta.photoType.toRequestBody("text/plain".toMediaTypeOrNull())
                 val colorReq = meta.plateColor?.toRequestBody("text/plain".toMediaTypeOrNull())
                 val seqReq = meta.seq?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
+                val lanKdReq = meta.lanKd.toString().toRequestBody("text/plain".toMediaTypeOrNull())
 
-                val resp = service.uploadPhoto(filePart, plateReq, colorReq, photoTypeReq, seqReq)
+                val resp = service.uploadPhoto(filePart, plateReq, colorReq, photoTypeReq, seqReq, lanKdReq)
 
                 if (resp.isSuccessful && resp.body()?.get("ok") == true) {
                     // Uploaded successfully, remove from queue

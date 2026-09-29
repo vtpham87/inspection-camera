@@ -43,6 +43,19 @@
             android:textSize="13sp"
             android:textStyle="bold" />
 
+        <!-- Badge Lần 2 (cam nổi bật) -->
+        <TextView
+            android:id="@+id/tv_item_lan_kd"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_lan2_badge"
+            android:text="LẦN 2"
+            android:textColor="@color/text_white"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
         <!-- Spacer đẩy thông tin trạng thái sang mép phải -->
         <View
             android:layout_width="0dp"

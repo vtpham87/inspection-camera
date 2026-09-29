@@ -30,7 +30,22 @@ def build_filename(
     photo_type: str,
     seq: int | None,
     color_suffix_enabled: bool,
+    lan_kd: int | None = 1,
 ) -> str:
+    if lan_kd and lan_kd > 1:
+        suffix = f"{plate_color or ''}L{lan_kd}"
+        if photo_type == "rear_45":
+            return f"{plate}{suffix}.jpg"
+        elif photo_type == "front_45":
+            return f"bs{plate}{suffix}.jpg"
+        elif photo_type == "chassis":
+            return f"sk_{plate}{suffix}.jpg"
+        elif photo_type in ("passenger", "new_vehicle"):
+            s = seq if seq else 1
+            return f"{plate}{suffix}_{s}.jpg"
+        else:
+            raise ValueError(f"Loại ảnh không hợp lệ: {photo_type}")
+
     suffix = ""
     if color_suffix_enabled and plate_color:
         suffix = plate_color
@@ -69,7 +84,12 @@ def validate_jpeg(file_bytes: bytes) -> bool:
     return file_bytes[:3] == JPEG_MAGIC
 
 
-def sync_new_vehicle_photos(plate: str, plate_color: str | None, config: PhotoConfig) -> None:
+def sync_new_vehicle_photos(
+    plate: str,
+    plate_color: str | None,
+    config: PhotoConfig,
+    lan_kd: int | None = 1,
+) -> None:
     if not getattr(config, "sync_new_vehicle_45", True):
         return
 
@@ -78,8 +98,9 @@ def sync_new_vehicle_photos(plate: str, plate_color: str | None, config: PhotoCo
         return
 
     # Only sync if new_veh_dir actually contains new_vehicle photos
+    prefix = f"{plate}{plate_color or ''}L{lan_kd}" if (lan_kd and lan_kd > 1) else plate
     existing_photos = [f for f in os.listdir(new_veh_dir) if f.lower().endswith(".jpg")]
-    has_nv = any(f.startswith(f"{plate}_") for f in existing_photos)
+    has_nv = any(f.startswith(f"{prefix}_") for f in existing_photos)
     if not has_nv:
         return
 
@@ -89,7 +110,7 @@ def sync_new_vehicle_photos(plate: str, plate_color: str | None, config: PhotoCo
     # Sync matching rear_45 photo
     if os.path.exists(rear_dir):
         try:
-            fname = build_filename(plate, plate_color, "rear_45", None, config.plate_color_suffix)
+            fname = build_filename(plate, plate_color, "rear_45", None, config.plate_color_suffix, lan_kd=lan_kd)
             src = os.path.join(rear_dir, fname)
             dst = os.path.join(new_veh_dir, fname)
             if os.path.exists(src) and os.path.getsize(src) > 10:
@@ -101,7 +122,7 @@ def sync_new_vehicle_photos(plate: str, plate_color: str | None, config: PhotoCo
     # Sync matching front_45 photo
     if os.path.exists(front_dir):
         try:
-            fname = build_filename(plate, plate_color, "front_45", None, config.plate_color_suffix)
+            fname = build_filename(plate, plate_color, "front_45", None, config.plate_color_suffix, lan_kd=lan_kd)
             src = os.path.join(front_dir, fname)
             dst = os.path.join(new_veh_dir, fname)
             if os.path.exists(src) and os.path.getsize(src) > 10:
@@ -118,6 +139,7 @@ def save_photo(
     photo_type: str,
     seq: int | None,
     config: PhotoConfig,
+    lan_kd: int | None = 1,
 ) -> dict:
     # Validate plate
     try:
@@ -146,7 +168,8 @@ def save_photo(
 
     # Auto-increment seq when seq is None for multi-photo types
     if photo_type in ("passenger", "new_vehicle") and seq is None:
-        pattern = re.compile(rf"^{re.escape(plate)}_(\d+)\.jpg$", re.IGNORECASE)
+        prefix = f"{plate}{plate_color or ''}L{lan_kd}" if (lan_kd and lan_kd > 1) else plate
+        pattern = re.compile(rf"^{re.escape(prefix)}_(\d+)\.jpg$", re.IGNORECASE)
         existing = []
         if os.path.exists(save_dir) and os.path.isdir(save_dir):
             for fname in os.listdir(save_dir):
@@ -156,7 +179,7 @@ def save_photo(
         seq = max(existing) + 1 if existing else 1
 
     # Build filename and path
-    filename = build_filename(plate, plate_color, photo_type, seq, config.plate_color_suffix)
+    filename = build_filename(plate, plate_color, photo_type, seq, config.plate_color_suffix, lan_kd=lan_kd)
     full_path = os.path.join(save_dir, filename)
 
     # Final path traversal check
@@ -169,6 +192,6 @@ def save_photo(
         f.write(file_bytes)
 
     if photo_type in ("new_vehicle", "rear_45", "front_45"):
-        sync_new_vehicle_photos(plate, plate_color, config)
+        sync_new_vehicle_photos(plate, plate_color, config, lan_kd=lan_kd)
 
     return {"ok": True, "path": full_path, "filename": filename}

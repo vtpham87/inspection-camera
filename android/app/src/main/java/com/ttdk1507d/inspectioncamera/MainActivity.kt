@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.view.View
 import android.widget.ImageButton
 import android.widget.ProgressBar
+import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
@@ -33,6 +34,9 @@ import com.ttdk1507d.inspectioncamera.util.PlateUtil
 import com.ttdk1507d.inspectioncamera.util.PrefsManager
 import com.ttdk1507d.inspectioncamera.worker.PendingUploadWorker
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -42,16 +46,22 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val PERMISSION_REQUEST_CAMERA = 1001
+        private const val AUTO_REFRESH_INTERVAL_MS = 2 * 60 * 1000L // 2 phút quét danh sách
     }
 
     private lateinit var prefs: PrefsManager
     private lateinit var vehicleAdapter: VehicleAdapter
+    private var currentVehiclesList: List<Vehicle> = emptyList()
+    private var autoRefreshJob: Job? = null
 
     private lateinit var btnSettings: ImageButton
     private lateinit var tvPendingBanner: TextView
     private lateinit var tilPlate: TextInputLayout
     private lateinit var etPlate: TextInputEditText
     private lateinit var rgPlateColor: RadioGroup
+    private lateinit var rgLanKd: RadioGroup
+    private lateinit var rbLan1: RadioButton
+    private lateinit var rbLan2: RadioButton
     private lateinit var btnSelectManual: MaterialButton
 
     private lateinit var layoutVehicleListContainer: View
@@ -80,6 +90,29 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         updatePendingBanner()
         applyVehicleListVisibility()
+        startPeriodicRefresh()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        stopPeriodicRefresh()
+    }
+
+    private fun startPeriodicRefresh() {
+        stopPeriodicRefresh()
+        autoRefreshJob = lifecycleScope.launch {
+            while (isActive) {
+                delay(AUTO_REFRESH_INTERVAL_MS)
+                if (prefs.vehicleListEnabled) {
+                    loadVehicles(silent = true)
+                }
+            }
+        }
+    }
+
+    private fun stopPeriodicRefresh() {
+        autoRefreshJob?.cancel()
+        autoRefreshJob = null
     }
 
     private fun initViews() {
@@ -88,6 +121,9 @@ class MainActivity : AppCompatActivity() {
         tilPlate = findViewById(R.id.til_plate)
         etPlate = findViewById(R.id.et_plate)
         rgPlateColor = findViewById(R.id.rg_plate_color)
+        rgLanKd = findViewById(R.id.rg_lan_kd)
+        rbLan1 = findViewById(R.id.rb_lan_1)
+        rbLan2 = findViewById(R.id.rb_lan_2)
         btnSelectManual = findViewById(R.id.btn_select_manual)
 
         layoutVehicleListContainer = findViewById(R.id.layout_vehicle_list_container)
@@ -101,7 +137,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupRecyclerView() {
         vehicleAdapter = VehicleAdapter { vehicle ->
-            openCamera(vehicle.plateClean, vehicle.plateColor, vehicle.photosTaken)
+            val lan = if (vehicle.lanKd >= 2 || vehicle.suggestLan2) 2 else 1
+            openCamera(vehicle.plateClean, vehicle.plateColor, vehicle.photosTaken, lanKd = lan)
         }
         rvVehicles.layoutManager = LinearLayoutManager(this)
         rvVehicles.adapter = vehicleAdapter
@@ -139,7 +176,7 @@ class MainActivity : AppCompatActivity() {
                 val raw = s?.toString()?.trim().orEmpty()
                 val cleaned = raw.replace(Regex("[.\\-\\s]"), "").uppercase()
                 if (cleaned.isNotEmpty()) {
-                    val (_, color) = PlateUtil.extractColor(cleaned)
+                    val (basePlate, color) = PlateUtil.extractColor(cleaned)
                     when (color) {
                         "T" -> rgPlateColor.check(R.id.rb_color_white)
                         "V" -> rgPlateColor.check(R.id.rb_color_yellow)
@@ -148,6 +185,20 @@ class MainActivity : AppCompatActivity() {
                             if (cleaned.last().isDigit() && Regex("^[0-9]{2}[A-Z]{1,2}[0-9]{4}$").matches(cleaned)) {
                                 rgPlateColor.check(R.id.rb_color_none)
                             }
+                        }
+                    }
+
+                    // Tự động nhận diện Lần 2 từ danh sách xe đã quét trong ngày
+                    val matching = currentVehiclesList.firstOrNull {
+                        it.plateClean.equals(cleaned, ignoreCase = true) ||
+                        it.plateClean.equals(basePlate, ignoreCase = true) ||
+                        it.plate.replace(Regex("[.\\-\\s]"), "").equals(cleaned, ignoreCase = true)
+                    }
+                    if (matching != null) {
+                        if (matching.lanKd >= 2 || matching.suggestLan2) {
+                            rgLanKd.check(R.id.rb_lan_2)
+                        } else {
+                            rgLanKd.check(R.id.rb_lan_1)
                         }
                     }
                 }
@@ -211,8 +262,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         val finalPlate = if (extractedColor != null) basePlate else cleanPlate
+        val lanKd = if (rbLan2.isChecked) 2 else 1
 
-        openCamera(finalPlate, finalColor, null)
+        openCamera(finalPlate, finalColor, null, lanKd = lanKd)
     }
 
     private fun updateFilterButtons() {
@@ -233,11 +285,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun openCamera(plate: String, plateColor: String?, photosTaken: List<String>? = null) {
-        val compactPlate = PlateUtil.formatCompactPlate(plate, plateColor)
+    private fun openCamera(plate: String, plateColor: String?, photosTaken: List<String>? = null, lanKd: Int = 1) {
+        val compactPlate = PlateUtil.formatCompactPlate(plate, plateColor, lanKd = lanKd)
         val intent = Intent(this, CameraActivity::class.java).apply {
             putExtra(CameraActivity.EXTRA_PLATE, compactPlate)
             putExtra(CameraActivity.EXTRA_PLATE_COLOR, plateColor)
+            putExtra(CameraActivity.EXTRA_LAN_KD, lanKd)
             if (photosTaken != null) {
                 putStringArrayListExtra(CameraActivity.EXTRA_PHOTOS_TAKEN, ArrayList(photosTaken))
             }
@@ -254,18 +307,22 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun loadVehicles() {
+    private fun loadVehicles(silent: Boolean = false) {
         if (!prefs.vehicleListEnabled) return
 
         lifecycleScope.launch {
-            pbLoading.visibility = View.VISIBLE
-            tvEmpty.visibility = View.GONE
+            if (!silent) {
+                pbLoading.visibility = View.VISIBLE
+                tvEmpty.visibility = View.GONE
+            }
 
             try {
                 val baseUrl = NetworkUtil.resolveBaseUrl(prefs.lanUrl, prefs.tailscaleUrl)
                 if (baseUrl == null) {
-                    tvEmpty.visibility = View.VISIBLE
-                    tvEmpty.text = "Không kết nối được máy chủ (${prefs.lanIp}:${prefs.serverPort})\nVuốt xuống để thử lại"
+                    if (!silent) {
+                        tvEmpty.visibility = View.VISIBLE
+                        tvEmpty.text = "Không kết nối được máy chủ (${prefs.lanIp}:${prefs.serverPort})\nVuốt xuống để thử lại"
+                    }
                     return@launch
                 }
                 val service = ApiClient.getService(baseUrl)
@@ -275,6 +332,7 @@ class MainActivity : AppCompatActivity() {
 
                 if (response.isSuccessful && response.body() != null) {
                     val list = response.body()!!
+                    currentVehiclesList = list
                     vehicleAdapter.updateList(list)
                     if (list.isEmpty()) {
                         tvEmpty.visibility = View.VISIBLE
@@ -286,15 +344,19 @@ class MainActivity : AppCompatActivity() {
                     } else {
                         tvEmpty.visibility = View.GONE
                     }
-                } else {
+                } else if (!silent) {
                     tvEmpty.visibility = View.VISIBLE
                     tvEmpty.text = getString(R.string.empty_vehicle_list)
                 }
             } catch (e: Exception) {
-                tvEmpty.visibility = View.VISIBLE
-                tvEmpty.text = "Lỗi kết nối: ${e.message}\nVuốt xuống để thử lại"
+                if (!silent) {
+                    tvEmpty.visibility = View.VISIBLE
+                    tvEmpty.text = "Lỗi kết nối: ${e.message}\nVuốt xuống để thử lại"
+                }
             } finally {
-                pbLoading.visibility = View.GONE
+                if (!silent) {
+                    pbLoading.visibility = View.GONE
+                }
                 swipeRefresh.isRefreshing = false
             }
         }

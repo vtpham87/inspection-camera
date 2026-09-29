@@ -40,11 +40,13 @@ class ReviewActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_PLATE = "extra_plate"
         const val EXTRA_PLATE_COLOR = "extra_plate_color"
+        const val EXTRA_LAN_KD = "extra_lan_kd"
     }
 
     private lateinit var prefs: PrefsManager
     private lateinit var plate: String
     private var plateColor: String? = null
+    private var lanKd: Int = 1
 
     private lateinit var toolbar: MaterialToolbar
     private lateinit var tvPlate: TextView
@@ -71,6 +73,7 @@ class ReviewActivity : AppCompatActivity() {
         prefs = PrefsManager(this)
         plate = intent.getStringExtra(EXTRA_PLATE) ?: ""
         plateColor = intent.getStringExtra(EXTRA_PLATE_COLOR)
+        lanKd = intent.getIntExtra(EXTRA_LAN_KD, 1)
 
         initViews()
         setupRecyclerView()
@@ -96,7 +99,7 @@ class ReviewActivity : AppCompatActivity() {
         btnDone = findViewById(R.id.btn_review_done)
 
         toolbar.setNavigationOnClickListener { finish() }
-        tvPlate.text = plate
+        tvPlate.text = com.ttdk1507d.inspectioncamera.util.PlateUtil.formatCompactPlate(plate, plateColor, lanKd)
 
         btnSync.setOnClickListener {
             uploadPendingPhotos()
@@ -122,6 +125,7 @@ class ReviewActivity : AppCompatActivity() {
                 val intent = Intent(this, CameraActivity::class.java).apply {
                     putExtra(CameraActivity.EXTRA_PLATE, plate)
                     putExtra(CameraActivity.EXTRA_PLATE_COLOR, plateColor)
+                    putExtra(CameraActivity.EXTRA_LAN_KD, lanKd)
                     putExtra(CameraActivity.EXTRA_FOCUS_TYPE, item.photoType.apiName)
                     flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 }
@@ -150,7 +154,8 @@ class ReviewActivity : AppCompatActivity() {
         val btnClose = dialog.findViewById<View>(R.id.btn_close_full_photo)
         val tvTitle = dialog.findViewById<TextView>(R.id.tv_full_photo_title)
 
-        tvTitle.text = "${item.displayTitle} • $plate"
+        val compactTitle = com.ttdk1507d.inspectioncamera.util.PlateUtil.formatCompactPlate(plate, plateColor, lanKd)
+        tvTitle.text = "${item.displayTitle} • $compactTitle"
         ivFull.load(file) {
             crossfade(true)
         }
@@ -162,7 +167,7 @@ class ReviewActivity : AppCompatActivity() {
     private fun loadPhotos() {
         reviewItems.clear()
 
-        // 1. Scan pending directory to find all pending (type, seq) for this plate
+        // 1. Scan pending directory to find all pending (type, seq) for this plate & lanKd
         val pendingSet = mutableSetOf<Pair<PhotoType, Int?>>()
         val pendingDir = File(filesDir, "pending")
         val pendingMetaList = mutableListOf<PendingUploadMetadata>()
@@ -172,7 +177,7 @@ class ReviewActivity : AppCompatActivity() {
             for (metaFile in metaFiles) {
                 try {
                     val meta = gson.fromJson(metaFile.readText(), PendingUploadMetadata::class.java)
-                    if (meta.plate.equals(plate, ignoreCase = true)) {
+                    if (meta.plate.equals(plate, ignoreCase = true) && meta.lanKd == lanKd) {
                         val photoType = PhotoType.values().firstOrNull { it.apiName == meta.photoType }
                         if (photoType != null) {
                             pendingSet.add(photoType to meta.seq)
@@ -185,8 +190,8 @@ class ReviewActivity : AppCompatActivity() {
             }
         }
 
-        // 2. Scan review directory for this plate
-        val reviewDir = File(filesDir, "review/$plate")
+        // 2. Scan review directory for this plate & lanKd
+        val reviewDir = if (lanKd > 1) File(filesDir, "review/$plate/$lanKd") else File(filesDir, "review/$plate")
         if (reviewDir.exists() && reviewDir.isDirectory) {
             val files = reviewDir.listFiles { f -> f.extension.equals("jpg", ignoreCase = true) } ?: emptyArray()
             for (file in files) {
@@ -256,7 +261,7 @@ class ReviewActivity : AppCompatActivity() {
         for (mf in metaFiles) {
             try {
                 val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
-                if (meta.plate.equals(plate, ignoreCase = true)) {
+                if (meta.plate.equals(plate, ignoreCase = true) && meta.lanKd == lanKd) {
                     plateMetas.add(mf to meta)
                 }
             } catch (e: Exception) {
@@ -333,8 +338,9 @@ class ReviewActivity : AppCompatActivity() {
                         val photoTypeReq = meta.photoType.toRequestBody("text/plain".toMediaTypeOrNull())
                         val colorReq = meta.plateColor?.toRequestBody("text/plain".toMediaTypeOrNull())
                         val seqReq = meta.seq?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
+                        val lanKdReq = meta.lanKd.toString().toRequestBody("text/plain".toMediaTypeOrNull())
 
-                        val resp = service.uploadPhoto(filePart, plateReq, colorReq, photoTypeReq, seqReq)
+                        val resp = service.uploadPhoto(filePart, plateReq, colorReq, photoTypeReq, seqReq, lanKdReq)
                         resp.isSuccessful && resp.body()?.get("ok") == true
                     } catch (e: Exception) {
                         false
@@ -400,7 +406,8 @@ class ReviewActivity : AppCompatActivity() {
                         "plate" to plate,
                         "plate_color" to plateColor,
                         "photo_type" to item.photoType.apiName,
-                        "seq" to item.seq
+                        "seq" to item.seq,
+                        "lan_kd" to lanKd
                     )
                     withContext(Dispatchers.IO) {
                         service.deletePhoto(body)
@@ -421,7 +428,7 @@ class ReviewActivity : AppCompatActivity() {
                 for (mf in metaFiles) {
                     try {
                         val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
-                        if (meta.plate == plate && meta.photoType == item.photoType.apiName && meta.seq == item.seq) {
+                        if (meta.plate == plate && meta.photoType == item.photoType.apiName && meta.seq == item.seq && meta.lanKd == lanKd) {
                             File(pendingDir, meta.imageFileName).delete()
                             mf.delete()
                         }

@@ -19,7 +19,8 @@ interface ApiService {
         @Part("plate") plate: RequestBody,
         @Part("plate_color") plateColor: RequestBody?,
         @Part("photo_type") photoType: RequestBody,
-        @Part("seq") seq: RequestBody?
+        @Part("seq") seq: RequestBody?,
+        @Part("lan_kd") lanKd: RequestBody? = null
     ): Response<Map<String, Any>>
 
     @HTTP(method = "DELETE", path = "/api/photos", hasBody = true)
@@ -30,6 +31,13 @@ interface ApiService {
         @Query("date") date: String? = null,
         @Query("waiting_only") waitingOnly: Boolean = true
     ): Response<List<Vehicle>>
+
+    @GET("/api/vehicles/check-plate")
+    suspend fun checkPlate(
+        @Query("plate") plate: String,
+        @Query("plate_color") plateColor: String? = null,
+        @Query("date") date: String? = null
+    ): Response<Map<String, Any>>
 
     @GET("/api/config")
     suspend fun getConfig(): Response<Map<String, Any>>

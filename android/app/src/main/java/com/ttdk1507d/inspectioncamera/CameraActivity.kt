@@ -72,6 +72,7 @@ class CameraActivity : AppCompatActivity() {
         const val EXTRA_PLATE_COLOR = "extra_plate_color"
         const val EXTRA_FOCUS_TYPE = "extra_focus_type"
         const val EXTRA_PHOTOS_TAKEN = "photos_taken"
+        const val EXTRA_LAN_KD = "extra_lan_kd"
     }
 
     private data class LocalPhotoInfo(val photoType: PhotoType, val seq: Int?)
@@ -81,9 +82,11 @@ class CameraActivity : AppCompatActivity() {
 
     private lateinit var plate: String
     private var plateColor: String? = null
+    private var lanKd: Int = 1
 
     private lateinit var previewView: PreviewView
     private lateinit var tvPlate: TextView
+    private lateinit var btnToggleLanKd: MaterialButton
     private lateinit var btnBack: ImageButton
 
     // AE/AF Views & State
@@ -119,6 +122,7 @@ class CameraActivity : AppCompatActivity() {
         prefs = PrefsManager(this)
         plate = intent.getStringExtra(EXTRA_PLATE) ?: ""
         plateColor = intent.getStringExtra(EXTRA_PLATE_COLOR)
+        lanKd = intent.getIntExtra(EXTRA_LAN_KD, 1)
 
         if (plate.isEmpty()) {
             Toast.makeText(this, "Thiếu thông tin biển số", Toast.LENGTH_SHORT).show()
@@ -182,6 +186,7 @@ class CameraActivity : AppCompatActivity() {
     private fun initViews() {
         previewView = findViewById(R.id.preview_view)
         tvPlate = findViewById(R.id.tv_camera_plate)
+        btnToggleLanKd = findViewById(R.id.btn_toggle_lan_kd)
         btnBack = findViewById(R.id.btn_camera_back)
 
         ivFocusRing = findViewById(R.id.iv_camera_focus)
@@ -196,13 +201,30 @@ class CameraActivity : AppCompatActivity() {
         layoutLoading = findViewById(R.id.layout_camera_loading)
         tvLoadingText = findViewById(R.id.tv_camera_loading_text)
 
-        // Gộp biển + màu biển ngắn gọn: ví dụ 15A12345T
-        val compactPlate = PlateUtil.formatCompactPlate(plate, plateColor)
+        updateLanKdUI()
+    }
+
+    private fun updateLanKdUI() {
+        val compactPlate = PlateUtil.formatCompactPlate(plate, plateColor, lanKd)
         tvPlate.text = compactPlate
+        if (lanKd > 1) {
+            btnToggleLanKd.text = "Lần $lanKd"
+            btnToggleLanKd.backgroundTintList = ContextCompat.getColorStateList(this, R.color.warning)
+        } else {
+            btnToggleLanKd.text = "Lần 1"
+            btnToggleLanKd.backgroundTintList = ContextCompat.getColorStateList(this, R.color.primary)
+        }
     }
 
     private fun setupListeners() {
         btnBack.setOnClickListener { finish() }
+
+        btnToggleLanKd.setOnClickListener {
+            lanKd = if (lanKd == 1) 2 else 1
+            updateLanKdUI()
+            refreshLocalPhotoStatus()
+            Toast.makeText(this, "Đã chuyển sang: Lần $lanKd", Toast.LENGTH_SHORT).show()
+        }
 
         btnRear45.setOnClickListener { takePhoto(PhotoType.REAR_45, null) }
         btnFront45.setOnClickListener { takePhoto(PhotoType.FRONT_45, null) }
@@ -213,6 +235,7 @@ class CameraActivity : AppCompatActivity() {
             val intent = Intent(this, ReviewActivity::class.java).apply {
                 putExtra(ReviewActivity.EXTRA_PLATE, plate)
                 putExtra(ReviewActivity.EXTRA_PLATE_COLOR, plateColor)
+                putExtra(ReviewActivity.EXTRA_LAN_KD, lanKd)
             }
             startActivity(intent)
         }
@@ -404,7 +427,7 @@ class CameraActivity : AppCompatActivity() {
     private fun refreshLocalPhotoStatus() {
         val reviewPhotos = mutableListOf<LocalPhotoInfo>()
 
-        val reviewDir = File(filesDir, "review/$plate")
+        val reviewDir = if (lanKd > 1) File(filesDir, "review/$plate/$lanKd") else File(filesDir, "review/$plate")
         if (reviewDir.exists() && reviewDir.isDirectory) {
             val files = reviewDir.listFiles { f -> f.extension.equals("jpg", ignoreCase = true) } ?: emptyArray()
             for (file in files) {
@@ -427,7 +450,7 @@ class CameraActivity : AppCompatActivity() {
             for (mf in metaFiles) {
                 try {
                     val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
-                    if (meta.plate.equals(plate, ignoreCase = true)) {
+                    if (meta.plate.equals(plate, ignoreCase = true) && meta.lanKd == lanKd) {
                         val pt = PhotoType.values().firstOrNull { it.apiName == meta.photoType }
                         if (pt != null) {
                             reviewPhotos.add(LocalPhotoInfo(pt, meta.seq))
@@ -576,6 +599,7 @@ class CameraActivity : AppCompatActivity() {
                 plateColor = plateColor,
                 photoType = type.apiName,
                 seq = seq,
+                lanKd = lanKd,
                 timestamp = timestamp
             )
             val metaJson = Gson().toJson(meta)
@@ -597,8 +621,9 @@ class CameraActivity : AppCompatActivity() {
                 val photoTypeReq = type.apiName.toRequestBody("text/plain".toMediaTypeOrNull())
                 val colorReq = plateColor?.toRequestBody("text/plain".toMediaTypeOrNull())
                 val seqReq = seq?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
+                val lanKdReq = lanKd.toString().toRequestBody("text/plain".toMediaTypeOrNull())
 
-                val resp = service.uploadPhoto(filePart, plateReq, colorReq, photoTypeReq, seqReq)
+                val resp = service.uploadPhoto(filePart, plateReq, colorReq, photoTypeReq, seqReq, lanKdReq)
                 if (resp.isSuccessful && resp.body()?.get("ok") == true) {
                     val pendingDir = File(filesDir, "pending")
                     val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
@@ -606,7 +631,7 @@ class CameraActivity : AppCompatActivity() {
                     for (mf in metaFiles) {
                         try {
                             val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
-                            if (meta.plate == plate && meta.photoType == type.apiName && meta.seq == seq) {
+                            if (meta.plate == plate && meta.photoType == type.apiName && meta.seq == seq && meta.lanKd == lanKd) {
                                 File(pendingDir, meta.imageFileName).delete()
                                 mf.delete()
                             }
@@ -658,7 +683,7 @@ class CameraActivity : AppCompatActivity() {
 
     private fun saveToLocalReview(type: PhotoType, seq: Int?, bytes: ByteArray) {
         try {
-            val reviewDir = File(filesDir, "review/$plate")
+            val reviewDir = if (lanKd > 1) File(filesDir, "review/$plate/$lanKd") else File(filesDir, "review/$plate")
             if (!reviewDir.exists()) reviewDir.mkdirs()
             val fileName = if (seq != null && type.multiPhoto) {
                 "${type.apiName}_$seq.jpg"

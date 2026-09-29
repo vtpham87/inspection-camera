@@ -114,7 +114,7 @@ def test_validate_empty_rejected():
 
 # --- save_photo ---
 def test_save_photo_creates_file(tmp_path):
-    config = PhotoConfig()
+    config = PhotoConfig(photo_save_dir=str(tmp_path))
     config.paths["rear_45"] = str(tmp_path / "{date}")
     jpeg = b"\xff\xd8\xff\xe0" + b"\x00" * 100 + b"\xff\xd9"
     result = save_photo(jpeg, "15A12345", "T", "rear_45", None, config)
@@ -122,14 +122,14 @@ def test_save_photo_creates_file(tmp_path):
     assert os.path.exists(result["path"])
 
 def test_save_photo_rejects_non_jpeg(tmp_path):
-    config = PhotoConfig()
+    config = PhotoConfig(photo_save_dir=str(tmp_path))
     config.paths["rear_45"] = str(tmp_path / "{date}")
     png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
     result = save_photo(png, "15A12345", "T", "rear_45", None, config)
     assert result["ok"] is False
 
 def test_save_photo_rejects_oversize(tmp_path):
-    config = PhotoConfig()
+    config = PhotoConfig(photo_save_dir=str(tmp_path))
     config.paths["rear_45"] = str(tmp_path / "{date}")
     # 11MB fake JPEG
     big = b"\xff\xd8\xff\xe0" + b"\x00" * (11 * 1024 * 1024)
@@ -137,21 +137,21 @@ def test_save_photo_rejects_oversize(tmp_path):
     assert result["ok"] is False
 
 def test_save_photo_path_traversal_rejected(tmp_path):
-    config = PhotoConfig()
+    config = PhotoConfig(photo_save_dir=str(tmp_path))
     config.paths["rear_45"] = str(tmp_path / "{date}")
     jpeg = b"\xff\xd8\xff\xe0" + b"\x00" * 100 + b"\xff\xd9"
     result = save_photo(jpeg, "../../../etc", None, "rear_45", None, config)
     assert result["ok"] is False
 
 def test_save_photo_rejects_invalid_photo_type(tmp_path):
-    config = PhotoConfig()
+    config = PhotoConfig(photo_save_dir=str(tmp_path))
     jpeg = b"\xff\xd8\xff\xe0" + b"\x00" * 100 + b"\xff\xd9"
     result = save_photo(jpeg, "15A12345", "T", "invalid_type", None, config)
     assert result["ok"] is False
     assert "Loại ảnh không hợp lệ" in result["error"]
 
 def test_save_photo_rejects_invalid_plate_color(tmp_path):
-    config = PhotoConfig()
+    config = PhotoConfig(photo_save_dir=str(tmp_path))
     config.paths["rear_45"] = str(tmp_path / "{date}")
     jpeg = b"\xff\xd8\xff\xe0" + b"\x00" * 100 + b"\xff\xd9"
     result = save_photo(jpeg, "15A12345", "INVALID", "rear_45", None, config)
@@ -159,7 +159,7 @@ def test_save_photo_rejects_invalid_plate_color(tmp_path):
     assert result["error"] == "Màu biển không hợp lệ"
 
 def test_save_photo_valid_plate_colors(tmp_path):
-    config = PhotoConfig()
+    config = PhotoConfig(photo_save_dir=str(tmp_path))
     config.paths["rear_45"] = str(tmp_path / "{date}")
     jpeg = b"\xff\xd8\xff\xe0" + b"\x00" * 100 + b"\xff\xd9"
     for color in (None, "", "T", "V", "X"):
@@ -167,7 +167,7 @@ def test_save_photo_valid_plate_colors(tmp_path):
         assert res["ok"] is True
 
 def test_save_photo_auto_increments_seq(tmp_path):
-    config = PhotoConfig()
+    config = PhotoConfig(photo_save_dir=str(tmp_path))
     config.paths["passenger"] = str(tmp_path / "{date}" / "{plate}")
     jpeg = b"\xff\xd8\xff\xe0" + b"\x00" * 100 + b"\xff\xd9"
     # First save with seq=None
@@ -202,10 +202,11 @@ def test_save_photo_auto_increments_seq(tmp_path):
 def test_sync_new_vehicle_copies_front_and_rear(tmp_path):
     root = str(tmp_path / "photos")
     config = PhotoConfig(
+        photo_save_dir=root,
         paths={
-            "rear_45": os.path.join(root, "{date}"),
-            "front_45": os.path.join(root, "{date}"),
-            "chassis": os.path.join(root, "{date}"),
+            "rear_45": root,
+            "front_45": root,
+            "chassis": root,
             "passenger": os.path.join(root, "{date}", "{plate}"),
             "new_vehicle": os.path.join(root, "{date}", "{plate}"),
         },
@@ -240,3 +241,33 @@ def test_save_photo_45_directly_in_chosen_dir_without_date(tmp_path):
     assert os.path.exists(expected_path)
     # Ensure no subdirectories were created inside chosen_dir
     assert os.listdir(str(chosen_dir)) == ["15A12345.jpg"]
+
+
+# --- lan_kd (Lần 2) tests ---
+def test_filename_lan2_rear_45_with_color():
+    assert build_filename("15A12345", "T", "rear_45", None, False, lan_kd=2) == "15A12345TL2.jpg"
+
+def test_filename_lan2_front_45_with_color():
+    assert build_filename("15A12345", "T", "front_45", None, False, lan_kd=2) == "bs15A12345TL2.jpg"
+
+def test_filename_lan2_no_color():
+    assert build_filename("11K2639", None, "rear_45", None, False, lan_kd=2) == "11K2639L2.jpg"
+    assert build_filename("11K2639", None, "front_45", None, False, lan_kd=2) == "bs11K2639L2.jpg"
+
+def test_filename_lan2_passenger():
+    assert build_filename("15A12345", "T", "passenger", 1, False, lan_kd=2) == "15A12345TL2_1.jpg"
+
+def test_filename_lan2_chassis():
+    assert build_filename("15A12345", "T", "chassis", None, False, lan_kd=2) == "sk_15A12345TL2.jpg"
+
+def test_save_photo_lan2(tmp_path):
+    chosen_dir = tmp_path / "Photos"
+    config = PhotoConfig(photo_save_dir=str(chosen_dir))
+    jpeg = b"\xff\xd8\xff\xe0" + b"\x00" * 100 + b"\xff\xd9"
+    result = save_photo(jpeg, "15A12345", "T", "rear_45", None, config, lan_kd=2)
+    assert result["ok"] is True
+    assert result["filename"] == "15A12345TL2.jpg"
+    expected_path = os.path.join(str(chosen_dir), "15A12345TL2.jpg")
+    assert result["path"] == expected_path
+    assert os.path.exists(expected_path)
+

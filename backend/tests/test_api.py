@@ -29,7 +29,7 @@ def setup_env(tmp_path):
 
     # Write config with test paths
     from config import PhotoConfig, save_config
-    cfg = PhotoConfig()
+    cfg = PhotoConfig(photo_save_dir=photo_dir)
     for key in cfg.paths:
         cfg.paths[key] = os.path.join(photo_dir, "{date}")
     save_config(cfg, config_path)
@@ -109,6 +109,40 @@ def test_post_config(setup_env):
     # Verify persisted
     r3 = client.get("/api/config")
     assert r3.json()["jpeg_quality"] == 70
+
+
+def test_upload_lan_kd_2(setup_env):
+    client, _ = setup_env
+    r = client.post(
+        "/api/upload",
+        data={"plate": "15A12345", "plate_color": "T", "photo_type": "rear_45", "lan_kd": 2},
+        files={"file": ("test.jpg", FAKE_JPEG, "image/jpeg")},
+    )
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+    assert r.json()["filename"] == "15A12345TL2.jpg"
+
+
+def test_upload_lan_kd_2_front(setup_env):
+    client, _ = setup_env
+    r = client.post(
+        "/api/upload",
+        data={"plate": "15A12345", "plate_color": "T", "photo_type": "front_45", "lan_kd": 2},
+        files={"file": ("test.jpg", FAKE_JPEG, "image/jpeg")},
+    )
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+    assert r.json()["filename"] == "bs15A12345TL2.jpg"
+
+
+def test_check_plate_endpoint(setup_env):
+    client, _ = setup_env
+    r = client.get("/api/vehicles/check-plate?plate=15A12345&plate_color=T&date=2026-09-27")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["plate"] == "15A12345"
+    assert "suggest_lan_2" in data
+
 
 def test_vehicles_today(setup_env):
     client, _ = setup_env
