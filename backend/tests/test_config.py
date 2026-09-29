@@ -60,3 +60,33 @@ def test_load_config_corrupt_returns_defaults(tmp_path):
         f.write("{ invalid json")
     loaded = load_config(path)
     assert loaded == CONFIG_DEFAULTS
+
+def test_photo_45_saves_directly_to_photo_save_dir():
+    cfg = PhotoConfig(photo_save_dir="Z:\\Anh Phuong Tien")
+    assert cfg.paths["rear_45"] == "Z:\\Anh Phuong Tien"
+    assert cfg.paths["front_45"] == "Z:\\Anh Phuong Tien"
+    assert cfg.paths["chassis"] == "Z:\\Anh Phuong Tien"
+    assert "{date}" not in cfg.paths["rear_45"]
+
+def test_default_photo_45_paths_have_no_date():
+    assert CONFIG_DEFAULTS.paths["rear_45"] == "D:\\Photos"
+    assert CONFIG_DEFAULTS.paths["front_45"] == "D:\\Photos"
+    assert "{date}" not in CONFIG_DEFAULTS.paths["rear_45"]
+
+def test_load_config_overwrites_stale_date_paths(tmp_path):
+    path = str(tmp_path / "config.json")
+    stale_data = {
+        "photo_save_dir": "Z:\\Anh Phuong Tien",
+        "paths": {
+            "rear_45": "Z:\\Anh Phuong Tien\\{date}",
+            "front_45": "Z:\\Anh Phuong Tien\\{date}",
+            "passenger": "Z:\\Anh Khoang HK\\{plate}",
+            "new_vehicle": "Z:\\Anh xe moi\\{plate}"
+        }
+    }
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(stale_data, f)
+    loaded = load_config(path)
+    assert loaded.paths["rear_45"] == "Z:\\Anh Phuong Tien"
+    assert loaded.paths["front_45"] == "Z:\\Anh Phuong Tien"
+    assert "{date}" not in loaded.paths["rear_45"]

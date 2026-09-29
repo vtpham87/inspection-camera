@@ -47,7 +47,7 @@ Hệ thống chụp và đồng bộ ảnh kiểm định xe cơ giới dành ch
                 ▼
 ┌─────────────────────────────────┐
 │  Hệ thống File Server (Windows) │
-│  - D:\Photos\YYYYMMDD\          │
+│  - D:\Photos\                   │
 │  - D:\Photos\YYYYMMDD\{plate}\  │
 └─────────────────────────────────┘
 ```
@@ -201,7 +201,7 @@ Base URL: `http://<server-ip>:8095`
   ```json
   {
     "ok": true,
-    "path": "D:\\Photos\\20260927\\15A12345T.jpg",
+    "path": "D:\\Photos\\15A12345T.jpg",
     "filename": "15A12345T.jpg"
   }
   ```
@@ -222,7 +222,7 @@ Base URL: `http://<server-ip>:8095`
   ```json
   {
     "ok": true,
-    "deleted": "D:\\Photos\\20260927\\15A12345T.jpg"
+    "deleted": "D:\\Photos\\15A12345T.jpg"
   }
   ```
 
@@ -264,9 +264,9 @@ File cấu hình đặt tại `backend/photo_config.json`:
   "vehicle_list_enabled": true,
   "server_port": 8095,
   "paths": {
-    "rear_45": "D:\\Photos\\{date}",
-    "front_45": "D:\\Photos\\{date}",
-    "chassis": "D:\\Photos\\{date}",
+    "rear_45": "D:\\Photos",
+    "front_45": "D:\\Photos",
+    "chassis": "D:\\Photos",
     "passenger": "D:\\Photos\\{date}\\{plate}",
     "new_vehicle": "D:\\Photos\\{date}\\{plate}"
   },

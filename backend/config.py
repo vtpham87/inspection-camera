@@ -22,9 +22,9 @@ class PhotoConfig(BaseModel):
     new_vehicle_path: str = "D:\\Photos\\{date}\\{plate}"
     sync_new_vehicle_45: bool = True
     paths: dict[str, str] = {
-        "rear_45": "D:\\Photos\\{date}",
-        "front_45": "D:\\Photos\\{date}",
-        "chassis": "D:\\Photos\\{date}",
+        "rear_45": "D:\\Photos",
+        "front_45": "D:\\Photos",
+        "chassis": "D:\\Photos",
         "passenger": "D:\\Photos\\{date}\\{plate}",
         "new_vehicle": "D:\\Photos\\{date}\\{plate}",
     }
@@ -35,11 +35,13 @@ class PhotoConfig(BaseModel):
 
     def model_post_init(self, __context):
         root = self.photo_save_dir.rstrip("\\/")
-        # Sync root to paths only if photo_save_dir is customized
+        # Ảnh góc 45° lưu trực tiếp vào thư mục chọn, không tạo thư mục con theo ngày
+        self.paths["rear_45"] = root
+        self.paths["front_45"] = root
+        self.paths["chassis"] = root
+
+        # Sync root to passenger & new_vehicle if using defaults
         if root != "D:\\Photos":
-            self.paths["rear_45"] = f"{root}\\{{date}}"
-            self.paths["front_45"] = f"{root}\\{{date}}"
-            self.paths["chassis"] = f"{root}\\{{date}}"
             if self.passenger_path == "D:\\Photos\\{date}\\{plate}":
                 self.passenger_path = f"{root}\\{{date}}\\{{plate}}"
             if self.new_vehicle_path == "D:\\Photos\\{date}\\{plate}":

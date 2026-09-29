@@ -107,7 +107,13 @@ def delete_photo(req: DeleteRequest):
 
     if deleted_path:
         try:
-            if os.path.exists(save_dir) and os.path.isdir(save_dir) and not os.listdir(save_dir):
+            root_save_dir = os.path.realpath(config.photo_save_dir)
+            if (
+                os.path.realpath(save_dir) != root_save_dir
+                and os.path.exists(save_dir)
+                and os.path.isdir(save_dir)
+                and not os.listdir(save_dir)
+            ):
                 os.rmdir(save_dir)
         except Exception:
             pass

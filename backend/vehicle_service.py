@@ -29,6 +29,10 @@ def _check_photos_taken(
             )
             if os.path.exists(os.path.join(save_dir, filename)):
                 taken.append(pt)
+            elif date and "{date}" not in config.paths.get(pt, ""):
+                date_clean = date.replace("-", "")
+                if os.path.exists(os.path.join(save_dir, date_clean, filename)):
+                    taken.append(pt)
         except Exception:
             pass
     return taken

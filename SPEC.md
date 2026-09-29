@@ -63,9 +63,9 @@ D:\inspection-camera\
 
 | photo_type | Tên file | Thư mục |
 |---|---|---|
-| `rear_45` | `{plate}.jpg` hoặc `{plate}{color}.jpg` | Cấu hình `paths.rear_45` |
-| `front_45` | `bs{plate}.jpg` hoặc `bs{plate}{color}.jpg` | Cấu hình `paths.front_45` |
-| `chassis` | `sk_{plate}.jpg` | Cấu hình `paths.chassis` |
+| `rear_45` | `{plate}.jpg` hoặc `{plate}{color}.jpg` | Cấu hình `paths.rear_45` (lưu trực tiếp thư mục chọn, không tạo thư mục ngày) |
+| `front_45` | `bs{plate}.jpg` hoặc `bs{plate}{color}.jpg` | Cấu hình `paths.front_45` (lưu trực tiếp thư mục chọn, không tạo thư mục ngày) |
+| `chassis` | `sk_{plate}.jpg` | Cấu hình `paths.chassis` (lưu trực tiếp thư mục chọn, không tạo thư mục ngày) |
 | `passenger` | `{plate}_1.jpg`, `{plate}_2.jpg`, ... | Cấu hình `paths.passenger` (thư mục con `{plate}\`) |
 | `new_vehicle` | `{plate}_1.jpg`, `{plate}_2.jpg`, ... | Cấu hình `paths.new_vehicle` (thư mục con `{plate}\`) |
 
@@ -81,7 +81,7 @@ D:\inspection-camera\
 ```json
 {
   "ok": true,
-  "path": "D:\\Photos\\20260927\\15A12345.jpg",
+  "path": "D:\\Photos\\15A12345.jpg",
   "filename": "15A12345.jpg"
 }
 ```
@@ -178,9 +178,9 @@ Trường `photos_taken` kiểm tra file đã tồn tại trên đĩa để hi�
   "vehicle_list_enabled": true,
   "server_port": 8095,
   "paths": {
-    "rear_45": "D:\\Photos\\{date}",
-    "front_45": "D:\\Photos\\{date}",
-    "chassis": "D:\\Photos\\{date}",
+    "rear_45": "D:\\Photos",
+    "front_45": "D:\\Photos",
+    "chassis": "D:\\Photos",
     "passenger": "D:\\Photos\\{date}\\{plate}",
     "new_vehicle": "D:\\Photos\\{date}\\{plate}"
   }
@@ -218,9 +218,9 @@ Trường `photos_taken` kiểm tra file đã tồn tại trên đĩa để hi�
   "vehicle_list_enabled": true,
   "server_port": 8095,
   "paths": {
-    "rear_45": "D:\\Photos\\{date}",
-    "front_45": "D:\\Photos\\{date}",
-    "chassis": "D:\\Photos\\{date}",
+    "rear_45": "D:\\Photos",
+    "front_45": "D:\\Photos",
+    "chassis": "D:\\Photos",
     "passenger": "D:\\Photos\\{date}\\{plate}",
     "new_vehicle": "D:\\Photos\\{date}\\{plate}"
   },

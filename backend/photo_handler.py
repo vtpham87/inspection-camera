@@ -55,7 +55,7 @@ def resolve_save_path(
     create_dir: bool = False,
     date_str: str | None = None,
 ) -> str:
-    template = config.paths.get(photo_type, "D:\\Photos\\{date}")
+    template = config.paths.get(photo_type, config.photo_save_dir)
     current_date = date_str.replace("-", "") if date_str is not None else datetime.now().strftime("%Y%m%d")
     path = template.replace("{date}", current_date).replace("{plate}", plate)
     if create_dir:
