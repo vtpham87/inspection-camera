@@ -142,8 +142,10 @@ curl http://localhost:8095/api/health
 ### Thiết lập kết nối máy chủ
 1. Mở ứng dụng, nhấn vào biểu tượng **Cài đặt (Bánh răng)** ở góc trên bên phải màn hình chính.
 2. Nhập các thông số mạng:
-   - **Địa chỉ máy chủ LAN**: Ví dụ `http://192.168.1.100:8095` (IP máy chủ trong mạng nội bộ trạm).
-   - **Địa chỉ máy chủ Tailscale**: Ví dụ `http://100.x.y.z:8095` (IP Tailscale của máy tính).
+   - **Bật kết nối LAN (Wi-Fi trạm)**: Công tắc bật/tắt kết nối LAN nội bộ. Tắt công tắc này nếu chỉ muốn app dùng 4G/Tailscale, không tốn thời gian dò sóng Wi-Fi.
+   - **Bật kết nối Tailscale (4G / Từ xa)**: Công tắc bật/tắt kết nối Tailscale. Tắt công tắc này nếu ĐKV ở trong nhà và chỉ dùng Wi-Fi trạm.
+   - **Địa chỉ máy chủ LAN**: Ví dụ `192.168.193.11`.
+   - **Địa chỉ máy chủ Tailscale**: Ví dụ `100.81.114.84`.
    - **Bật danh sách xe**: Bật công tắc để hiển thị danh sách xe khám trong ngày từ phần mềm PTCGDB.
 3. Nhấn **Lưu cấu hình**.
 
