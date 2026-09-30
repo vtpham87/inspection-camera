@@ -624,7 +624,7 @@ class CameraActivity : AppCompatActivity() {
     private fun triggerBackgroundUpload(type: PhotoType, seq: Int?, bytes: ByteArray) {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val baseUrl = NetworkUtil.resolveBaseUrl(prefs.lanUrl, prefs.tailscaleUrl) ?: return@launch
+                val baseUrl = NetworkUtil.resolveBaseUrl(prefs) ?: return@launch
                 val service = ApiClient.getService(baseUrl)
 
                 val fileReq = bytes.toRequestBody("image/jpeg".toMediaTypeOrNull())

@@ -8,6 +8,8 @@ data class BackupConfig(
     @SerializedName("export_time") val exportTime: String? = null,
     @SerializedName("lan_ip") val lanIp: String = "192.168.193.11",
     @SerializedName("tailscale_ip") val tailscaleIp: String = "100.81.114.84",
+    @SerializedName("lan_enabled") val lanEnabled: Boolean = true,
+    @SerializedName("tailscale_enabled") val tailscaleEnabled: Boolean = true,
     @SerializedName("server_port") val serverPort: Int = 8095,
     @SerializedName("vehicle_list_enabled") val vehicleListEnabled: Boolean = true,
     @SerializedName("photo_save_dir") val photoSaveDir: String = "D:\\Photos",

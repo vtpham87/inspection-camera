@@ -1,7 +1,6 @@
 package com.ttdk1507d.inspectioncamera.util
 
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
@@ -10,8 +9,8 @@ object NetworkUtil {
     // LAN Wi-Fi is local; 1200ms is more than enough for a local ping (<50ms).
     private const val LAN_TIMEOUT_MS = 1200
     // Tailscale on 4G in Vietnam often relays via Singapore (DERP). Latency is 400-600ms,
-    // so TCP handshake + HTTP GET needs a generous 4500ms timeout.
-    private const val TAILSCALE_TIMEOUT_MS = 4500
+    // so TCP handshake + HTTP GET needs a generous 4000ms timeout.
+    private const val TAILSCALE_TIMEOUT_MS = 4000
 
     @Volatile
     private var lastWorkingUrl: String? = null
@@ -19,47 +18,78 @@ object NetworkUtil {
     private var lastWorkingTimestamp: Long = 0L
     private const val CACHE_VALID_MS = 10_000L // 10s fast cache
 
-    suspend fun resolveBaseUrl(lanUrl: String, tailscaleUrl: String): String? {
+    suspend fun resolveBaseUrl(prefs: PrefsManager): String? {
+        return resolveBaseUrl(prefs.lanUrl, prefs.tailscaleUrl, prefs.lanEnabled, prefs.tailscaleEnabled)
+    }
+
+    suspend fun resolveBaseUrl(
+        lanUrl: String,
+        tailscaleUrl: String,
+        lanEnabled: Boolean = true,
+        tailscaleEnabled: Boolean = true
+    ): String? {
         return withContext(Dispatchers.IO) {
             val cleanLan = lanUrl.trimEnd('/')
             val cleanTs = tailscaleUrl.trimEnd('/')
 
-            // Quick check: if last working URL was verified very recently (< 10s),
-            // and it is still healthy, reuse it immediately (0ms wait for secondary).
+            val isLanActive = lanEnabled && cleanLan.isNotEmpty()
+            val isTsActive = tailscaleEnabled && cleanTs.isNotEmpty()
+
+            if (!isLanActive && !isTsActive) {
+                lastWorkingUrl = null
+                return@withContext null
+            }
+
+            // Quick check: if last working URL is still enabled and was verified recently (< 10s)
             val cached = lastWorkingUrl
             val now = System.currentTimeMillis()
             if (cached != null && now - lastWorkingTimestamp < CACHE_VALID_MS) {
-                val timeout = if (cached == cleanLan) LAN_TIMEOUT_MS else TAILSCALE_TIMEOUT_MS
-                if (probeUrl(cached, timeout)) {
-                    lastWorkingTimestamp = System.currentTimeMillis()
-                    return@withContext cached
+                val cachedStillEnabled = (cached == cleanLan && isLanActive) || (cached == cleanTs && isTsActive)
+                if (cachedStillEnabled) {
+                    val timeout = if (cached == cleanLan) LAN_TIMEOUT_MS else TAILSCALE_TIMEOUT_MS
+                    if (probeUrl(cached, timeout)) {
+                        lastWorkingTimestamp = System.currentTimeMillis()
+                        return@withContext cached
+                    }
                 }
             }
 
-            // Probe LAN and Tailscale concurrently so 4G never suffers from sequential LAN timeout.
-            val lanJob = async {
-                if (cleanLan.isNotEmpty()) probeUrl(cleanLan, LAN_TIMEOUT_MS) else false
-            }
-            val tsJob = async {
-                if (cleanTs.isNotEmpty()) probeUrlWithRetry(cleanTs, TAILSCALE_TIMEOUT_MS) else false
+            // 1. If only LAN is enabled -> test LAN only, never probe Tailscale
+            if (isLanActive && !isTsActive) {
+                if (probeUrl(cleanLan, LAN_TIMEOUT_MS)) {
+                    lastWorkingUrl = cleanLan
+                    lastWorkingTimestamp = System.currentTimeMillis()
+                    return@withContext cleanLan
+                }
+                lastWorkingUrl = null
+                return@withContext null
             }
 
-            // Preferred route is LAN (station Wi-Fi)
-            if (lanJob.await()) {
-                tsJob.cancel()
+            // 2. If only Tailscale is enabled -> test Tailscale only, never probe LAN
+            if (!isLanActive && isTsActive) {
+                if (probeUrlWithRetry(cleanTs, TAILSCALE_TIMEOUT_MS)) {
+                    lastWorkingUrl = cleanTs
+                    lastWorkingTimestamp = System.currentTimeMillis()
+                    return@withContext cleanTs
+                }
+                lastWorkingUrl = null
+                return@withContext null
+            }
+
+            // 3. Both are enabled: sequential probe (LAN first ~15ms; if LAN unreachable, fallback to Tailscale)
+            // Does not probe in parallel across networks.
+            if (probeUrl(cleanLan, LAN_TIMEOUT_MS)) {
                 lastWorkingUrl = cleanLan
                 lastWorkingTimestamp = System.currentTimeMillis()
                 return@withContext cleanLan
             }
 
-            // LAN failed or empty; check Tailscale which was probing in parallel
-            if (tsJob.await()) {
+            if (probeUrlWithRetry(cleanTs, TAILSCALE_TIMEOUT_MS)) {
                 lastWorkingUrl = cleanTs
                 lastWorkingTimestamp = System.currentTimeMillis()
                 return@withContext cleanTs
             }
 
-            // Both failed
             lastWorkingUrl = null
             null
         }

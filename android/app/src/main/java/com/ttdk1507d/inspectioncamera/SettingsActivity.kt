@@ -42,6 +42,8 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var toolbar: MaterialToolbar
     private lateinit var etLanIp: TextInputEditText
     private lateinit var etTailscaleIp: TextInputEditText
+    private lateinit var switchLanEnabled: MaterialSwitch
+    private lateinit var switchTailscaleEnabled: MaterialSwitch
     private lateinit var etPort: TextInputEditText
     private lateinit var etPhotoSaveDir: TextInputEditText
     private lateinit var etPassengerPath: TextInputEditText
@@ -130,6 +132,8 @@ class SettingsActivity : AppCompatActivity() {
         toolbar = findViewById(R.id.toolbar_settings)
         etLanIp = findViewById(R.id.et_settings_lan_ip)
         etTailscaleIp = findViewById(R.id.et_settings_tailscale_ip)
+        switchLanEnabled = findViewById(R.id.switch_settings_lan_enabled)
+        switchTailscaleEnabled = findViewById(R.id.switch_settings_tailscale_enabled)
         etPort = findViewById(R.id.et_settings_port)
         etPhotoSaveDir = findViewById(R.id.et_settings_photo_save_dir)
         etPassengerPath = findViewById(R.id.et_settings_passenger_path)
@@ -240,6 +244,11 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun loadCurrentSettings() {
+        switchLanEnabled.isChecked = prefs.lanEnabled
+        switchTailscaleEnabled.isChecked = prefs.tailscaleEnabled
+        etLanIp.isEnabled = prefs.lanEnabled
+        etTailscaleIp.isEnabled = prefs.tailscaleEnabled
+
         etLanIp.setText(prefs.lanIp)
         etTailscaleIp.setText(prefs.tailscaleIp)
         etPort.setText(prefs.serverPort.toString())
@@ -272,6 +281,14 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun setupListeners() {
+        switchLanEnabled.setOnCheckedChangeListener { _, isChecked ->
+            etLanIp.isEnabled = isChecked
+        }
+
+        switchTailscaleEnabled.setOnCheckedChangeListener { _, isChecked ->
+            etTailscaleIp.isEnabled = isChecked
+        }
+
         btnTest.setOnClickListener {
             testConnections()
         }
@@ -298,6 +315,16 @@ class SettingsActivity : AppCompatActivity() {
         val tailscaleIp = etTailscaleIp.text?.toString()?.trim().orEmpty()
         val port = etPort.text?.toString()?.trim()?.toIntOrNull() ?: prefs.serverPort
 
+        val lanEnabled = switchLanEnabled.isChecked
+        val tailscaleEnabled = switchTailscaleEnabled.isChecked
+
+        if (!lanEnabled && !tailscaleEnabled) {
+            tvTestResult.visibility = View.VISIBLE
+            tvTestResult.setTextColor(ContextCompat.getColor(this, R.color.error))
+            tvTestResult.text = "Cả LAN và Tailscale đều đang tắt. Hãy bật ít nhất một kết nối."
+            return
+        }
+
         val lanUrl = "http://$lanIp:$port"
         val tailscaleUrl = "http://$tailscaleIp:$port"
 
@@ -307,23 +334,36 @@ class SettingsActivity : AppCompatActivity() {
         tvTestResult.text = getString(R.string.test_testing)
 
         lifecycleScope.launch {
-            val lanDeferred = async(Dispatchers.IO) { checkHealth(lanUrl) }
-            val tsDeferred = async(Dispatchers.IO) { checkHealth(tailscaleUrl) }
+            val lanDeferred = async(Dispatchers.IO) {
+                if (lanEnabled) checkHealth(lanUrl) else null
+            }
+            val tsDeferred = async(Dispatchers.IO) {
+                if (tailscaleEnabled) checkHealth(tailscaleUrl) else null
+            }
 
-            val lanOk = lanDeferred.await()
-            val tsOk = tsDeferred.await()
+            val lanResult = lanDeferred.await()
+            val tsResult = tsDeferred.await()
 
             btnTest.isEnabled = true
 
             val resultText = buildString {
                 append("LAN ($lanIp:$port): ")
-                append(if (lanOk) "✅ Hoạt động" else "❌ Không phản hồi")
+                append(when (lanResult) {
+                    true -> "✅ Hoạt động"
+                    false -> "❌ Không phản hồi"
+                    null -> "⏸️ Đã tắt"
+                })
                 append("\nTailscale ($tailscaleIp:$port): ")
-                append(if (tsOk) "✅ Hoạt động" else "❌ Không phản hồi")
+                append(when (tsResult) {
+                    true -> "✅ Hoạt động"
+                    false -> "❌ Không phản hồi"
+                    null -> "⏸️ Đã tắt"
+                })
             }
 
             tvTestResult.text = resultText
-            val resultColor = if (lanOk || tsOk) {
+            val hasSuccess = (lanResult == true) || (tsResult == true)
+            val resultColor = if (hasSuccess) {
                 R.color.status_done_text
             } else {
                 R.color.error
@@ -343,6 +383,14 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun saveSettings() {
+        val lanEnabled = switchLanEnabled.isChecked
+        val tailscaleEnabled = switchTailscaleEnabled.isChecked
+
+        if (!lanEnabled && !tailscaleEnabled) {
+            Toast.makeText(this, "Phải bật ít nhất một kết nối (LAN hoặc Tailscale)", Toast.LENGTH_LONG).show()
+            return
+        }
+
         val lanIp = etLanIp.text?.toString()?.trim().orEmpty()
         val tailscaleIp = etTailscaleIp.text?.toString()?.trim().orEmpty()
         val port = etPort.text?.toString()?.trim()?.toIntOrNull()
@@ -350,12 +398,12 @@ class SettingsActivity : AppCompatActivity() {
         val passengerPath = etPassengerPath.text?.toString()?.trim().orEmpty()
         val newVehiclePath = etNewVehiclePath.text?.toString()?.trim().orEmpty()
 
-        if (lanIp.isEmpty()) {
+        if (lanEnabled && lanIp.isEmpty()) {
             etLanIp.error = "IP LAN không được để trống"
             return
         }
 
-        if (tailscaleIp.isEmpty()) {
+        if (tailscaleEnabled && tailscaleIp.isEmpty()) {
             etTailscaleIp.error = "IP Tailscale không được để trống"
             return
         }
@@ -371,8 +419,10 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         // Save immediately to local persistent preferences
-        prefs.lanIp = lanIp
-        prefs.tailscaleIp = tailscaleIp
+        prefs.lanEnabled = lanEnabled
+        prefs.tailscaleEnabled = tailscaleEnabled
+        if (lanIp.isNotEmpty()) prefs.lanIp = lanIp
+        if (tailscaleIp.isNotEmpty()) prefs.tailscaleIp = tailscaleIp
         prefs.serverPort = port
         prefs.photoSaveDir = saveDir
         if (passengerPath.isNotEmpty()) prefs.passengerPath = passengerPath
@@ -442,11 +492,9 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun syncConfigToServer() {
         val currentConfig = prefs.getAppConfig()
-        val lanUrl = prefs.lanUrl
-        val tailscaleUrl = prefs.tailscaleUrl
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val baseUrl = NetworkUtil.resolveBaseUrl(lanUrl, tailscaleUrl)
+                val baseUrl = NetworkUtil.resolveBaseUrl(prefs)
                 if (baseUrl != null) {
                     val service = ApiClient.getService(baseUrl)
                     val body = mapOf<String, Any>(

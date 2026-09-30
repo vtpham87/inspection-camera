@@ -77,6 +77,8 @@
     <string name="sync_failed">⚠️ Gửi ảnh chưa thành công. Bấm để thử lại.</string>
 
     <!-- Settings -->
+    <string name="setting_lan_enabled">Bật kết nối LAN (Wi-Fi trạm)</string>
+    <string name="setting_tailscale_enabled">Bật kết nối Tailscale (4G / Từ xa)</string>
     <string name="setting_lan_ip">Địa chỉ IP LAN (Wi-Fi nội bộ)</string>
     <string name="setting_tailscale_ip">Địa chỉ IP Tailscale / 4G</string>
     <string name="setting_port">Cổng dịch vụ (Port)</string>

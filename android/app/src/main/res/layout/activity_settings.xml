@@ -56,10 +56,22 @@
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
-                    <com.google.android.material.textfield.TextInputLayout
+                    <!-- LAN Connection Switch & IP -->
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switch_settings_lan_enabled"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
+                        android:text="@string/setting_lan_enabled"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text_primary" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/til_settings_lan_ip"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
                         android:hint="@string/setting_lan_ip"
                         style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
 
@@ -71,10 +83,22 @@
                             android:textColor="@color/text_primary" />
                     </com.google.android.material.textfield.TextInputLayout>
 
-                    <com.google.android.material.textfield.TextInputLayout
+                    <!-- Tailscale Connection Switch & IP -->
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switch_settings_tailscale_enabled"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/setting_tailscale_enabled"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text_primary" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/til_settings_tailscale_ip"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
                         android:hint="@string/setting_tailscale_ip"
                         style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
 

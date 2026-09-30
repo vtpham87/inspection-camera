@@ -329,12 +329,21 @@ class MainActivity : AppCompatActivity() {
             }
 
             try {
-                val baseUrl = NetworkUtil.resolveBaseUrl(prefs.lanUrl, prefs.tailscaleUrl)
+                val baseUrl = NetworkUtil.resolveBaseUrl(prefs)
                 if (baseUrl == null) {
                     if (!silent) {
                         if (currentVehiclesList.isEmpty()) {
                             tvEmpty.visibility = View.VISIBLE
-                            tvEmpty.text = "Không kết nối được máy chủ\n(LAN: ${prefs.lanIp} • Tailscale: ${prefs.tailscaleIp})\nVuốt xuống để thử lại"
+                            tvEmpty.text = when {
+                                !prefs.lanEnabled && !prefs.tailscaleEnabled ->
+                                    "Cả mạng LAN và Tailscale đều đang tắt\nVào Cài đặt để bật lại kết nối"
+                                prefs.lanEnabled && !prefs.tailscaleEnabled ->
+                                    "Không kết nối được máy chủ LAN (${prefs.lanIp}:${prefs.serverPort})\nVuốt xuống để thử lại"
+                                !prefs.lanEnabled && prefs.tailscaleEnabled ->
+                                    "Không kết nối được máy chủ Tailscale (${prefs.tailscaleIp}:${prefs.serverPort})\nVuốt xuống để thử lại"
+                                else ->
+                                    "Không kết nối được máy chủ\n(LAN: ${prefs.lanIp} • Tailscale: ${prefs.tailscaleIp})\nVuốt xuống để thử lại"
+                            }
                         } else {
                             Toast.makeText(this@MainActivity, "Không thể kết nối máy chủ, đang dùng danh sách hiện tại", Toast.LENGTH_SHORT).show()
                         }

@@ -288,7 +288,7 @@ class ReviewActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             val baseUrl = withContext(Dispatchers.IO) {
-                NetworkUtil.resolveBaseUrl(prefs.lanUrl, prefs.tailscaleUrl)
+                NetworkUtil.resolveBaseUrl(prefs)
             }
 
             if (baseUrl == null) {
@@ -404,7 +404,7 @@ class ReviewActivity : AppCompatActivity() {
 
             // 1. Delete on server
             try {
-                val baseUrl = NetworkUtil.resolveBaseUrl(prefs.lanUrl, prefs.tailscaleUrl)
+                val baseUrl = NetworkUtil.resolveBaseUrl(prefs)
                 if (baseUrl != null) {
                     val service = ApiClient.getService(baseUrl)
                     val body = mutableMapOf<String, Any?>(

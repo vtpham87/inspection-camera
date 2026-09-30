@@ -25,6 +25,14 @@ class PrefsManager(private val prefs: SharedPreferences) {
         get() = prefs.getString("tailscale_ip", "100.81.114.84") ?: "100.81.114.84"
         set(value) { prefs.edit().putString("tailscale_ip", value).commit() }
 
+    var lanEnabled: Boolean
+        get() = prefs.getBoolean("lan_enabled", true)
+        set(value) { prefs.edit().putBoolean("lan_enabled", value).commit() }
+
+    var tailscaleEnabled: Boolean
+        get() = prefs.getBoolean("tailscale_enabled", true)
+        set(value) { prefs.edit().putBoolean("tailscale_enabled", value).commit() }
+
     var serverPort: Int
         get() = prefs.getInt("server_port", 8095)
         set(value) { prefs.edit().putInt("server_port", value).commit() }
@@ -127,6 +135,8 @@ class PrefsManager(private val prefs: SharedPreferences) {
             exportTime = sdf.format(Date()),
             lanIp = lanIp,
             tailscaleIp = tailscaleIp,
+            lanEnabled = lanEnabled,
+            tailscaleEnabled = tailscaleEnabled,
             serverPort = serverPort,
             vehicleListEnabled = vehicleListEnabled,
             photoSaveDir = photoSaveDir,
@@ -146,6 +156,8 @@ class PrefsManager(private val prefs: SharedPreferences) {
     fun restoreBackupConfig(config: BackupConfig) {
         lanIp = config.lanIp
         tailscaleIp = config.tailscaleIp
+        lanEnabled = config.lanEnabled
+        tailscaleEnabled = config.tailscaleEnabled
         serverPort = config.serverPort
         vehicleListEnabled = config.vehicleListEnabled
         photoSaveDir = config.photoSaveDir

@@ -20,10 +20,28 @@ class PrefsManagerTest {
     fun testDefaultValues() {
         assertEquals("192.168.193.11", prefsManager.lanIp)
         assertEquals("100.81.114.84", prefsManager.tailscaleIp)
+        assertTrue(prefsManager.lanEnabled)
+        assertTrue(prefsManager.tailscaleEnabled)
         assertEquals(8095, prefsManager.serverPort)
         assertTrue(prefsManager.vehicleListEnabled)
         assertEquals("http://192.168.193.11:8095", prefsManager.lanUrl)
         assertEquals("http://100.81.114.84:8095", prefsManager.tailscaleUrl)
+    }
+
+    @Test
+    fun testSetLanEnabled() {
+        prefsManager.lanEnabled = false
+        assertFalse(prefsManager.lanEnabled)
+        prefsManager.lanEnabled = true
+        assertTrue(prefsManager.lanEnabled)
+    }
+
+    @Test
+    fun testSetTailscaleEnabled() {
+        prefsManager.tailscaleEnabled = false
+        assertFalse(prefsManager.tailscaleEnabled)
+        prefsManager.tailscaleEnabled = true
+        assertTrue(prefsManager.tailscaleEnabled)
     }
 
     @Test
