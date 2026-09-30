@@ -313,7 +313,7 @@ class MainActivity : AppCompatActivity() {
     private fun applyVehicleListVisibility() {
         if (prefs.vehicleListEnabled) {
             layoutVehicleListContainer.visibility = View.VISIBLE
-            loadVehicles()
+            loadVehicles(silent = currentVehiclesList.isNotEmpty())
         } else {
             layoutVehicleListContainer.visibility = View.GONE
         }
@@ -323,7 +323,7 @@ class MainActivity : AppCompatActivity() {
         if (!prefs.vehicleListEnabled) return
 
         lifecycleScope.launch {
-            if (!silent) {
+            if (!silent && currentVehiclesList.isEmpty()) {
                 pbLoading.visibility = View.VISIBLE
                 tvEmpty.visibility = View.GONE
             }
@@ -332,8 +332,12 @@ class MainActivity : AppCompatActivity() {
                 val baseUrl = NetworkUtil.resolveBaseUrl(prefs.lanUrl, prefs.tailscaleUrl)
                 if (baseUrl == null) {
                     if (!silent) {
-                        tvEmpty.visibility = View.VISIBLE
-                        tvEmpty.text = "Không kết nối được máy chủ (${prefs.lanIp}:${prefs.serverPort})\nVuốt xuống để thử lại"
+                        if (currentVehiclesList.isEmpty()) {
+                            tvEmpty.visibility = View.VISIBLE
+                            tvEmpty.text = "Không kết nối được máy chủ\n(LAN: ${prefs.lanIp} • Tailscale: ${prefs.tailscaleIp})\nVuốt xuống để thử lại"
+                        } else {
+                            Toast.makeText(this@MainActivity, "Không thể kết nối máy chủ, đang dùng danh sách hiện tại", Toast.LENGTH_SHORT).show()
+                        }
                     }
                     return@launch
                 }
@@ -357,18 +361,24 @@ class MainActivity : AppCompatActivity() {
                         tvEmpty.visibility = View.GONE
                     }
                 } else if (!silent) {
-                    tvEmpty.visibility = View.VISIBLE
-                    tvEmpty.text = getString(R.string.empty_vehicle_list)
+                    if (currentVehiclesList.isEmpty()) {
+                        tvEmpty.visibility = View.VISIBLE
+                        tvEmpty.text = getString(R.string.empty_vehicle_list)
+                    } else {
+                        Toast.makeText(this@MainActivity, "Lỗi tải danh sách xe từ máy chủ", Toast.LENGTH_SHORT).show()
+                    }
                 }
             } catch (e: Exception) {
                 if (!silent) {
-                    tvEmpty.visibility = View.VISIBLE
-                    tvEmpty.text = "Lỗi kết nối: ${e.message}\nVuốt xuống để thử lại"
+                    if (currentVehiclesList.isEmpty()) {
+                        tvEmpty.visibility = View.VISIBLE
+                        tvEmpty.text = "Lỗi kết nối: ${e.message}\nVuốt xuống để thử lại"
+                    } else {
+                        Toast.makeText(this@MainActivity, "Lỗi kết nối: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
                 }
             } finally {
-                if (!silent) {
-                    pbLoading.visibility = View.GONE
-                }
+                pbLoading.visibility = View.GONE
                 swipeRefresh.isRefreshing = false
             }
         }

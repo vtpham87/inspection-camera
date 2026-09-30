@@ -38,10 +38,10 @@ _ACCESS_CACHE: dict = {"timestamp": 0.0, "data": []}
 
 
 def get_waiting_vehicles_from_access() -> list[dict]:
-    """Query tmp_DangKyKD from PTCGDB Access DB via 32-bit PowerShell with 3s cache."""
+    """Query tmp_DangKyKD from PTCGDB Access DB via 32-bit PowerShell with 10s cache."""
     global _ACCESS_CACHE
     now = time.time()
-    if now - _ACCESS_CACHE["timestamp"] < 3.0 and _ACCESS_CACHE["data"]:
+    if now - _ACCESS_CACHE["timestamp"] < 10.0 and _ACCESS_CACHE["data"]:
         return _ACCESS_CACHE["data"]
 
     if not os.path.exists(ACCESS_DB_PATH):

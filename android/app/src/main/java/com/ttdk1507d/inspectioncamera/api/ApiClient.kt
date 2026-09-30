@@ -16,9 +16,10 @@ object ApiClient {
         if (retrofit == null || currentBaseUrl != normalizedUrl) {
             currentBaseUrl = normalizedUrl
             val client = OkHttpClient.Builder()
-                .connectTimeout(5, TimeUnit.SECONDS)
+                .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
                 .writeTimeout(60, TimeUnit.SECONDS)
+                .retryOnConnectionFailure(true)
                 .build()
 
             retrofit = Retrofit.Builder()
