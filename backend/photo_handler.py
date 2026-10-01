@@ -28,15 +28,17 @@ def clean_plate_and_color(
     detected_color = None
     detected_lan = 1
     while True:
-        m = re.search(r"([TVX])?L(\d+)$", s)
+        m = re.search(r"([TVX])?L([1-9])$", s)
         if m:
-            if m.group(1):
-                detected_color = m.group(1)
-            l = int(m.group(2))
-            if l > 1:
-                detected_lan = l
-            s = s[:m.start()]
-            continue
+            prefix = s[:m.start()]
+            if prefix and prefix[-1].isdigit():
+                if m.group(1):
+                    detected_color = m.group(1)
+                l = int(m.group(2))
+                if l > 1:
+                    detected_lan = l
+                s = prefix
+                continue
         m2 = re.search(r"([TVX])+$", s)
         if m2:
             prefix = s[:m2.start()]

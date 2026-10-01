@@ -2,6 +2,7 @@ import os
 import pytest
 from photo_handler import (
     normalize_plate,
+    clean_plate_and_color,
     extract_plate_color,
     build_filename,
     resolve_save_path,
@@ -315,5 +316,40 @@ def test_save_photo_lan2_no_duplicate_tl2(tmp_path):
     assert result["ok"] is True
     assert result["filename"] == "15A12345TL2.jpg"
     assert os.path.exists(os.path.join(str(chosen_dir), "15A12345TL2.jpg"))
+
+
+def test_plate_with_l_series():
+    # Plates with 'L' in the series (e.g. 16L-3565, 29L-1234) must NOT be truncated to province code
+    p, c, lan = clean_plate_and_color("16L-3565", None, 1)
+    assert p == "16L3565"
+    assert c is None
+    assert lan == 1
+
+    p2, c2, lan2 = clean_plate_and_color("16L3565", None, 1)
+    assert p2 == "16L3565"
+    assert c2 is None
+    assert lan2 == 1
+
+    # Lần 1 filenames
+    assert build_filename("16L-3565", None, "rear_45", None, False, lan_kd=1) == "16L3565.jpg"
+    assert build_filename("16L-3565", None, "front_45", None, False, lan_kd=1) == "bs16L3565.jpg"
+    assert build_filename("16L3565", None, "rear_45", None, False, lan_kd=1) == "16L3565.jpg"
+    assert build_filename("16L3565", None, "front_45", None, False, lan_kd=1) == "bs16L3565.jpg"
+
+    # Lần 2 filenames
+    assert build_filename("16L3565", None, "rear_45", None, False, lan_kd=2) == "16L3565L2.jpg"
+    assert build_filename("16L3565", None, "front_45", None, False, lan_kd=2) == "bs16L3565L2.jpg"
+    assert build_filename("16L-3565L2", None, "rear_45", None, False, lan_kd=2) == "16L3565L2.jpg"
+
+
+def test_save_photo_plate_with_l_series(tmp_path):
+    chosen_dir = tmp_path / "Photos"
+    config = PhotoConfig(photo_save_dir=str(chosen_dir))
+    jpeg = b"\xff\xd8\xff\xe0" + b"\x00" * 100 + b"\xff\xd9"
+    result = save_photo(jpeg, "16L-3565", None, "rear_45", None, config, lan_kd=1)
+    assert result["ok"] is True
+    assert result["filename"] == "16L3565.jpg"
+    assert os.path.exists(os.path.join(str(chosen_dir), "16L3565.jpg"))
+
 
 

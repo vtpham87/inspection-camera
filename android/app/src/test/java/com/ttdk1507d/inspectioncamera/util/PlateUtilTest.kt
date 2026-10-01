@@ -72,4 +72,27 @@ class PlateUtilTest {
         assertEquals("11K2639", PlateUtil.formatCompactPlate("11K2639", null))
         assertEquals("15A12345TL2", PlateUtil.formatCompactPlate("15A12345", "T", lanKd = 2))
     }
+
+    @Test
+    fun testPlateWithLSeries() {
+        val parsed1 = PlateUtil.parsePlate("16L-3565")
+        assertEquals("16L3565", parsed1.basePlate)
+        assertNull(parsed1.color)
+        assertEquals(1, parsed1.lanKd)
+
+        val parsed2 = PlateUtil.parsePlate("16L3565")
+        assertEquals("16L3565", parsed2.basePlate)
+        assertNull(parsed2.color)
+        assertEquals(1, parsed2.lanKd)
+
+        val parsedL2 = PlateUtil.parsePlate("16L-3565L2")
+        assertEquals("16L3565", parsedL2.basePlate)
+        assertNull(parsedL2.color)
+        assertEquals(2, parsedL2.lanKd)
+
+        assertEquals("16L3565", PlateUtil.formatCompactPlate("16L-3565", null))
+        assertEquals("16L3565", PlateUtil.formatCompactPlate("16L3565", null))
+        assertEquals("16L3565L2", PlateUtil.formatCompactPlate("16L-3565", null, lanKd = 2))
+        assertEquals("16L3565L2", PlateUtil.formatCompactPlate("16L3565L2", null, lanKd = 2))
+    }
 }

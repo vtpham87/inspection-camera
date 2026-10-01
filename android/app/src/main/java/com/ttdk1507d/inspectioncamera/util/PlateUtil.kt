@@ -28,15 +28,18 @@ object PlateUtil {
         var lan = 1
 
         while (true) {
-            val lanMatch = Regex("([TVX])?L(\\d+)$").find(s)
+            val lanMatch = Regex("([TVX])?L([1-9])$").find(s)
             if (lanMatch != null) {
-                if (lanMatch.groupValues[1].isNotEmpty()) {
-                    color = lanMatch.groupValues[1]
+                val prefix = s.substring(0, lanMatch.range.first)
+                if (prefix.isNotEmpty() && prefix.last().isDigit()) {
+                    if (lanMatch.groupValues[1].isNotEmpty()) {
+                        color = lanMatch.groupValues[1]
+                    }
+                    val l = lanMatch.groupValues[2].toIntOrNull() ?: 1
+                    if (l > 1) lan = l
+                    s = prefix
+                    continue
                 }
-                val l = lanMatch.groupValues[2].toIntOrNull() ?: 1
-                if (l > 1) lan = l
-                s = s.substring(0, lanMatch.range.first)
-                continue
             }
             val colorMatch = Regex("([TVX])+$").find(s)
             if (colorMatch != null) {
