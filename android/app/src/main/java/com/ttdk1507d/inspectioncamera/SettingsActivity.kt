@@ -325,8 +325,8 @@ class SettingsActivity : AppCompatActivity() {
             return
         }
 
-        val lanUrl = "http://$lanIp:$port"
-        val tailscaleUrl = "http://$tailscaleIp:$port"
+        val lanUrl = NetworkUtil.formatUrl(lanIp, port)
+        val tailscaleUrl = NetworkUtil.formatUrl(tailscaleIp, port)
 
         btnTest.isEnabled = false
         tvTestResult.visibility = View.VISIBLE
@@ -346,6 +346,7 @@ class SettingsActivity : AppCompatActivity() {
 
             btnTest.isEnabled = true
 
+            val tsDisplay = if (tailscaleIp.startsWith("http://") || tailscaleIp.startsWith("https://") || tailscaleIp.contains(".trycloudflare.com") || tailscaleIp.contains(".ts.net")) tailscaleIp else "$tailscaleIp:$port"
             val resultText = buildString {
                 append("LAN ($lanIp:$port): ")
                 append(when (lanResult) {
@@ -353,7 +354,7 @@ class SettingsActivity : AppCompatActivity() {
                     false -> "❌ Không phản hồi"
                     null -> "⏸️ Đã tắt"
                 })
-                append("\nTailscale ($tailscaleIp:$port): ")
+                append("\nTừ xa / Hub ($tsDisplay): ")
                 append(when (tsResult) {
                     true -> "✅ Hoạt động"
                     false -> "❌ Không phản hồi"

@@ -6,6 +6,18 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 object NetworkUtil {
+    fun formatUrl(hostOrUrl: String, defaultPort: Int): String {
+        val trimmed = hostOrUrl.trim()
+        if (trimmed.isEmpty()) return ""
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+            return trimmed.trimEnd('/')
+        }
+        if (trimmed.contains(".trycloudflare.com") || trimmed.contains(".ts.net")) {
+            return "https://$trimmed".trimEnd('/')
+        }
+        return "http://$trimmed:$defaultPort".trimEnd('/')
+    }
+
     // LAN Wi-Fi is local; 1200ms is more than enough for a local ping (<50ms).
     private const val LAN_TIMEOUT_MS = 1200
     // Tailscale on 4G in Vietnam often relays via Singapore (DERP). Latency is 400-600ms,

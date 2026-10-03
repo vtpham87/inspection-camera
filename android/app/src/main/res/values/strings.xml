@@ -78,9 +78,9 @@
 
     <!-- Settings -->
     <string name="setting_lan_enabled">Bật kết nối LAN (Wi-Fi trạm)</string>
-    <string name="setting_tailscale_enabled">Bật kết nối Tailscale (4G / Từ xa)</string>
+    <string name="setting_tailscale_enabled">Bật kết nối Từ xa (Tailscale / VRCam Hub)</string>
     <string name="setting_lan_ip">Địa chỉ IP LAN (Wi-Fi nội bộ)</string>
-    <string name="setting_tailscale_ip">Địa chỉ IP Tailscale / 4G</string>
+    <string name="setting_tailscale_ip">IP Tailscale hoặc VRCam Hub URL</string>
     <string name="setting_port">Cổng dịch vụ (Port)</string>
     <string name="setting_vehicle_list">Hiển thị danh sách xe từ máy tính</string>
     <string name="btn_test_connection">KIỂM TRA KẾT NỐI</string>

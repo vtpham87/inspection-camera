@@ -89,8 +89,8 @@ class PrefsManager(private val prefs: SharedPreferences) {
         get() = prefs.getString("new_vehicle_path", "D:\\Photos\\{date}\\{plate}") ?: "D:\\Photos\\{date}\\{plate}"
         set(value) { prefs.edit().putString("new_vehicle_path", value).commit() }
 
-    val lanUrl: String get() = "http://$lanIp:$serverPort"
-    val tailscaleUrl: String get() = "http://$tailscaleIp:$serverPort"
+    val lanUrl: String get() = NetworkUtil.formatUrl(lanIp, serverPort)
+    val tailscaleUrl: String get() = NetworkUtil.formatUrl(tailscaleIp, serverPort)
 
     fun getAppConfig(): AppConfig {
         return AppConfig(
