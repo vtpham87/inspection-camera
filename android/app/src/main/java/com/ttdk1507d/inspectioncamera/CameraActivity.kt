@@ -45,6 +45,7 @@ import androidx.work.WorkManager
 import com.google.android.material.button.MaterialButton
 import com.google.gson.Gson
 import com.ttdk1507d.inspectioncamera.api.ApiClient
+import com.ttdk1507d.inspectioncamera.firebase.FirebaseManager
 import com.ttdk1507d.inspectioncamera.model.AppConfig
 import com.ttdk1507d.inspectioncamera.model.PhotoType
 import com.ttdk1507d.inspectioncamera.util.NetworkUtil
@@ -624,19 +625,47 @@ class CameraActivity : AppCompatActivity() {
     private fun triggerBackgroundUpload(type: PhotoType, seq: Int?, bytes: ByteArray) {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val baseUrl = NetworkUtil.resolveBaseUrl(prefs) ?: return@launch
-                val service = ApiClient.getService(baseUrl)
+                val baseUrl = NetworkUtil.resolveBaseUrl(prefs)
+                var uploadOk = false
 
-                val fileReq = bytes.toRequestBody("image/jpeg".toMediaTypeOrNull())
-                val filePart = MultipartBody.Part.createFormData("file", "upload.jpg", fileReq)
-                val plateReq = plate.toRequestBody("text/plain".toMediaTypeOrNull())
-                val photoTypeReq = type.apiName.toRequestBody("text/plain".toMediaTypeOrNull())
-                val colorReq = plateColor?.toRequestBody("text/plain".toMediaTypeOrNull())
-                val seqReq = seq?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
-                val lanKdReq = lanKd.toString().toRequestBody("text/plain".toMediaTypeOrNull())
+                if (baseUrl != null) {
+                    val service = ApiClient.getService(baseUrl)
+                    val fileReq = bytes.toRequestBody("image/jpeg".toMediaTypeOrNull())
+                    val filePart = MultipartBody.Part.createFormData("file", "upload.jpg", fileReq)
+                    val plateReq = plate.toRequestBody("text/plain".toMediaTypeOrNull())
+                    val photoTypeReq = type.apiName.toRequestBody("text/plain".toMediaTypeOrNull())
+                    val colorReq = plateColor?.toRequestBody("text/plain".toMediaTypeOrNull())
+                    val seqReq = seq?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
+                    val lanKdReq = lanKd.toString().toRequestBody("text/plain".toMediaTypeOrNull())
 
-                val resp = service.uploadPhoto(filePart, plateReq, colorReq, photoTypeReq, seqReq, lanKdReq)
-                if (resp.isSuccessful && resp.body()?.get("ok") == true) {
+                    val resp = service.uploadPhoto(filePart, plateReq, colorReq, photoTypeReq, seqReq, lanKdReq)
+                    uploadOk = resp.isSuccessful && resp.body()?.get("ok") == true
+                } else if (prefs.firebaseEnabled) {
+                    val pendingDir = File(filesDir, "pending")
+                    val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
+                    val gson = Gson()
+                    for (mf in metaFiles) {
+                        try {
+                            val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
+                            if (meta.plate == plate && meta.photoType == type.apiName && meta.seq == seq && meta.lanKd == lanKd) {
+                                val targetFile = File(pendingDir, meta.imageFileName)
+                                uploadOk = FirebaseManager.uploadPhotoToInbox(
+                                    plate = plate,
+                                    plateColor = plateColor,
+                                    photoType = type.apiName,
+                                    seq = seq ?: 1,
+                                    lanKd = lanKd,
+                                    photoFile = targetFile
+                                )
+                                break
+                            }
+                        } catch (e: Exception) {
+                            // Ignore
+                        }
+                    }
+                }
+
+                if (uploadOk) {
                     val pendingDir = File(filesDir, "pending")
                     val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
                     val gson = Gson()

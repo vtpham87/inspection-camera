@@ -56,6 +56,17 @@
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
+                    <!-- Firebase Cloud Sync Switch -->
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switch_settings_firebase_enabled"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="Đồng bộ đám mây Firebase (Khuyên dùng)"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/primary" />
+
                     <!-- LAN Connection Switch & IP -->
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/switch_settings_lan_enabled"

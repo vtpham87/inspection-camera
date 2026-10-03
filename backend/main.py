@@ -34,6 +34,13 @@ def get_db_path() -> str:
 
 app = FastAPI(title="15-07D Photo Server", version="1.0.0")
 
+@app.on_event("startup")
+def start_firebase_sync():
+    import threading
+    from firebase_sync import run_sync_loop
+    t = threading.Thread(target=run_sync_loop, args=(10,), daemon=True)
+    t.start()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

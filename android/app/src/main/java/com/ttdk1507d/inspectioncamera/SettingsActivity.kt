@@ -42,6 +42,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var toolbar: MaterialToolbar
     private lateinit var etLanIp: TextInputEditText
     private lateinit var etTailscaleIp: TextInputEditText
+    private lateinit var switchFirebaseEnabled: MaterialSwitch
     private lateinit var switchLanEnabled: MaterialSwitch
     private lateinit var switchTailscaleEnabled: MaterialSwitch
     private lateinit var etPort: TextInputEditText
@@ -132,6 +133,7 @@ class SettingsActivity : AppCompatActivity() {
         toolbar = findViewById(R.id.toolbar_settings)
         etLanIp = findViewById(R.id.et_settings_lan_ip)
         etTailscaleIp = findViewById(R.id.et_settings_tailscale_ip)
+        switchFirebaseEnabled = findViewById(R.id.switch_settings_firebase_enabled)
         switchLanEnabled = findViewById(R.id.switch_settings_lan_enabled)
         switchTailscaleEnabled = findViewById(R.id.switch_settings_tailscale_enabled)
         etPort = findViewById(R.id.et_settings_port)
@@ -244,6 +246,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun loadCurrentSettings() {
+        switchFirebaseEnabled.isChecked = prefs.firebaseEnabled
         switchLanEnabled.isChecked = prefs.lanEnabled
         switchTailscaleEnabled.isChecked = prefs.tailscaleEnabled
         etLanIp.isEnabled = prefs.lanEnabled
@@ -384,11 +387,12 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun saveSettings() {
+        val firebaseEnabled = switchFirebaseEnabled.isChecked
         val lanEnabled = switchLanEnabled.isChecked
         val tailscaleEnabled = switchTailscaleEnabled.isChecked
 
-        if (!lanEnabled && !tailscaleEnabled) {
-            Toast.makeText(this, "Phải bật ít nhất một kết nối (LAN hoặc Tailscale)", Toast.LENGTH_LONG).show()
+        if (!firebaseEnabled && !lanEnabled && !tailscaleEnabled) {
+            Toast.makeText(this, "Phải bật ít nhất một kết nối (Firebase, LAN hoặc Tailscale)", Toast.LENGTH_LONG).show()
             return
         }
 
@@ -420,6 +424,7 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         // Save immediately to local persistent preferences
+        prefs.firebaseEnabled = firebaseEnabled
         prefs.lanEnabled = lanEnabled
         prefs.tailscaleEnabled = tailscaleEnabled
         if (lanIp.isNotEmpty()) prefs.lanIp = lanIp

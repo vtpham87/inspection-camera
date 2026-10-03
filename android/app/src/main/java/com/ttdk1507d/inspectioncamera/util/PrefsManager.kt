@@ -41,6 +41,10 @@ class PrefsManager(private val prefs: SharedPreferences) {
         get() = prefs.getBoolean("vehicle_list_enabled", true)
         set(value) { prefs.edit().putBoolean("vehicle_list_enabled", value).commit() }
 
+    var firebaseEnabled: Boolean
+        get() = prefs.getBoolean("firebase_enabled", true)
+        set(value) { prefs.edit().putBoolean("firebase_enabled", value).commit() }
+
     var timestampEnabled: Boolean
         get() = prefs.getBoolean("timestamp_enabled", true)
         set(value) { prefs.edit().putBoolean("timestamp_enabled", value).commit() }

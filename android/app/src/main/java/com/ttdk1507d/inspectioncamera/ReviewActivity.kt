@@ -23,6 +23,7 @@ import com.google.gson.Gson
 import com.ttdk1507d.inspectioncamera.adapter.PhotoReviewAdapter
 import com.ttdk1507d.inspectioncamera.adapter.PhotoReviewItem
 import com.ttdk1507d.inspectioncamera.api.ApiClient
+import com.ttdk1507d.inspectioncamera.firebase.FirebaseManager
 import com.ttdk1507d.inspectioncamera.model.PhotoType
 import com.ttdk1507d.inspectioncamera.util.NetworkUtil
 import com.ttdk1507d.inspectioncamera.util.PrefsManager
@@ -291,7 +292,7 @@ class ReviewActivity : AppCompatActivity() {
                 NetworkUtil.resolveBaseUrl(prefs)
             }
 
-            if (baseUrl == null) {
+            if (baseUrl == null && !prefs.firebaseEnabled) {
                 isSyncing = false
                 pbSync.visibility = View.GONE
                 btnSync.isEnabled = true
@@ -300,26 +301,28 @@ class ReviewActivity : AppCompatActivity() {
                 return@launch
             }
 
-            val service = ApiClient.getService(baseUrl)
+            val service = if (baseUrl != null) ApiClient.getService(baseUrl) else null
 
-            // Ensure server has latest paths from device before saving
-            withContext(Dispatchers.IO) {
-                try {
-                    val cfg = prefs.getAppConfig()
-                    val body = mapOf<String, Any>(
-                        "vehicle_list_enabled" to cfg.vehicleListEnabled,
-                        "server_port" to cfg.serverPort,
-                        "photo_save_dir" to cfg.photoSaveDir,
-                        "passenger_path" to cfg.passengerPath,
-                        "new_vehicle_path" to cfg.newVehiclePath,
-                        "sync_new_vehicle_45" to cfg.syncNewVehicle45,
-                        "jpeg_quality" to cfg.jpegQuality,
-                        "plate_color_suffix" to true,
-                        "photo_resolution" to cfg.photoResolution
-                    )
-                    service.postConfig(body)
-                } catch (e: Exception) {
-                    // Non-blocking sync
+            // Ensure server has latest paths from device before saving (if server reachable)
+            if (service != null) {
+                withContext(Dispatchers.IO) {
+                    try {
+                        val cfg = prefs.getAppConfig()
+                        val body = mapOf<String, Any>(
+                            "vehicle_list_enabled" to cfg.vehicleListEnabled,
+                            "server_port" to cfg.serverPort,
+                            "photo_save_dir" to cfg.photoSaveDir,
+                            "passenger_path" to cfg.passengerPath,
+                            "new_vehicle_path" to cfg.newVehiclePath,
+                            "sync_new_vehicle_45" to cfg.syncNewVehicle45,
+                            "jpeg_quality" to cfg.jpegQuality,
+                            "plate_color_suffix" to true,
+                            "photo_resolution" to cfg.photoResolution
+                        )
+                        service.postConfig(body)
+                    } catch (e: Exception) {
+                        // Non-blocking sync
+                    }
                 }
             }
 
@@ -333,20 +336,32 @@ class ReviewActivity : AppCompatActivity() {
                     continue
                 }
 
-                tvSyncStatus.text = getString(R.string.sync_in_progress, uploadedCount + 1, total)
+                val syncTarget = if (service != null) "máy chủ" else "Firebase"
+                tvSyncStatus.text = "Đang đồng bộ qua $syncTarget (${uploadedCount + 1}/$total)..."
 
                 val success = withContext(Dispatchers.IO) {
                     try {
-                        val fileReq = imgFile.readBytes().toRequestBody("image/jpeg".toMediaTypeOrNull())
-                        val filePart = MultipartBody.Part.createFormData("file", meta.imageFileName, fileReq)
-                        val plateReq = meta.plate.toRequestBody("text/plain".toMediaTypeOrNull())
-                        val photoTypeReq = meta.photoType.toRequestBody("text/plain".toMediaTypeOrNull())
-                        val colorReq = meta.plateColor?.toRequestBody("text/plain".toMediaTypeOrNull())
-                        val seqReq = meta.seq?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
-                        val lanKdReq = meta.lanKd.toString().toRequestBody("text/plain".toMediaTypeOrNull())
+                        if (service != null) {
+                            val fileReq = imgFile.readBytes().toRequestBody("image/jpeg".toMediaTypeOrNull())
+                            val filePart = MultipartBody.Part.createFormData("file", meta.imageFileName, fileReq)
+                            val plateReq = meta.plate.toRequestBody("text/plain".toMediaTypeOrNull())
+                            val photoTypeReq = meta.photoType.toRequestBody("text/plain".toMediaTypeOrNull())
+                            val colorReq = meta.plateColor?.toRequestBody("text/plain".toMediaTypeOrNull())
+                            val seqReq = meta.seq?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
+                            val lanKdReq = meta.lanKd.toString().toRequestBody("text/plain".toMediaTypeOrNull())
 
-                        val resp = service.uploadPhoto(filePart, plateReq, colorReq, photoTypeReq, seqReq, lanKdReq)
-                        resp.isSuccessful && resp.body()?.get("ok") == true
+                            val resp = service.uploadPhoto(filePart, plateReq, colorReq, photoTypeReq, seqReq, lanKdReq)
+                            resp.isSuccessful && resp.body()?.get("ok") == true
+                        } else {
+                            FirebaseManager.uploadPhotoToInbox(
+                                plate = meta.plate,
+                                plateColor = meta.plateColor,
+                                photoType = meta.photoType,
+                                seq = meta.seq ?: 1,
+                                lanKd = meta.lanKd,
+                                photoFile = imgFile
+                            )
+                        }
                     } catch (e: Exception) {
                         false
                     }
@@ -365,7 +380,8 @@ class ReviewActivity : AppCompatActivity() {
             loadPhotos()
 
             if (uploadedCount > 0) {
-                Toast.makeText(this@ReviewActivity, "Đã gửi thành công $uploadedCount ảnh về máy tính", Toast.LENGTH_SHORT).show()
+                val dest = if (service != null) "máy tính" else "Firebase Đám mây"
+                Toast.makeText(this@ReviewActivity, "Đã gửi thành công $uploadedCount ảnh qua $dest", Toast.LENGTH_SHORT).show()
             }
         }
     }

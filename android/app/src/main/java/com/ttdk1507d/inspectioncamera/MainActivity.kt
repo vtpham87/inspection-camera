@@ -28,6 +28,7 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.ttdk1507d.inspectioncamera.adapter.VehicleAdapter
 import com.ttdk1507d.inspectioncamera.api.ApiClient
+import com.ttdk1507d.inspectioncamera.firebase.FirebaseManager
 import com.ttdk1507d.inspectioncamera.model.Vehicle
 import com.ttdk1507d.inspectioncamera.util.NetworkUtil
 import com.ttdk1507d.inspectioncamera.util.PlateUtil
@@ -72,6 +73,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var rvVehicles: RecyclerView
     private lateinit var pbLoading: ProgressBar
     private lateinit var tvEmpty: TextView
+    private var firebaseJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -90,12 +92,13 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         updatePendingBanner()
         applyVehicleListVisibility()
-        startPeriodicRefresh()
     }
 
     override fun onPause() {
         super.onPause()
         stopPeriodicRefresh()
+        firebaseJob?.cancel()
+        firebaseJob = null
     }
 
     private fun startPeriodicRefresh() {
@@ -103,7 +106,7 @@ class MainActivity : AppCompatActivity() {
         autoRefreshJob = lifecycleScope.launch {
             while (isActive) {
                 delay(AUTO_REFRESH_INTERVAL_MS)
-                if (prefs.vehicleListEnabled) {
+                if (prefs.vehicleListEnabled && !prefs.firebaseEnabled) {
                     loadVehicles(silent = true)
                 }
             }
@@ -113,6 +116,41 @@ class MainActivity : AppCompatActivity() {
     private fun stopPeriodicRefresh() {
         autoRefreshJob?.cancel()
         autoRefreshJob = null
+    }
+
+    private fun observeFirebaseVehicles() {
+        firebaseJob?.cancel()
+        firebaseJob = lifecycleScope.launch {
+            if (currentVehiclesList.isEmpty()) {
+                pbLoading.visibility = View.VISIBLE
+                tvEmpty.visibility = View.GONE
+            }
+            FirebaseManager.observeVehicles().collect { list ->
+                pbLoading.visibility = View.GONE
+                swipeRefresh.isRefreshing = false
+                currentVehiclesList = list
+                applyCurrentFilter()
+            }
+        }
+    }
+
+    private fun applyCurrentFilter() {
+        val filtered = if (isFilterWaiting) {
+            currentVehiclesList.filter { it.result != 1 || it.photosTaken.size < 5 }
+        } else {
+            currentVehiclesList
+        }
+        vehicleAdapter.updateList(filtered)
+        if (filtered.isEmpty()) {
+            tvEmpty.visibility = View.VISIBLE
+            tvEmpty.text = if (isFilterWaiting) {
+                "Không có xe nào đang chờ\n(Đã hoàn thành kiểm định hoặc chưa có xe vào dây chuyền)"
+            } else {
+                "Hôm nay chưa có xe kiểm định nào"
+            }
+        } else {
+            tvEmpty.visibility = View.GONE
+        }
     }
 
     private fun initViews() {
@@ -157,7 +195,11 @@ class MainActivity : AppCompatActivity() {
             if (!isFilterWaiting) {
                 isFilterWaiting = true
                 updateFilterButtons()
-                loadVehicles()
+                if (prefs.firebaseEnabled) {
+                    applyCurrentFilter()
+                } else {
+                    loadVehicles()
+                }
             }
         }
 
@@ -165,7 +207,11 @@ class MainActivity : AppCompatActivity() {
             if (isFilterWaiting) {
                 isFilterWaiting = false
                 updateFilterButtons()
-                loadVehicles()
+                if (prefs.firebaseEnabled) {
+                    applyCurrentFilter()
+                } else {
+                    loadVehicles()
+                }
             }
         }
 
@@ -210,7 +256,11 @@ class MainActivity : AppCompatActivity() {
         })
 
         swipeRefresh.setOnRefreshListener {
-            loadVehicles()
+            if (prefs.firebaseEnabled) {
+                observeFirebaseVehicles()
+            } else {
+                loadVehicles()
+            }
         }
 
         tvPendingBanner.setOnClickListener {
@@ -313,9 +363,20 @@ class MainActivity : AppCompatActivity() {
     private fun applyVehicleListVisibility() {
         if (prefs.vehicleListEnabled) {
             layoutVehicleListContainer.visibility = View.VISIBLE
-            loadVehicles(silent = currentVehiclesList.isNotEmpty())
+            if (prefs.firebaseEnabled) {
+                stopPeriodicRefresh()
+                observeFirebaseVehicles()
+            } else {
+                firebaseJob?.cancel()
+                firebaseJob = null
+                loadVehicles(silent = currentVehiclesList.isNotEmpty())
+                startPeriodicRefresh()
+            }
         } else {
             layoutVehicleListContainer.visibility = View.GONE
+            stopPeriodicRefresh()
+            firebaseJob?.cancel()
+            firebaseJob = null
         }
     }
 
@@ -331,6 +392,10 @@ class MainActivity : AppCompatActivity() {
             try {
                 val baseUrl = NetworkUtil.resolveBaseUrl(prefs)
                 if (baseUrl == null) {
+                    if (prefs.firebaseEnabled) {
+                        observeFirebaseVehicles()
+                        return@launch
+                    }
                     if (!silent) {
                         if (currentVehiclesList.isEmpty()) {
                             tvEmpty.visibility = View.VISIBLE
