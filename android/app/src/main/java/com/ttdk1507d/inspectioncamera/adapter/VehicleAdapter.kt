@@ -96,8 +96,9 @@ class VehicleAdapter(
             }
 
             // Số phiếu ngắn gọn
-            if (!vehicle.ticketNum.isNullOrBlank()) {
-                val shortTicket = if (vehicle.ticketNum.contains("/")) vehicle.ticketNum.split("/")[0] else vehicle.ticketNum
+            val ticket = vehicle.ticketNum
+            if (!ticket.isNullOrBlank()) {
+                val shortTicket = if (ticket.contains("/")) ticket.split("/")[0] else ticket
                 tvTicket.visibility = View.VISIBLE
                 tvTicket.text = "#$shortTicket"
             } else {
