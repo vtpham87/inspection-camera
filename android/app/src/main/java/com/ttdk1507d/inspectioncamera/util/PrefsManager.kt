@@ -13,6 +13,10 @@ import java.util.Locale
 
 class PrefsManager(private val prefs: SharedPreferences) {
 
+    companion object {
+        const val DEFAULT_CLOUD_URL = "https://cottage-charlotte-valuation-bestsellers.trycloudflare.com"
+    }
+
     constructor(context: Context) : this(
         context.getSharedPreferences("inspection_camera", Context.MODE_PRIVATE)
     )
@@ -22,7 +26,10 @@ class PrefsManager(private val prefs: SharedPreferences) {
         set(value) { prefs.edit().putString("lan_ip", value).commit() }
 
     var tailscaleIp: String
-        get() = prefs.getString("tailscale_ip", "100.81.114.84") ?: "100.81.114.84"
+        get() {
+            val v = prefs.getString("tailscale_ip", null)
+            return if (v.isNullOrEmpty() || v == "100.81.114.84") DEFAULT_CLOUD_URL else v
+        }
         set(value) { prefs.edit().putString("tailscale_ip", value).commit() }
 
     var lanEnabled: Boolean

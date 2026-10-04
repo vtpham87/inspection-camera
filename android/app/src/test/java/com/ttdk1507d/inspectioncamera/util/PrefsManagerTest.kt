@@ -19,13 +19,13 @@ class PrefsManagerTest {
     @Test
     fun testDefaultValues() {
         assertEquals("192.168.193.11", prefsManager.lanIp)
-        assertEquals("100.81.114.84", prefsManager.tailscaleIp)
+        assertEquals(PrefsManager.DEFAULT_CLOUD_URL, prefsManager.tailscaleIp)
         assertTrue(prefsManager.lanEnabled)
         assertTrue(prefsManager.tailscaleEnabled)
         assertEquals(8095, prefsManager.serverPort)
         assertTrue(prefsManager.vehicleListEnabled)
         assertEquals("http://192.168.193.11:8095", prefsManager.lanUrl)
-        assertEquals("http://100.81.114.84:8095", prefsManager.tailscaleUrl)
+        assertEquals(PrefsManager.DEFAULT_CLOUD_URL, prefsManager.tailscaleUrl)
     }
 
     @Test
@@ -63,7 +63,7 @@ class PrefsManagerTest {
         prefsManager.serverPort = 9000
         assertEquals(9000, prefsManager.serverPort)
         assertEquals("http://192.168.193.11:9000", prefsManager.lanUrl)
-        assertEquals("http://100.81.114.84:9000", prefsManager.tailscaleUrl)
+        assertEquals(PrefsManager.DEFAULT_CLOUD_URL, prefsManager.tailscaleUrl)
     }
 
     @Test
