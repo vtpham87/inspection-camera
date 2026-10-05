@@ -26,6 +26,7 @@ import androidx.work.WorkManager
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
+import com.google.gson.Gson
 import com.ttdk1507d.inspectioncamera.adapter.VehicleAdapter
 import com.ttdk1507d.inspectioncamera.api.ApiClient
 import com.ttdk1507d.inspectioncamera.firebase.FirebaseManager
@@ -33,6 +34,7 @@ import com.ttdk1507d.inspectioncamera.model.Vehicle
 import com.ttdk1507d.inspectioncamera.util.NetworkUtil
 import com.ttdk1507d.inspectioncamera.util.PlateUtil
 import com.ttdk1507d.inspectioncamera.util.PrefsManager
+import com.ttdk1507d.inspectioncamera.worker.PendingUploadMetadata
 import com.ttdk1507d.inspectioncamera.worker.PendingUploadWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -136,7 +138,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun applyCurrentFilter() {
         val filtered = if (isFilterWaiting) {
-            currentVehiclesList.filter { it.result != 1 || it.photosTaken.size < 5 }
+            currentVehiclesList.filter { vehicle ->
+                !isVehicleFinished(vehicle)
+            }
         } else {
             currentVehiclesList
         }
@@ -144,13 +148,60 @@ class MainActivity : AppCompatActivity() {
         if (filtered.isEmpty()) {
             tvEmpty.visibility = View.VISIBLE
             tvEmpty.text = if (isFilterWaiting) {
-                "Không có xe nào đang chờ\n(Đã hoàn thành kiểm định hoặc chưa có xe vào dây chuyền)"
+                "Không có xe nào đang chờ\n(Đã hoàn thành kiểm định hoặc chụp ảnh xong)"
             } else {
                 "Hôm nay chưa có xe kiểm định nào"
             }
         } else {
             tvEmpty.visibility = View.GONE
         }
+    }
+
+    private fun isVehicleFinished(vehicle: Vehicle): Boolean {
+        if (vehicle.isFinished()) return true
+        if (hasLocalCompletedPhotos(vehicle.plateClean, vehicle.lanKd)) return true
+        return false
+    }
+
+    private fun hasLocalCompletedPhotos(plate: String, lanKd: Int): Boolean {
+        if (plate.isBlank()) return false
+        val cleanPlate = plate.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
+
+        // 1. Kiểm tra ảnh trong thư mục review
+        val reviewDir = if (lanKd > 1) File(filesDir, "review/$cleanPlate/$lanKd") else File(filesDir, "review/$cleanPlate")
+        var hasLocalRear = false
+        var hasLocalFront = false
+
+        if (reviewDir.exists() && reviewDir.isDirectory) {
+            val files = reviewDir.listFiles { f -> f.extension.equals("jpg", ignoreCase = true) } ?: emptyArray()
+            for (f in files) {
+                if (f.name.startsWith("rear_45")) hasLocalRear = true
+                if (f.name.startsWith("front_45")) hasLocalFront = true
+            }
+        }
+
+        // 2. Kiểm tra ảnh trong thư mục pending (ảnh đang chờ upload)
+        if (!hasLocalRear || !hasLocalFront) {
+            val pendingDir = File(filesDir, "pending")
+            if (pendingDir.exists() && pendingDir.isDirectory) {
+                val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
+                val gson = Gson()
+                for (mf in metaFiles) {
+                    try {
+                        val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
+                        val metaPlate = meta.plate.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
+                        if (metaPlate == cleanPlate && meta.lanKd == lanKd) {
+                            if (meta.photoType == "rear_45") hasLocalRear = true
+                            if (meta.photoType == "front_45") hasLocalFront = true
+                        }
+                    } catch (e: Exception) {
+                        // ignore
+                    }
+                }
+            }
+        }
+
+        return hasLocalRear && hasLocalFront
     }
 
     private fun initViews() {
@@ -366,6 +417,9 @@ class MainActivity : AppCompatActivity() {
             if (prefs.firebaseEnabled) {
                 stopPeriodicRefresh()
                 observeFirebaseVehicles()
+                if (currentVehiclesList.isNotEmpty()) {
+                    applyCurrentFilter()
+                }
             } else {
                 firebaseJob?.cancel()
                 firebaseJob = null
@@ -423,17 +477,7 @@ class MainActivity : AppCompatActivity() {
                 if (response.isSuccessful && response.body() != null) {
                     val list = response.body()!!
                     currentVehiclesList = list
-                    vehicleAdapter.updateList(list)
-                    if (list.isEmpty()) {
-                        tvEmpty.visibility = View.VISIBLE
-                        tvEmpty.text = if (isFilterWaiting) {
-                            "Không có xe nào đang chờ\n(Đã hoàn thành kiểm định hoặc chưa có xe vào dây chuyền)"
-                        } else {
-                            "Hôm nay chưa có xe kiểm định nào"
-                        }
-                    } else {
-                        tvEmpty.visibility = View.GONE
-                    }
+                    applyCurrentFilter()
                 } else if (!silent) {
                     if (currentVehiclesList.isEmpty()) {
                         tvEmpty.visibility = View.VISIBLE

@@ -249,10 +249,6 @@ def get_vehicles_today(
                 if lan_kd_val <= 0:
                     lan_kd_val = 1
 
-                if filter_waiting and ketluan == 1:
-                    continue
-
-                seen_tickets.add(sp)
                 plate_num, plate_color = extract_plate_color(biendk_id)
 
                 has_l1 = len(_check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=1)) > 0
@@ -267,6 +263,18 @@ def get_vehicles_today(
                         photos_taken = l2_photos
                     else:
                         photos_taken = _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=1)
+
+                has_both_45 = ("rear_45" in photos_taken) and ("front_45" in photos_taken)
+                is_completed = bool(
+                    has_both_45
+                    or (ketluan == 0)
+                    or (ketluan == 1 and not suggest_lan_2 and lan_kd_val < 2)
+                )
+
+                if filter_waiting and ketluan == 1:
+                    continue
+
+                seen_tickets.add(sp)
 
                 cur.execute(
                     "SELECT biendk, nhanhieu, tenloaipt, chupt FROM vehicles WHERE biendk_clean = ? OR biendk_id = ?",
@@ -303,6 +311,7 @@ def get_vehicles_today(
                     "photos_taken": photos_taken,
                     "lan_kd": lan_kd_val,
                     "suggest_lan_2": suggest_lan_2,
+                    "is_completed": is_completed,
                 })
 
         # 2. Truy vấn bổ sung từ SQLite inspections (hoặc làm nguồn chính khi không có Access/lịch sử)
@@ -357,6 +366,16 @@ def get_vehicles_today(
                     else:
                         photos_taken = _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=1)
 
+                has_both_45 = ("rear_45" in photos_taken) and ("front_45" in photos_taken)
+                res_val = row["ketluan"]
+                st_val = (row["sotem"] or "").strip() if has_sotem else ""
+                is_completed = bool(
+                    st_val
+                    or has_both_45
+                    or (res_val == 0)
+                    or (res_val == 1 and not suggest_lan_2 and lan_kd_val < 2)
+                )
+
                 m = re.match(r"^(\d+)", sp.strip())
                 ticket_int = int(m.group(1)) if m else 999999
 
@@ -376,6 +395,7 @@ def get_vehicles_today(
                     "photos_taken": photos_taken,
                     "lan_kd": lan_kd_val,
                     "suggest_lan_2": suggest_lan_2,
+                    "is_completed": is_completed,
                 })
     finally:
         conn.close()
