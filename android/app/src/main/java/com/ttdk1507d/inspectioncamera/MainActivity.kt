@@ -43,6 +43,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
@@ -132,6 +133,16 @@ class MainActivity : AppCompatActivity() {
                 swipeRefresh.isRefreshing = false
                 currentVehiclesList = list
                 applyCurrentFilter()
+
+                // Cập nhật lại Lần 1 / Lần 2 nếu người dùng đang nhập dở biển số
+                val currentPlate = etPlate.text?.toString()?.trim().orEmpty()
+                if (currentPlate.isNotEmpty()) {
+                    val clean = currentPlate.replace(Regex("[.\\-\\s]"), "").uppercase()
+                    val (base, _) = PlateUtil.extractColor(clean)
+                    if (isPlateDataCompleteToday(base, clean)) {
+                        rgLanKd.check(R.id.rb_lan_2)
+                    }
+                }
             }
         }
     }
@@ -163,11 +174,19 @@ class MainActivity : AppCompatActivity() {
         return false
     }
 
+    private fun isSameDay(timeMillis: Long): Boolean {
+        if (timeMillis <= 0) return false
+        val calNow = Calendar.getInstance()
+        val calTarget = Calendar.getInstance().apply { this.timeInMillis = timeMillis }
+        return calNow.get(Calendar.YEAR) == calTarget.get(Calendar.YEAR) &&
+               calNow.get(Calendar.DAY_OF_YEAR) == calTarget.get(Calendar.DAY_OF_YEAR)
+    }
+
     private fun hasLocalCompletedPhotos(plate: String, lanKd: Int): Boolean {
         if (plate.isBlank()) return false
         val cleanPlate = plate.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
 
-        // 1. Kiểm tra ảnh trong thư mục review
+        // 1. Kiểm tra ảnh trong thư mục review (chỉ tính ảnh chụp trong ngày hôm nay)
         val reviewDir = if (lanKd > 1) File(filesDir, "review/$cleanPlate/$lanKd") else File(filesDir, "review/$cleanPlate")
         var hasLocalRear = false
         var hasLocalFront = false
@@ -175,12 +194,14 @@ class MainActivity : AppCompatActivity() {
         if (reviewDir.exists() && reviewDir.isDirectory) {
             val files = reviewDir.listFiles { f -> f.extension.equals("jpg", ignoreCase = true) } ?: emptyArray()
             for (f in files) {
-                if (f.name.startsWith("rear_45")) hasLocalRear = true
-                if (f.name.startsWith("front_45")) hasLocalFront = true
+                if (isSameDay(f.lastModified())) {
+                    if (f.name.startsWith("rear_45")) hasLocalRear = true
+                    if (f.name.startsWith("front_45")) hasLocalFront = true
+                }
             }
         }
 
-        // 2. Kiểm tra ảnh trong thư mục pending (ảnh đang chờ upload)
+        // 2. Kiểm tra ảnh trong thư mục pending (ảnh đang chờ upload trong ngày hôm nay)
         if (!hasLocalRear || !hasLocalFront) {
             val pendingDir = File(filesDir, "pending")
             if (pendingDir.exists() && pendingDir.isDirectory) {
@@ -190,7 +211,7 @@ class MainActivity : AppCompatActivity() {
                     try {
                         val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
                         val metaPlate = meta.plate.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
-                        if (metaPlate == cleanPlate && meta.lanKd == lanKd) {
+                        if (metaPlate == cleanPlate && meta.lanKd == lanKd && isSameDay(meta.timestamp)) {
                             if (meta.photoType == "rear_45") hasLocalRear = true
                             if (meta.photoType == "front_45") hasLocalFront = true
                         }
@@ -202,6 +223,46 @@ class MainActivity : AppCompatActivity() {
         }
 
         return hasLocalRear && hasLocalFront
+    }
+
+    /**
+     * Kiểm tra phương tiện đã có đủ dữ liệu / đủ ảnh trong ngày hôm nay chưa.
+     * Nếu đã có đủ dữ liệu lần 1 thì khi nhập thủ công mặc định chuyển sang Lần 2.
+     */
+    private fun isPlateDataCompleteToday(basePlate: String, cleaned: String): Boolean {
+        if (basePlate.isBlank()) return false
+        val cleanBase = basePlate.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
+        val cleanInput = cleaned.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
+
+        // 1. Tìm trong danh sách xe tiếp nhận / đồng bộ hôm nay
+        val matchingList = currentVehiclesList.filter {
+            val itClean = it.plateClean.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
+            val itPlate = it.plate.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
+            itClean == cleanBase || itClean == cleanInput || itPlate == cleanBase || itPlate == cleanInput
+        }
+
+        for (matching in matchingList) {
+            // Đã là lần 2 trở lên hoặc có gợi ý lần 2
+            if (matching.lanKd >= 2 || matching.suggestLan2) return true
+
+            // Đã hoàn thành kiểm định
+            if (isVehicleFinished(matching)) return true
+
+            // Đã chụp đủ ảnh góc trước và góc sau 45 độ trên server
+            val photos = matching.photosTaken
+            val hasRear = photos.any { it.startsWith("rear_45") }
+            val hasFront = photos.any { it.startsWith("front_45") }
+            if (hasRear && hasFront) return true
+
+            // Đã có đủ ảnh Lần 1 lưu cục bộ trên máy hôm nay
+            if (hasLocalCompletedPhotos(matching.plateClean, 1)) return true
+        }
+
+        // 2. Kiểm tra ảnh lưu cục bộ trên máy (thư mục review hoặc pending) cho Lần 1 trong ngày
+        if (hasLocalCompletedPhotos(cleanBase, 1)) return true
+        if (hasLocalCompletedPhotos(cleanInput, 1)) return true
+
+        return false
     }
 
     private fun initViews() {
@@ -226,7 +287,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupRecyclerView() {
         vehicleAdapter = VehicleAdapter { vehicle ->
-            val lan = if (vehicle.lanKd >= 2 || vehicle.suggestLan2) 2 else 1
+            val lan = if (vehicle.lanKd >= 2 || vehicle.suggestLan2 || isVehicleFinished(vehicle)) 2 else 1
             openCamera(vehicle.plateClean, vehicle.plateColor, vehicle.photosTaken, lanKd = lan)
         }
         rvVehicles.layoutManager = LinearLayoutManager(this)
@@ -276,7 +337,13 @@ class MainActivity : AppCompatActivity() {
                     val (basePlate, color) = PlateUtil.extractColor(cleaned)
                     val isOld = PlateUtil.isOldPlate(basePlate)
                     if (!isOld) {
-                        when (color) {
+                        val matchedVehicle = currentVehiclesList.firstOrNull {
+                            val itClean = it.plateClean.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
+                            val itPlate = it.plate.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
+                            itClean == basePlate || itClean == cleaned || itPlate == basePlate || itPlate == cleaned
+                        }
+                        val finalPlateColor = color ?: matchedVehicle?.plateColor
+                        when (finalPlateColor) {
                             "T" -> rgPlateColor.check(R.id.rb_color_white)
                             "V" -> rgPlateColor.check(R.id.rb_color_yellow)
                             "X" -> rgPlateColor.check(R.id.rb_color_blue)
@@ -288,19 +355,14 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
 
-                    // Tự động nhận diện Lần 2 từ danh sách xe đã quét trong ngày
-                    val matching = currentVehiclesList.firstOrNull {
-                        it.plateClean.equals(cleaned, ignoreCase = true) ||
-                        it.plateClean.equals(basePlate, ignoreCase = true) ||
-                        it.plate.replace(Regex("[.\\-\\s]"), "").equals(cleaned, ignoreCase = true)
+                    // Tự động nhận diện Lần 2 khi dữ liệu trong ngày đã có đủ
+                    if (isPlateDataCompleteToday(basePlate, cleaned)) {
+                        rgLanKd.check(R.id.rb_lan_2)
+                    } else {
+                        rgLanKd.check(R.id.rb_lan_1)
                     }
-                    if (matching != null) {
-                        if (matching.lanKd >= 2 || matching.suggestLan2) {
-                            rgLanKd.check(R.id.rb_lan_2)
-                        } else {
-                            rgLanKd.check(R.id.rb_lan_1)
-                        }
-                    }
+                } else {
+                    rgLanKd.check(R.id.rb_lan_1)
                 }
             }
         })
@@ -354,7 +416,14 @@ class MainActivity : AppCompatActivity() {
             parsed.color ?: selectedColor
         }
 
-        val selectedLan = if (rbLan2.isChecked) 2 else 1
+        val selectedLan = if (rbLan2.isChecked) {
+            2
+        } else if (isPlateDataCompleteToday(basePlate, cleanPlate)) {
+            rgLanKd.check(R.id.rb_lan_2)
+            2
+        } else {
+            1
+        }
         val finalLan = selectedLan
 
         openCamera(basePlate, finalColor, null, lanKd = finalLan)
