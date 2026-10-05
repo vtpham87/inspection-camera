@@ -112,6 +112,15 @@ def test_vehicles_ordered_by_sophieu_asc(mock_db):
     assert result[1]["ticket_num"] == "002/26"
 
 
+def test_vehicles_ordered_by_sophieu_desc_when_not_waiting(mock_db):
+    config = PhotoConfig()
+    result = get_vehicles_today(mock_db, "2026-09-27", config, filter_waiting=False)
+    assert result is not None
+    assert len(result) == 2
+    assert result[0]["ticket_num"] == "002/26"
+    assert result[1]["ticket_num"] == "001/26"
+
+
 def test_photos_taken_detects_existing_photos(mock_db, tmp_path):
     config = PhotoConfig()
     photo_dir = tmp_path / "photos"

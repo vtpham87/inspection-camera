@@ -24,6 +24,10 @@ data class Vehicle(
     @get:PropertyName("sophieu") @set:PropertyName("sophieu")
     var sophieu: String? = null,
 
+    @get:PropertyName("ticket_int") @set:PropertyName("ticket_int")
+    @SerializedName("ticket_int")
+    var ticketInt: Int = 0,
+
     @get:PropertyName("sotem") @set:PropertyName("sotem")
     @SerializedName("sotem")
     var sotem: String? = null,
@@ -61,6 +65,13 @@ data class Vehicle(
     var isCompleted: Boolean = false
 ) {
     constructor() : this("")
+
+    fun getEffectiveTicketInt(): Int {
+        if (ticketInt > 0) return ticketInt
+        val raw = (ticketNum ?: sophieu).orEmpty().trim()
+        val m = Regex("(\\d+)").find(raw)
+        return m?.groupValues?.get(1)?.toIntOrNull() ?: 0
+    }
 
     fun isFinished(): Boolean {
         if (isCompleted) return true

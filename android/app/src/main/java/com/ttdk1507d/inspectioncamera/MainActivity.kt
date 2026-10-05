@@ -149,11 +149,20 @@ class MainActivity : AppCompatActivity() {
 
     private fun applyCurrentFilter() {
         val filtered = if (isFilterWaiting) {
-            currentVehiclesList.filter { vehicle ->
-                !isVehicleFinished(vehicle)
-            }
+            currentVehiclesList
+                .filter { vehicle -> !isVehicleFinished(vehicle) }
+                .sortedWith(Comparator { v1, v2 ->
+                    val t1 = v1.getEffectiveTicketInt()
+                    val t2 = v2.getEffectiveTicketInt()
+                    if (t1 != t2) t1.compareTo(t2) else v1.time.compareTo(v2.time)
+                })
         } else {
             currentVehiclesList
+                .sortedWith(Comparator { v1, v2 ->
+                    val t1 = v1.getEffectiveTicketInt()
+                    val t2 = v2.getEffectiveTicketInt()
+                    if (t1 != t2) t2.compareTo(t1) else v2.time.compareTo(v1.time)
+                })
         }
         vehicleAdapter.updateList(filtered)
         if (filtered.isEmpty()) {
@@ -312,6 +321,7 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     loadVehicles()
                 }
+                rvVehicles.scrollToPosition(0)
             }
         }
 
@@ -324,6 +334,7 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     loadVehicles()
                 }
+                rvVehicles.scrollToPosition(0)
             }
         }
 

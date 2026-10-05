@@ -400,6 +400,9 @@ def get_vehicles_today(
     finally:
         conn.close()
 
-    # Sắp xếp thứ tự theo số phiếu tăng dần
-    results.sort(key=lambda x: (x["ticket_int"], x.get("time") or ""))
+    # Sắp xếp thứ tự: "Đang chờ" (filter_waiting=True) theo số phiếu tăng dần; "Tất cả" (filter_waiting=False) gần đây nhất lên đầu
+    results.sort(
+        key=lambda x: (x["ticket_int"], x.get("time") or ""),
+        reverse=not filter_waiting,
+    )
     return results
