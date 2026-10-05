@@ -4,16 +4,23 @@ import android.app.Application
 import android.util.Log
 import com.google.firebase.FirebaseApp
 import com.google.firebase.database.FirebaseDatabase
+import com.ttdk1507d.inspectioncamera.firebase.FirebaseManager
 
 class InspectionCameraApp : Application() {
     override fun onCreate() {
         super.onCreate()
         try {
             FirebaseApp.initializeApp(this)
-            FirebaseDatabase.getInstance("https://ttdk-1507d-default-rtdb.asia-southeast1.firebasedatabase.app").setPersistenceEnabled(true)
-            Log.d("InspectionCameraApp", "Firebase initialized with persistence enabled")
+            for (url in FirebaseManager.ALL_URLS) {
+                try {
+                    FirebaseDatabase.getInstance(url).setPersistenceEnabled(true)
+                } catch (e: Exception) {
+                    Log.e("InspectionCameraApp", "Error configuring persistence for $url", e)
+                }
+            }
+            Log.d("InspectionCameraApp", "Firebase multi-cluster initialized with persistence")
         } catch (e: Exception) {
-            Log.e("InspectionCameraApp", "Error configuring Firebase persistence", e)
+            Log.e("InspectionCameraApp", "Error configuring Firebase", e)
         }
     }
 }

@@ -31,7 +31,7 @@
             android:orientation="vertical"
             android:paddingBottom="24dp">
 
-            <!-- Card 1: Server Connection -->
+            <!-- Card 1: Firebase Multi-Cluster Cloud Connection -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -51,98 +51,37 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/header_server_connection"
+                        android:text="KẾT NỐI ĐÁM MÂY FIREBASE (TỰ ĐỘNG)"
                         android:textColor="@color/primary"
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
-                    <!-- Firebase Cloud Sync Switch -->
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switch_settings_firebase_enabled"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:text="Đồng bộ đám mây Firebase (Khuyên dùng)"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/primary" />
-
-                    <!-- LAN Connection Switch & IP -->
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switch_settings_lan_enabled"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:text="@string/setting_lan_enabled"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/text_primary" />
-
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/til_settings_lan_ip"
+                    <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
-                        android:hint="@string/setting_lan_ip"
-                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                        android:text="Tự động luân phiên 3 cụm máy chủ chính theo thứ trong tuần và tự động chuyển sang Cụm Dự phòng (Failover) khi cần thiết."
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp"
+                        android:lineSpacingExtra="2dp" />
 
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/et_settings_lan_ip"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:inputType="textUri"
-                            android:textColor="@color/text_primary" />
-                    </com.google.android.material.textfield.TextInputLayout>
-
-                    <!-- Tailscale Connection Switch & IP -->
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switch_settings_tailscale_enabled"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:text="@string/setting_tailscale_enabled"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/text_primary" />
-
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/til_settings_tailscale_ip"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:hint="@string/setting_tailscale_ip"
-                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
-
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/et_settings_tailscale_ip"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:inputType="textUri"
-                            android:textColor="@color/text_primary" />
-                    </com.google.android.material.textfield.TextInputLayout>
-
-                    <com.google.android.material.textfield.TextInputLayout
+                    <TextView
+                        android:id="@+id/tv_settings_current_cluster"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
-                        android:hint="@string/setting_port"
-                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
-
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/et_settings_port"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:inputType="number"
-                            android:textColor="@color/text_primary" />
-                    </com.google.android.material.textfield.TextInputLayout>
+                        android:text="Cụm máy chủ hôm nay: ..."
+                        android:textColor="@color/primary"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_settings_test"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
+                        android:layout_marginTop="14dp"
                         android:minHeight="48dp"
-                        android:text="@string/btn_test_connection"
+                        android:text="KIỂM TRA 4 CỤM MÁY CHỦ FIREBASE"
                         android:textSize="14sp"
                         android:textStyle="bold"
                         android:textColor="@color/primary"
@@ -155,16 +94,17 @@
                         android:id="@+id/tv_settings_test_result"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:gravity="center"
-                        android:textSize="14sp"
+                        android:layout_marginTop="10dp"
+                        android:textSize="13sp"
+                        android:textColor="@color/text_primary"
+                        android:lineSpacingExtra="3dp"
                         android:visibility="gone" />
 
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/switch_settings_vehicle_list"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
+                        android:layout_marginTop="14dp"
                         android:text="@string/setting_vehicle_list"
                         android:textSize="14sp"
                         android:textColor="@color/text_primary" />

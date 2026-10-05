@@ -49,13 +49,6 @@ class PendingUploadWorker(
 
         var anyFailed = false
 
-        val baseUrl = NetworkUtil.resolveBaseUrl(prefs)
-        val service = if (baseUrl != null) ApiClient.getService(baseUrl) else null
-
-        if (service == null && !prefs.firebaseEnabled) {
-            return@withContext Result.retry()
-        }
-
         for (metaFile in metaFiles) {
             var imgFile: File? = null
             try {
@@ -70,47 +63,16 @@ class PendingUploadWorker(
                     continue
                 }
 
-                if (service != null) {
-                    val fileReq = imgFile.asRequestBody("image/jpeg".toMediaTypeOrNull())
-                    val filePart = MultipartBody.Part.createFormData("file", imgFile.name, fileReq)
-                    val plateReq = meta.plate.toRequestBody("text/plain".toMediaTypeOrNull())
-                    val photoTypeReq = meta.photoType.toRequestBody("text/plain".toMediaTypeOrNull())
-                    val colorReq = meta.plateColor?.toRequestBody("text/plain".toMediaTypeOrNull())
-                    val seqReq = meta.seq?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
-                    val lanKdReq = meta.lanKd.toString().toRequestBody("text/plain".toMediaTypeOrNull())
-
-                    val resp = service.uploadPhoto(filePart, plateReq, colorReq, photoTypeReq, seqReq, lanKdReq)
-
-                    if (resp.isSuccessful && resp.body()?.get("ok") == true) {
-                        // Uploaded successfully, remove from queue
-                        imgFile.delete()
-                        metaFile.delete()
-                    } else if (resp.code() in 400..499) {
-                        // Server returned 4xx client error (do not infinite retry on 400)
-                        imgFile.delete()
-                        metaFile.delete()
-                    } else {
-                        anyFailed = true
-                    }
-                } else if (prefs.firebaseEnabled) {
-                    val success = FirebaseManager.uploadPhotoToInbox(
-                        plate = meta.plate,
-                        plateColor = meta.plateColor,
-                        photoType = meta.photoType,
-                        seq = meta.seq ?: 1,
-                        lanKd = meta.lanKd,
-                        photoFile = imgFile
-                    )
-                    if (success) {
-                        imgFile.delete()
-                        metaFile.delete()
-                    } else {
-                        anyFailed = true
-                    }
-                }
-            } catch (e: HttpException) {
-                if (e.code() in 400..499) {
-                    imgFile?.delete()
+                val success = FirebaseManager.uploadPhotoToInbox(
+                    plate = meta.plate,
+                    plateColor = meta.plateColor,
+                    photoType = meta.photoType,
+                    seq = meta.seq ?: 1,
+                    lanKd = meta.lanKd,
+                    photoFile = imgFile
+                )
+                if (success) {
+                    imgFile.delete()
                     metaFile.delete()
                 } else {
                     anyFailed = true

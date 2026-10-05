@@ -40,12 +40,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var prefs: PrefsManager
 
     private lateinit var toolbar: MaterialToolbar
-    private lateinit var etLanIp: TextInputEditText
-    private lateinit var etTailscaleIp: TextInputEditText
-    private lateinit var switchFirebaseEnabled: MaterialSwitch
-    private lateinit var switchLanEnabled: MaterialSwitch
-    private lateinit var switchTailscaleEnabled: MaterialSwitch
-    private lateinit var etPort: TextInputEditText
+    private lateinit var tvCurrentCluster: TextView
     private lateinit var etPhotoSaveDir: TextInputEditText
     private lateinit var etPassengerPath: TextInputEditText
     private lateinit var etNewVehiclePath: TextInputEditText
@@ -131,12 +126,7 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun initViews() {
         toolbar = findViewById(R.id.toolbar_settings)
-        etLanIp = findViewById(R.id.et_settings_lan_ip)
-        etTailscaleIp = findViewById(R.id.et_settings_tailscale_ip)
-        switchFirebaseEnabled = findViewById(R.id.switch_settings_firebase_enabled)
-        switchLanEnabled = findViewById(R.id.switch_settings_lan_enabled)
-        switchTailscaleEnabled = findViewById(R.id.switch_settings_tailscale_enabled)
-        etPort = findViewById(R.id.et_settings_port)
+        tvCurrentCluster = findViewById(R.id.tv_settings_current_cluster)
         etPhotoSaveDir = findViewById(R.id.et_settings_photo_save_dir)
         etPassengerPath = findViewById(R.id.et_settings_passenger_path)
         etNewVehiclePath = findViewById(R.id.et_settings_new_vehicle_path)
@@ -246,15 +236,9 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun loadCurrentSettings() {
-        switchFirebaseEnabled.isChecked = prefs.firebaseEnabled
-        switchLanEnabled.isChecked = prefs.lanEnabled
-        switchTailscaleEnabled.isChecked = prefs.tailscaleEnabled
-        etLanIp.isEnabled = prefs.lanEnabled
-        etTailscaleIp.isEnabled = prefs.tailscaleEnabled
+        val current = com.ttdk1507d.inspectioncamera.firebase.FirebaseManager.getScheduledNode()
+        tvCurrentCluster.text = "Cụm hoạt động hôm nay: ${current.name} (${current.scheduleDesc})"
 
-        etLanIp.setText(prefs.lanIp)
-        etTailscaleIp.setText(prefs.tailscaleIp)
-        etPort.setText(prefs.serverPort.toString())
         etPhotoSaveDir.setText(prefs.photoSaveDir)
         etPassengerPath.setText(prefs.passengerPath)
         etNewVehiclePath.setText(prefs.newVehiclePath)
@@ -284,14 +268,6 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun setupListeners() {
-        switchLanEnabled.setOnCheckedChangeListener { _, isChecked ->
-            etLanIp.isEnabled = isChecked
-        }
-
-        switchTailscaleEnabled.setOnCheckedChangeListener { _, isChecked ->
-            etTailscaleIp.isEnabled = isChecked
-        }
-
         btnTest.setOnClickListener {
             testConnections()
         }
@@ -314,122 +290,46 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun testConnections() {
-        val lanIp = etLanIp.text?.toString()?.trim().orEmpty()
-        val tailscaleIp = etTailscaleIp.text?.toString()?.trim().orEmpty()
-        val port = etPort.text?.toString()?.trim()?.toIntOrNull() ?: prefs.serverPort
-
-        val lanEnabled = switchLanEnabled.isChecked
-        val tailscaleEnabled = switchTailscaleEnabled.isChecked
-
-        if (!lanEnabled && !tailscaleEnabled) {
-            tvTestResult.visibility = View.VISIBLE
-            tvTestResult.setTextColor(ContextCompat.getColor(this, R.color.error))
-            tvTestResult.text = "Cả LAN và Tailscale đều đang tắt. Hãy bật ít nhất một kết nối."
-            return
-        }
-
-        val lanUrl = NetworkUtil.formatUrl(lanIp, port)
-        val tailscaleUrl = NetworkUtil.formatUrl(tailscaleIp, port)
-
         btnTest.isEnabled = false
         tvTestResult.visibility = View.VISIBLE
         tvTestResult.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
-        tvTestResult.text = getString(R.string.test_testing)
+        tvTestResult.text = "Đang kiểm tra kết nối tới 4 cụm máy chủ Firebase..."
 
         lifecycleScope.launch {
-            val lanDeferred = async(Dispatchers.IO) {
-                if (lanEnabled) checkHealth(lanUrl) else null
-            }
-            val tsDeferred = async(Dispatchers.IO) {
-                if (tailscaleEnabled) checkHealth(tailscaleUrl) else null
-            }
-
-            val lanResult = lanDeferred.await()
-            val tsResult = tsDeferred.await()
-
+            val results = com.ttdk1507d.inspectioncamera.firebase.FirebaseManager.testAllNodes()
             btnTest.isEnabled = true
 
-            val tsDisplay = if (tailscaleIp.startsWith("http://") || tailscaleIp.startsWith("https://") || tailscaleIp.contains(".trycloudflare.com") || tailscaleIp.contains(".ts.net")) tailscaleIp else "$tailscaleIp:$port"
-            val resultText = buildString {
-                append("LAN ($lanIp:$port): ")
-                append(when (lanResult) {
-                    true -> "✅ Hoạt động"
-                    false -> "❌ Không phản hồi"
-                    null -> "⏸️ Đã tắt"
-                })
-                append("\nTừ xa / Hub ($tsDisplay): ")
-                append(when (tsResult) {
-                    true -> "✅ Hoạt động"
-                    false -> "❌ Không phản hồi"
-                    null -> "⏸️ Đã tắt"
-                })
+            val sb = StringBuilder()
+            var allOk = true
+            for (r in results) {
+                if (r.isOk) {
+                    sb.append("• ${r.node.name} (${r.node.scheduleDesc}): ✓ Sẵn sàng (${r.latencyMs}ms)\n")
+                } else {
+                    allOk = false
+                    sb.append("• ${r.node.name} (${r.node.scheduleDesc}): ✗ Lỗi (${r.error})\n")
+                }
             }
 
-            tvTestResult.text = resultText
-            val hasSuccess = (lanResult == true) || (tsResult == true)
-            val resultColor = if (hasSuccess) {
-                R.color.status_done_text
-            } else {
-                R.color.error
-            }
+            tvTestResult.text = sb.toString().trimEnd()
+            val resultColor = if (allOk) R.color.status_done_text else R.color.warning
             tvTestResult.setTextColor(ContextCompat.getColor(this@SettingsActivity, resultColor))
         }
     }
 
-    private suspend fun checkHealth(url: String): Boolean {
-        return try {
-            val service = ApiClient.getService(url)
-            val resp = service.health()
-            resp.isSuccessful && resp.body()?.get("ok") == true
-        } catch (e: Exception) {
-            false
-        }
-    }
-
     private fun saveSettings() {
-        val firebaseEnabled = switchFirebaseEnabled.isChecked
-        val lanEnabled = switchLanEnabled.isChecked
-        val tailscaleEnabled = switchTailscaleEnabled.isChecked
-
-        if (!firebaseEnabled && !lanEnabled && !tailscaleEnabled) {
-            Toast.makeText(this, "Phải bật ít nhất một kết nối (Firebase, LAN hoặc Tailscale)", Toast.LENGTH_LONG).show()
-            return
-        }
-
-        val lanIp = etLanIp.text?.toString()?.trim().orEmpty()
-        val tailscaleIp = etTailscaleIp.text?.toString()?.trim().orEmpty()
-        val port = etPort.text?.toString()?.trim()?.toIntOrNull()
         val saveDir = etPhotoSaveDir.text?.toString()?.trim().orEmpty()
         val passengerPath = etPassengerPath.text?.toString()?.trim().orEmpty()
         val newVehiclePath = etNewVehiclePath.text?.toString()?.trim().orEmpty()
-
-        if (lanEnabled && lanIp.isEmpty()) {
-            etLanIp.error = "IP LAN không được để trống"
-            return
-        }
-
-        if (tailscaleEnabled && tailscaleIp.isEmpty()) {
-            etTailscaleIp.error = "IP Tailscale không được để trống"
-            return
-        }
-
-        if (port == null || port !in 1..65535) {
-            etPort.error = "Port phải từ 1 đến 65535"
-            return
-        }
 
         if (saveDir.isEmpty()) {
             etPhotoSaveDir.error = "Đường dẫn lưu ảnh không được để trống"
             return
         }
 
-        // Save immediately to local persistent preferences
-        prefs.firebaseEnabled = firebaseEnabled
-        prefs.lanEnabled = lanEnabled
-        prefs.tailscaleEnabled = tailscaleEnabled
-        if (lanIp.isNotEmpty()) prefs.lanIp = lanIp
-        if (tailscaleIp.isNotEmpty()) prefs.tailscaleIp = tailscaleIp
-        prefs.serverPort = port
+        // Save immediately to local persistent preferences (100% Firebase default)
+        prefs.firebaseEnabled = true
+        prefs.lanEnabled = false
+        prefs.tailscaleEnabled = false
         prefs.photoSaveDir = saveDir
         if (passengerPath.isNotEmpty()) prefs.passengerPath = passengerPath
         if (newVehiclePath.isNotEmpty()) prefs.newVehiclePath = newVehiclePath

@@ -9,44 +9,86 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.ttdk1507d.inspectioncamera.model.Vehicle
 import com.ttdk1507d.inspectioncamera.util.PlateUtil
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.Calendar
 import kotlin.coroutines.resume
+
+data class FirebaseNode(
+    val id: String,
+    val name: String,
+    val scheduleDesc: String,
+    val url: String,
+    val activeDays: List<Int>
+)
+
+data class NodeTestResult(
+    val node: FirebaseNode,
+    val isOk: Boolean,
+    val latencyMs: Long,
+    val error: String? = null
+)
 
 object FirebaseManager {
     private const val TAG = "FirebaseManager"
-    private const val RTDB_URL = "https://ttdk-1507d-default-rtdb.asia-southeast1.firebasedatabase.app"
 
-    val database: FirebaseDatabase by lazy {
-        FirebaseDatabase.getInstance(RTDB_URL)
+    val NODE_1 = FirebaseNode(
+        id = "node1",
+        name = "Cụm 1",
+        scheduleDesc = "Thứ 2 & Thứ 5",
+        url = "https://ttdk-1507d-default-rtdb.asia-southeast1.firebasedatabase.app",
+        activeDays = listOf(Calendar.MONDAY, Calendar.THURSDAY)
+    )
+
+    val NODE_2 = FirebaseNode(
+        id = "node2",
+        name = "Cụm 2",
+        scheduleDesc = "Thứ 3 & Thứ 6",
+        url = "https://ttdk-1507d-p2-default-rtdb.asia-southeast1.firebasedatabase.app",
+        activeDays = listOf(Calendar.TUESDAY, Calendar.FRIDAY)
+    )
+
+    val NODE_3 = FirebaseNode(
+        id = "node3",
+        name = "Cụm 3",
+        scheduleDesc = "Thứ 4 & Thứ 7",
+        url = "https://ttdk-1507d-p3-default-rtdb.asia-southeast1.firebasedatabase.app",
+        activeDays = listOf(Calendar.WEDNESDAY, Calendar.SATURDAY)
+    )
+
+    val NODE_BACKUP = FirebaseNode(
+        id = "backup",
+        name = "Cụm Dự Phòng",
+        scheduleDesc = "Tự động kích hoạt khi có sự cố (Failover)",
+        url = "https://ttdk-1507d-bk-default-rtdb.asia-southeast1.firebasedatabase.app",
+        activeDays = emptyList()
+    )
+
+    val ALL_NODES = listOf(NODE_1, NODE_2, NODE_3, NODE_BACKUP)
+    val ALL_URLS = ALL_NODES.map { it.url }
+
+    fun getScheduledNode(): FirebaseNode {
+        val dayOfWeek = Calendar.getInstance().get(Calendar.DAY_OF_WEEK)
+        return ALL_NODES.firstOrNull { it.activeDays.contains(dayOfWeek) } ?: NODE_1
     }
 
-    /**
-     * Lắng nghe trạng thái kết nối với máy chủ Firebase Realtime Database
-     */
-    fun observeConnection(): Flow<Boolean> = callbackFlow {
-        val connectedRef = database.getReference(".info/connected")
-        val listener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val connected = snapshot.getValue(Boolean::class.java) ?: false
-                trySend(connected)
-            }
-
-            override fun onCancelled(error: DatabaseError) {
-                Log.e(TAG, "Connection listener cancelled: ${error.message}")
-            }
-        }
-        connectedRef.addValueEventListener(listener)
-        awaitClose { connectedRef.removeEventListener(listener) }
+    fun getDatabase(node: FirebaseNode = getScheduledNode()): FirebaseDatabase {
+        return FirebaseDatabase.getInstance(node.url)
     }
 
     /**
      * Lắng nghe danh sách xe kiểm định hôm nay từ Firebase RTDB node /vehicles_today
      */
-    fun observeVehicles(): Flow<List<Vehicle>> = callbackFlow {
+    fun observeVehicles(node: FirebaseNode = getScheduledNode()): Flow<List<Vehicle>> = callbackFlow {
+        val database = getDatabase(node)
         val vehiclesRef = database.getReference("vehicles_today")
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
@@ -79,7 +121,9 @@ object FirebaseManager {
     }
 
     /**
-     * Tải ảnh chụp lên Firebase RTDB node /photo_inbox (Coroutine Suspend)
+     * Tải ảnh chụp lên Firebase RTDB node /photo_inbox với cơ chế failover:
+     * 1. Thử gửi lên cụm chính theo lịch ngày
+     * 2. Nếu thất bại, tự động chuyển sang Cụm Dự Phòng
      */
     suspend fun uploadPhotoToInbox(
         plate: String,
@@ -88,21 +132,56 @@ object FirebaseManager {
         seq: Int,
         lanKd: Int,
         photoFile: File
-    ): Boolean = suspendCancellableCoroutine { continuation ->
-        if (!photoFile.exists()) {
-            continuation.resume(false)
-            return@suspendCancellableCoroutine
+    ): Boolean {
+        if (!photoFile.exists()) return false
+
+        val primaryNode = getScheduledNode()
+        Log.d(TAG, "Uploading photo to primary node ${primaryNode.name}...")
+
+        // Thử node chính (timeout 12s)
+        val primarySuccess = withTimeoutOrNull(12_000L) {
+            pushPhotoToNode(primaryNode, plate, plateColor, photoType, seq, lanKd, photoFile)
+        } ?: false
+
+        if (primarySuccess) {
+            Log.d(TAG, "Uploaded successfully to primary node ${primaryNode.name}")
+            return true
         }
+
+        // Chuyển sang node dự phòng Failover
+        Log.w(TAG, "Primary node ${primaryNode.name} upload failed, failing over to ${NODE_BACKUP.name}...")
+        val backupSuccess = withTimeoutOrNull(12_000L) {
+            pushPhotoToNode(NODE_BACKUP, plate, plateColor, photoType, seq, lanKd, photoFile)
+        } ?: false
+
+        if (backupSuccess) {
+            Log.i(TAG, "Uploaded successfully to backup node ${NODE_BACKUP.name}")
+            return true
+        }
+
+        Log.e(TAG, "Upload failed on both primary and backup nodes for plate $plate ($photoType)")
+        return false
+    }
+
+    private suspend fun pushPhotoToNode(
+        node: FirebaseNode,
+        plate: String,
+        plateColor: String?,
+        photoType: String,
+        seq: Int,
+        lanKd: Int,
+        photoFile: File
+    ): Boolean = suspendCancellableCoroutine { continuation ->
         try {
             val bytes = photoFile.readBytes()
             val base64Str = Base64.encodeToString(bytes, Base64.NO_WRAP)
 
-            val inboxRef = database.getReference("photo_inbox")
+            val db = getDatabase(node)
+            val inboxRef = db.getReference("photo_inbox")
             val newPhotoRef = inboxRef.push()
             val photoId = newPhotoRef.key ?: System.currentTimeMillis().toString()
 
             val cleanPlate = plate.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
-
             val isOld = PlateUtil.isOldPlate(cleanPlate)
             val finalColor = if (isOld) "" else (plateColor ?: "T")
 
@@ -118,21 +197,48 @@ object FirebaseManager {
                 "file_size" to bytes.size,
                 "created_at" to System.currentTimeMillis(),
                 "device_model" to Build.MODEL,
-                "status" to "pending"
+                "status" to "pending",
+                "node_id" to node.id
             )
 
             newPhotoRef.setValue(payload)
                 .addOnSuccessListener {
-                    Log.d(TAG, "Photo pushed to Firebase inbox: $photoId for $plate ($photoType)")
+                    Log.d(TAG, "[${node.name}] Photo pushed: $photoId for $plate ($photoType)")
                     if (continuation.isActive) continuation.resume(true)
                 }
                 .addOnFailureListener { e ->
-                    Log.e(TAG, "Failed to push photo to Firebase inbox: ${e.message}")
+                    Log.e(TAG, "[${node.name}] Failed to push photo: ${e.message}")
                     if (continuation.isActive) continuation.resume(false)
                 }
         } catch (e: Exception) {
-            Log.e(TAG, "Exception during uploadPhotoToInbox: ${e.message}", e)
+            Log.e(TAG, "[${node.name}] Exception pushing photo: ${e.message}", e)
             if (continuation.isActive) continuation.resume(false)
+        }
+    }
+
+    /**
+     * Kiểm tra trạng thái và tốc độ phản hồi (latency) của cả 4 cụm máy chủ Firebase
+     */
+    suspend fun testAllNodes(): List<NodeTestResult> = withContext(Dispatchers.IO) {
+        ALL_NODES.map { node ->
+            try {
+                val start = System.currentTimeMillis()
+                val url = URL("${node.url}/.json?shallow=true")
+                val conn = url.openConnection() as HttpURLConnection
+                conn.connectTimeout = 4000
+                conn.readTimeout = 4000
+                conn.requestMethod = "GET"
+                val code = conn.responseCode
+                val latency = System.currentTimeMillis() - start
+                conn.disconnect()
+                if (code in 200..299) {
+                    NodeTestResult(node, true, latency)
+                } else {
+                    NodeTestResult(node, false, latency, "HTTP $code")
+                }
+            } catch (e: Exception) {
+                NodeTestResult(node, false, 0, e.message ?: "Không phản hồi")
+            }
         }
     }
 }

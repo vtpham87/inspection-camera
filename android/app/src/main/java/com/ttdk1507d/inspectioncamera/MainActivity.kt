@@ -306,11 +306,7 @@ class MainActivity : AppCompatActivity() {
         })
 
         swipeRefresh.setOnRefreshListener {
-            if (prefs.firebaseEnabled) {
-                observeFirebaseVehicles()
-            } else {
-                loadVehicles()
-            }
+            observeFirebaseVehicles()
         }
 
         tvPendingBanner.setOnClickListener {
@@ -410,17 +406,10 @@ class MainActivity : AppCompatActivity() {
     private fun applyVehicleListVisibility() {
         if (prefs.vehicleListEnabled) {
             layoutVehicleListContainer.visibility = View.VISIBLE
-            if (prefs.firebaseEnabled) {
-                stopPeriodicRefresh()
-                observeFirebaseVehicles()
-                if (currentVehiclesList.isNotEmpty()) {
-                    applyCurrentFilter()
-                }
-            } else {
-                firebaseJob?.cancel()
-                firebaseJob = null
-                loadVehicles(silent = currentVehiclesList.isNotEmpty())
-                startPeriodicRefresh()
+            stopPeriodicRefresh()
+            observeFirebaseVehicles()
+            if (currentVehiclesList.isNotEmpty()) {
+                applyCurrentFilter()
             }
         } else {
             layoutVehicleListContainer.visibility = View.GONE
@@ -432,70 +421,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadVehicles(silent: Boolean = false) {
         if (!prefs.vehicleListEnabled) return
-
-        lifecycleScope.launch {
-            if (!silent && currentVehiclesList.isEmpty()) {
-                pbLoading.visibility = View.VISIBLE
-                tvEmpty.visibility = View.GONE
-            }
-
-            try {
-                val baseUrl = NetworkUtil.resolveBaseUrl(prefs)
-                if (baseUrl == null) {
-                    if (prefs.firebaseEnabled) {
-                        observeFirebaseVehicles()
-                        return@launch
-                    }
-                    if (!silent) {
-                        if (currentVehiclesList.isEmpty()) {
-                            tvEmpty.visibility = View.VISIBLE
-                            tvEmpty.text = when {
-                                !prefs.lanEnabled && !prefs.tailscaleEnabled ->
-                                    "Cả mạng LAN và Tailscale đều đang tắt\nVào Cài đặt để bật lại kết nối"
-                                prefs.lanEnabled && !prefs.tailscaleEnabled ->
-                                    "Không kết nối được máy chủ LAN (${prefs.lanIp}:${prefs.serverPort})\nVuốt xuống để thử lại"
-                                !prefs.lanEnabled && prefs.tailscaleEnabled ->
-                                    "Không kết nối được máy chủ Tailscale (${prefs.tailscaleIp}:${prefs.serverPort})\nVuốt xuống để thử lại"
-                                else ->
-                                    "Không kết nối được máy chủ\n(LAN: ${prefs.lanIp} • Tailscale: ${prefs.tailscaleIp})\nVuốt xuống để thử lại"
-                            }
-                        } else {
-                            Toast.makeText(this@MainActivity, "Không thể kết nối máy chủ, đang dùng danh sách hiện tại", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                    return@launch
-                }
-                val service = ApiClient.getService(baseUrl)
-                val response = withContext(Dispatchers.IO) {
-                    service.getVehiclesToday(waitingOnly = isFilterWaiting)
-                }
-
-                if (response.isSuccessful && response.body() != null) {
-                    val list = response.body()!!
-                    currentVehiclesList = list
-                    applyCurrentFilter()
-                } else if (!silent) {
-                    if (currentVehiclesList.isEmpty()) {
-                        tvEmpty.visibility = View.VISIBLE
-                        tvEmpty.text = getString(R.string.empty_vehicle_list)
-                    } else {
-                        Toast.makeText(this@MainActivity, "Lỗi tải danh sách xe từ máy chủ", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            } catch (e: Exception) {
-                if (!silent) {
-                    if (currentVehiclesList.isEmpty()) {
-                        tvEmpty.visibility = View.VISIBLE
-                        tvEmpty.text = "Lỗi kết nối: ${e.message}\nVuốt xuống để thử lại"
-                    } else {
-                        Toast.makeText(this@MainActivity, "Lỗi kết nối: ${e.message}", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            } finally {
-                pbLoading.visibility = View.GONE
-                swipeRefresh.isRefreshing = false
-            }
-        }
+        observeFirebaseVehicles()
     }
 
     private fun updatePendingBanner() {

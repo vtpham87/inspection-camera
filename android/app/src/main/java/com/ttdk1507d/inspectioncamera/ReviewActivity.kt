@@ -293,44 +293,6 @@ class ReviewActivity : AppCompatActivity() {
         btnSync.isEnabled = false
 
         lifecycleScope.launch {
-            val baseUrl = withContext(Dispatchers.IO) {
-                NetworkUtil.resolveBaseUrl(prefs)
-            }
-
-            if (baseUrl == null && !prefs.firebaseEnabled) {
-                isSyncing = false
-                pbSync.visibility = View.GONE
-                btnSync.isEnabled = true
-                tvSyncStatus.text = getString(R.string.sync_failed)
-                tvSyncStatus.setTextColor(ContextCompat.getColor(this@ReviewActivity, R.color.error))
-                return@launch
-            }
-
-            val service = if (baseUrl != null) ApiClient.getService(baseUrl) else null
-
-            // Ensure server has latest paths from device before saving (if server reachable)
-            if (service != null) {
-                withContext(Dispatchers.IO) {
-                    try {
-                        val cfg = prefs.getAppConfig()
-                        val body = mapOf<String, Any>(
-                            "vehicle_list_enabled" to cfg.vehicleListEnabled,
-                            "server_port" to cfg.serverPort,
-                            "photo_save_dir" to cfg.photoSaveDir,
-                            "passenger_path" to cfg.passengerPath,
-                            "new_vehicle_path" to cfg.newVehiclePath,
-                            "sync_new_vehicle_45" to cfg.syncNewVehicle45,
-                            "jpeg_quality" to cfg.jpegQuality,
-                            "plate_color_suffix" to true,
-                            "photo_resolution" to cfg.photoResolution
-                        )
-                        service.postConfig(body)
-                    } catch (e: Exception) {
-                        // Non-blocking sync
-                    }
-                }
-            }
-
             val total = plateMetas.size
             var uploadedCount = 0
 
@@ -341,32 +303,18 @@ class ReviewActivity : AppCompatActivity() {
                     continue
                 }
 
-                val syncTarget = if (service != null) "máy chủ" else "Firebase"
-                tvSyncStatus.text = "Đang đồng bộ qua $syncTarget (${uploadedCount + 1}/$total)..."
+                tvSyncStatus.text = "Đang đồng bộ qua Firebase (${uploadedCount + 1}/$total)..."
 
                 val success = withContext(Dispatchers.IO) {
                     try {
-                        if (service != null) {
-                            val fileReq = imgFile.readBytes().toRequestBody("image/jpeg".toMediaTypeOrNull())
-                            val filePart = MultipartBody.Part.createFormData("file", meta.imageFileName, fileReq)
-                            val plateReq = meta.plate.toRequestBody("text/plain".toMediaTypeOrNull())
-                            val photoTypeReq = meta.photoType.toRequestBody("text/plain".toMediaTypeOrNull())
-                            val colorReq = meta.plateColor?.toRequestBody("text/plain".toMediaTypeOrNull())
-                            val seqReq = meta.seq?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull())
-                            val lanKdReq = meta.lanKd.toString().toRequestBody("text/plain".toMediaTypeOrNull())
-
-                            val resp = service.uploadPhoto(filePart, plateReq, colorReq, photoTypeReq, seqReq, lanKdReq)
-                            resp.isSuccessful && resp.body()?.get("ok") == true
-                        } else {
-                            FirebaseManager.uploadPhotoToInbox(
-                                plate = meta.plate,
-                                plateColor = meta.plateColor,
-                                photoType = meta.photoType,
-                                seq = meta.seq ?: 1,
-                                lanKd = meta.lanKd,
-                                photoFile = imgFile
-                            )
-                        }
+                        FirebaseManager.uploadPhotoToInbox(
+                            plate = meta.plate,
+                            plateColor = meta.plateColor,
+                            photoType = meta.photoType,
+                            seq = meta.seq ?: 1,
+                            lanKd = meta.lanKd,
+                            photoFile = imgFile
+                        )
                     } catch (e: Exception) {
                         false
                     }
@@ -385,8 +333,7 @@ class ReviewActivity : AppCompatActivity() {
             loadPhotos()
 
             if (uploadedCount > 0) {
-                val dest = if (service != null) "máy tính" else "Firebase Đám mây"
-                Toast.makeText(this@ReviewActivity, "Đã gửi thành công $uploadedCount ảnh qua $dest", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@ReviewActivity, "Đã gửi thành công $uploadedCount ảnh qua Firebase Đám mây", Toast.LENGTH_SHORT).show()
             }
         }
     }
