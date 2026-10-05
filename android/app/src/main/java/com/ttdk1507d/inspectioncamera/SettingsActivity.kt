@@ -24,6 +24,7 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.ttdk1507d.inspectioncamera.api.ApiClient
+import com.ttdk1507d.inspectioncamera.firebase.FirebaseManager
 import com.ttdk1507d.inspectioncamera.util.NetworkUtil
 import com.ttdk1507d.inspectioncamera.util.PrefsManager
 import kotlinx.coroutines.CoroutineScope

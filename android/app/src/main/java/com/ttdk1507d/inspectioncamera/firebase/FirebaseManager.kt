@@ -248,7 +248,7 @@ object FirebaseManager {
      * Lắng nghe cấu hình thời gian thực từ máy tính trạm qua Firebase (/config)
      */
     fun observeConfig(onConfigChange: (Map<String, Any>) -> Unit): ValueEventListener? {
-        val node = getActiveNodeForToday()
+        val node = getScheduledNode()
         return try {
             val db = FirebaseDatabase.getInstance(node.url)
             val ref = db.getReference("config")
@@ -278,7 +278,7 @@ object FirebaseManager {
      * Lấy cấu hình một lần từ Firebase (/config)
      */
     suspend fun fetchConfigOnce(): Map<String, Any>? = withContext(Dispatchers.IO) {
-        val node = getActiveNodeForToday()
+        val node = getScheduledNode()
         try {
             val url = URL("${node.url}/config.json")
             val conn = url.openConnection() as HttpURLConnection
