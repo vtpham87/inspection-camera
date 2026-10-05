@@ -166,14 +166,6 @@
                             android:layout_marginStart="4dp"
                             android:textSize="13sp" />
 
-                        <RadioButton
-                            android:id="@+id/rb_color_none"
-                            android:layout_width="wrap_content"
-                            android:layout_height="36dp"
-                            android:text="@string/plate_none"
-                            android:layout_marginStart="4dp"
-                            android:textSize="13sp" />
-
                     </RadioGroup>
 
                 </LinearLayout>

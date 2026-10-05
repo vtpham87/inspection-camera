@@ -48,6 +48,9 @@ def clean_plate_and_color(
                 continue
         break
     color = plate_color or detected_color
+    if not re.search(r"\d{5}$", s):
+        # Biển cũ (không kết thúc bằng 5 số): mặc định không thêm t/v/x
+        color = None
     lan = lan_kd if (lan_kd and lan_kd > 1) else detected_lan
     return s, color, lan
 

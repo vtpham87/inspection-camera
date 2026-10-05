@@ -8,6 +8,7 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.ttdk1507d.inspectioncamera.model.Vehicle
+import com.ttdk1507d.inspectioncamera.util.PlateUtil
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -102,11 +103,14 @@ object FirebaseManager {
 
             val cleanPlate = plate.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
 
+            val isOld = PlateUtil.isOldPlate(cleanPlate)
+            val finalColor = if (isOld) "" else (plateColor ?: "T")
+
             val payload = hashMapOf(
                 "id" to photoId,
                 "plate" to plate,
                 "plate_clean" to cleanPlate,
-                "plate_color" to (plateColor ?: "T"),
+                "plate_color" to finalColor,
                 "photo_type" to photoType,
                 "seq" to seq,
                 "lan_kd" to lanKd,

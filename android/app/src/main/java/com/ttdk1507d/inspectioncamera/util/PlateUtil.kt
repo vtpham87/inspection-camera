@@ -52,7 +52,14 @@ object PlateUtil {
             }
             break
         }
-        return PlateInfo(s, color, lan)
+        val isOld = !Regex("\\d{5}$").containsMatchIn(s)
+        val finalColor = if (isOld) null else color
+        return PlateInfo(s, finalColor, lan)
+    }
+
+    fun isOldPlate(plate: String): Boolean {
+        val parsed = parsePlate(plate)
+        return !Regex("\\d{5}$").containsMatchIn(parsed.basePlate)
     }
 
     fun extractColor(cleanPlate: String): Pair<String, String?> {
@@ -61,13 +68,19 @@ object PlateUtil {
     }
 
     /**
-     * Gộp biển + màu biển ngắn gọn: ví dụ 15A12345T, 15C12345V, 11K2639, hoặc 15A12345TL2 khi lanKd = 2
+     * Gộp biển + màu biển ngắn gọn: ví dụ 15A12345T, 15C12345V, 11K2639, hoặc 15A12345TL2 khi lanKd = 2.
+     * Biển cũ (4 số hoặc không có 5 số ở đuôi) mặc định không thêm t/v/x.
      */
     fun formatCompactPlate(rawPlate: String, rawColor: String?, lanKd: Int = 1): String {
         val parsed = parsePlate(rawPlate)
         val base = parsed.basePlate
-        var color = (rawColor?.uppercase() ?: parsed.color)?.trim()
-        if (color.isNullOrEmpty() && Regex("\\d{5}$").containsMatchIn(base)) {
+        val isOld = isOldPlate(base)
+        var color = if (isOld) {
+            null // Biển cũ mặc định không thêm t/v/x
+        } else {
+            (rawColor?.uppercase() ?: parsed.color)?.trim()
+        }
+        if (!isOld && color.isNullOrEmpty() && Regex("\\d{5}$").containsMatchIn(base)) {
             color = "T"
         }
         val effectiveLan = if (lanKd > 1) lanKd else 1

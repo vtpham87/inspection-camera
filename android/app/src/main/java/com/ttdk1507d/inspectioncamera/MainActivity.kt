@@ -274,15 +274,14 @@ class MainActivity : AppCompatActivity() {
                 val cleaned = raw.replace(Regex("[.\\-\\s]"), "").uppercase()
                 if (cleaned.isNotEmpty()) {
                     val (basePlate, color) = PlateUtil.extractColor(cleaned)
-                    when (color) {
-                        "T" -> rgPlateColor.check(R.id.rb_color_white)
-                        "V" -> rgPlateColor.check(R.id.rb_color_yellow)
-                        "X" -> rgPlateColor.check(R.id.rb_color_blue)
-                        else -> {
-                            if (cleaned.last().isDigit() && Regex("^[0-9]{2}[A-Z]{1,2}[0-9]{4}$").matches(cleaned)) {
-                                rgPlateColor.check(R.id.rb_color_none)
-                            } else if (cleaned.isNotEmpty() && Regex("\\d{5}$").containsMatchIn(cleaned)) {
-                                if (rgPlateColor.checkedRadioButtonId == R.id.rb_color_none || rgPlateColor.checkedRadioButtonId == -1) {
+                    val isOld = PlateUtil.isOldPlate(basePlate)
+                    if (!isOld) {
+                        when (color) {
+                            "T" -> rgPlateColor.check(R.id.rb_color_white)
+                            "V" -> rgPlateColor.check(R.id.rb_color_yellow)
+                            "X" -> rgPlateColor.check(R.id.rb_color_blue)
+                            else -> {
+                                if (rgPlateColor.checkedRadioButtonId == -1) {
                                     rgPlateColor.check(R.id.rb_color_white)
                                 }
                             }
@@ -345,26 +344,18 @@ class MainActivity : AppCompatActivity() {
 
         val parsed = PlateUtil.parsePlate(cleanPlate)
         val basePlate = parsed.basePlate
-        val extractedColor = parsed.color
+        val isOld = PlateUtil.isOldPlate(basePlate)
 
-        val selectedColor = when (rgPlateColor.checkedRadioButtonId) {
-            R.id.rb_color_white -> "T"
-            R.id.rb_color_yellow -> "V"
-            R.id.rb_color_blue -> "X"
-            R.id.rb_color_none -> null
-            else -> null
-        }
-
-        // Determine final plate and color:
-        // 1. If plate ends with color suffix (T/V/X), use extracted color.
-        // 2. If user selected rb_color_none or didn't specify, plateColor is null.
-        // 3. If entered plate ends with a digit (old plate like 11K2639), do NOT force "T".
-        val finalColor = when {
-            extractedColor != null -> extractedColor
-            selectedColor != null -> selectedColor
-            rgPlateColor.checkedRadioButtonId == R.id.rb_color_none -> null
-            basePlate.isNotEmpty() && Regex("\\d{5}$").containsMatchIn(basePlate) -> "T"
-            else -> null
+        val finalColor = if (isOld) {
+            null // Biển cũ mặc định không thêm t/v/x
+        } else {
+            val selectedColor = when (rgPlateColor.checkedRadioButtonId) {
+                R.id.rb_color_white -> "T"
+                R.id.rb_color_yellow -> "V"
+                R.id.rb_color_blue -> "X"
+                else -> "T"
+            }
+            parsed.color ?: selectedColor
         }
 
         val selectedLan = if (rbLan2.isChecked) 2 else 1
@@ -394,8 +385,13 @@ class MainActivity : AppCompatActivity() {
     private fun openCamera(plate: String, plateColor: String?, photosTaken: List<String>? = null, lanKd: Int = 1) {
         val parsed = PlateUtil.parsePlate(plate)
         val basePlate = parsed.basePlate
-        var color = plateColor ?: parsed.color
-        if (color == null && Regex("\\d{5}$").containsMatchIn(basePlate)) {
+        val isOld = PlateUtil.isOldPlate(basePlate)
+        var color = if (isOld) {
+            null // Biển cũ mặc định không thêm t/v/x
+        } else {
+            plateColor ?: parsed.color
+        }
+        if (!isOld && color == null && Regex("\\d{5}$").containsMatchIn(basePlate)) {
             color = "T"
         }
         val effectiveLan = if (lanKd > 1) lanKd else parsed.lanKd

@@ -124,8 +124,13 @@ class CameraActivity : AppCompatActivity() {
         val rawPlate = intent.getStringExtra(EXTRA_PLATE) ?: ""
         val parsed = PlateUtil.parsePlate(rawPlate)
         plate = parsed.basePlate
-        plateColor = intent.getStringExtra(EXTRA_PLATE_COLOR) ?: parsed.color
-        if (plateColor == null && Regex("\\d{5}$").containsMatchIn(plate)) {
+        val isOld = PlateUtil.isOldPlate(plate)
+        plateColor = if (isOld) {
+            null // Biển cũ mặc định không thêm t/v/x
+        } else {
+            intent.getStringExtra(EXTRA_PLATE_COLOR) ?: parsed.color
+        }
+        if (!isOld && plateColor == null && Regex("\\d{5}$").containsMatchIn(plate)) {
             plateColor = "T"
         }
         lanKd = intent.getIntExtra(EXTRA_LAN_KD, parsed.lanKd)

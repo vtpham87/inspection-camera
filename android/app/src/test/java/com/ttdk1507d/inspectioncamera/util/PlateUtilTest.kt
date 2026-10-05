@@ -95,4 +95,20 @@ class PlateUtilTest {
         assertEquals("16L3565L2", PlateUtil.formatCompactPlate("16L-3565", null, lanKd = 2))
         assertEquals("16L3565L2", PlateUtil.formatCompactPlate("16L3565L2", null, lanKd = 2))
     }
+
+    @Test
+    fun testOldPlateIgnoresColor() {
+        // Biển cũ (4 số) mặc định không thêm t/v/x dù có truyền mã màu
+        assertTrue(PlateUtil.isOldPlate("11K2639"))
+        assertTrue(PlateUtil.isOldPlate("16L3565"))
+        assertFalse(PlateUtil.isOldPlate("15A12345"))
+
+        assertEquals("11K2639", PlateUtil.formatCompactPlate("11K2639", "T"))
+        assertEquals("11K2639", PlateUtil.formatCompactPlate("11K2639", "V"))
+        assertEquals("11K2639", PlateUtil.formatCompactPlate("11K2639", "X"))
+        assertEquals("11K2639L2", PlateUtil.formatCompactPlate("11K2639", "T", lanKd = 2))
+
+        assertEquals("16L3565", PlateUtil.formatCompactPlate("16L-3565", "T"))
+        assertEquals("16L3565L2", PlateUtil.formatCompactPlate("16L-3565", "T", lanKd = 2))
+    }
 }

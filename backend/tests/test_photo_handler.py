@@ -47,6 +47,10 @@ def test_extract_color_old_plate():
     plate, color = extract_plate_color("11K2639")
     assert plate == "11K2639"
     assert color is None
+    # Biển cũ kể cả khi có gắn hậu tố màu cũng tự động bóc bỏ (mặc định không có màu)
+    plate_t, color_t = extract_plate_color("11K2639T")
+    assert plate_t == "11K2639"
+    assert color_t is None
 
 # --- build_filename ---
 def test_filename_rear_45_with_color():
@@ -54,6 +58,14 @@ def test_filename_rear_45_with_color():
 
 def test_filename_rear_45_no_color():
     assert build_filename("11K2639", None, "rear_45", None, True) == "11K2639.jpg"
+
+def test_filename_old_plate_ignores_color():
+    """Biển cũ mặc định không thêm t/v/x dù có truyền mã màu."""
+    assert build_filename("11K2639", "T", "rear_45", None, True) == "11K2639.jpg"
+    assert build_filename("11K2639", "V", "rear_45", None, True) == "11K2639.jpg"
+    assert build_filename("11K2639", "X", "front_45", None, True) == "bs11K2639.jpg"
+    assert build_filename("11K2639", "T", "rear_45", None, True, lan_kd=2) == "11K2639L2.jpg"
+    assert build_filename("16L3565", "T", "rear_45", None, True) == "16L3565.jpg"
 
 def test_filename_rear_45_suffix_disabled():
     assert build_filename("15A12345", "T", "rear_45", None, False) == "15A12345.jpg"

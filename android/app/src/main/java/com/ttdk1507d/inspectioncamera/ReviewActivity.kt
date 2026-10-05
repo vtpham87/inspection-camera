@@ -75,8 +75,13 @@ class ReviewActivity : AppCompatActivity() {
         val rawPlate = intent.getStringExtra(EXTRA_PLATE) ?: ""
         val parsed = com.ttdk1507d.inspectioncamera.util.PlateUtil.parsePlate(rawPlate)
         plate = parsed.basePlate
-        plateColor = intent.getStringExtra(EXTRA_PLATE_COLOR) ?: parsed.color
-        if (plateColor == null && Regex("\\d{5}$").containsMatchIn(plate)) {
+        val isOld = com.ttdk1507d.inspectioncamera.util.PlateUtil.isOldPlate(plate)
+        plateColor = if (isOld) {
+            null // Biển cũ mặc định không thêm t/v/x
+        } else {
+            intent.getStringExtra(EXTRA_PLATE_COLOR) ?: parsed.color
+        }
+        if (!isOld && plateColor == null && Regex("\\d{5}$").containsMatchIn(plate)) {
             plateColor = "T"
         }
         lanKd = intent.getIntExtra(EXTRA_LAN_KD, parsed.lanKd)
