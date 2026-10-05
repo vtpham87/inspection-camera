@@ -47,6 +47,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var etPassengerPath: TextInputEditText
     private lateinit var etNewVehiclePath: TextInputEditText
     private lateinit var btnRefreshPcConfig: MaterialButton
+    private lateinit var switchPcAutostart: MaterialSwitch
     private lateinit var switchVehicleList: MaterialSwitch
     private lateinit var btnTest: MaterialButton
     private lateinit var tvTestResult: TextView
@@ -135,6 +136,7 @@ class SettingsActivity : AppCompatActivity() {
         etPassengerPath = findViewById(R.id.et_settings_passenger_path)
         etNewVehiclePath = findViewById(R.id.et_settings_new_vehicle_path)
         btnRefreshPcConfig = findViewById(R.id.btn_settings_refresh_pc_config)
+        switchPcAutostart = findViewById(R.id.switch_settings_pc_autostart)
         switchVehicleList = findViewById(R.id.switch_settings_vehicle_list)
         btnTest = findViewById(R.id.btn_settings_test)
         tvTestResult = findViewById(R.id.tv_settings_test_result)
@@ -271,12 +273,15 @@ class SettingsActivity : AppCompatActivity() {
         val upIdx = uploadModeKeys.indexOf(prefs.uploadMode)
         spinnerUploadMode.setSelection(if (upIdx >= 0) upIdx else 0)
 
+        switchPcAutostart.isChecked = prefs.autoStartWithWindows
+
         lifecycleScope.launch {
             val serverConfig = FirebaseManager.fetchConfigOnce()
             if (serverConfig != null) {
                 val dir = serverConfig["photo_save_dir"] as? String
                 val pass = serverConfig["passenger_path"] as? String
                 val nv = serverConfig["new_vehicle_path"] as? String
+                val autostart = serverConfig["auto_start_with_windows"] as? Boolean
                 if (!dir.isNullOrBlank()) {
                     prefs.photoSaveDir = dir
                     etPhotoSaveDir.setText(dir)
@@ -288,6 +293,10 @@ class SettingsActivity : AppCompatActivity() {
                 if (!nv.isNullOrBlank()) {
                     prefs.newVehiclePath = nv
                     etNewVehiclePath.setText(nv)
+                }
+                if (autostart != null) {
+                    prefs.autoStartWithWindows = autostart
+                    switchPcAutostart.isChecked = autostart
                 }
                 tvPathsSyncStatus.text = "🟢 Đã đồng bộ với máy tính trạm qua Firebase"
                 tvPathsSyncStatus.setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.success))
@@ -334,6 +343,11 @@ class SettingsActivity : AppCompatActivity() {
                     if (!nv.isNullOrBlank()) {
                         prefs.newVehiclePath = nv
                         etNewVehiclePath.setText(nv)
+                    }
+                    val autostart = serverConfig["auto_start_with_windows"] as? Boolean
+                    if (autostart != null) {
+                        prefs.autoStartWithWindows = autostart
+                        switchPcAutostart.isChecked = autostart
                     }
                     tvPathsSyncStatus.text = "🟢 Đã đồng bộ thành công từ máy tính!"
                     tvPathsSyncStatus.setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.success))
@@ -407,6 +421,7 @@ class SettingsActivity : AppCompatActivity() {
         prefs.jpegQuality = jpegQualities[spinnerJpegQuality.selectedItemPosition.coerceIn(0, jpegQualities.lastIndex)]
         prefs.plateColorSuffix = true
         prefs.uploadMode = uploadModeKeys[spinnerUploadMode.selectedItemPosition.coerceIn(0, uploadModeKeys.lastIndex)]
+        prefs.autoStartWithWindows = switchPcAutostart.isChecked
 
         // Sync with server — send ALL fields including paths so backend updates correctly
         syncConfigToServer()
@@ -469,6 +484,7 @@ class SettingsActivity : AppCompatActivity() {
                     "passenger_path" to currentConfig.passengerPath,
                     "new_vehicle_path" to currentConfig.newVehiclePath,
                     "sync_new_vehicle_45" to currentConfig.syncNewVehicle45,
+                    "auto_start_with_windows" to currentConfig.autoStartWithWindows,
                     "jpeg_quality" to currentConfig.jpegQuality,
                     "plate_color_suffix" to true,
                     "photo_resolution" to currentConfig.photoResolution,

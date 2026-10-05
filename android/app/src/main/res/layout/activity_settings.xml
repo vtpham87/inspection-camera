@@ -202,6 +202,15 @@
                         app:strokeColor="@color/primary"
                         app:strokeWidth="1dp"
                         style="@style/Widget.Material3.Button.OutlinedButton" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switch_settings_pc_autostart"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="🖥️ Máy tính: Tự khởi động cùng Windows"
+                        android:textSize="14sp"
+                        android:textColor="@color/text_primary" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

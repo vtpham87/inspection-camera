@@ -104,6 +104,10 @@ class PrefsManager(private val prefs: SharedPreferences) {
         get() = prefs.getBoolean("sync_new_vehicle_45", true)
         set(value) { prefs.edit().putBoolean("sync_new_vehicle_45", value).commit() }
 
+    var autoStartWithWindows: Boolean
+        get() = prefs.getBoolean("auto_start_with_windows", true)
+        set(value) { prefs.edit().putBoolean("auto_start_with_windows", value).commit() }
+
     val lanUrl: String get() = NetworkUtil.formatUrl(lanIp, serverPort)
     val tailscaleUrl: String get() = NetworkUtil.formatUrl(tailscaleIp, serverPort)
 
@@ -115,6 +119,7 @@ class PrefsManager(private val prefs: SharedPreferences) {
             passengerPath = passengerPath,
             newVehiclePath = newVehiclePath,
             syncNewVehicle45 = syncNewVehicle45,
+            autoStartWithWindows = autoStartWithWindows,
             jpegQuality = jpegQuality,
             plateColorSuffix = plateColorSuffix,
             photoResolution = photoResolution,
@@ -134,6 +139,8 @@ class PrefsManager(private val prefs: SharedPreferences) {
         photoSaveDir = config.photoSaveDir
         passengerPath = config.passengerPath
         newVehiclePath = config.newVehiclePath
+        syncNewVehicle45 = config.syncNewVehicle45
+        autoStartWithWindows = config.autoStartWithWindows
         jpegQuality = config.jpegQuality
         plateColorSuffix = config.plateColorSuffix
         photoResolution = config.photoResolution

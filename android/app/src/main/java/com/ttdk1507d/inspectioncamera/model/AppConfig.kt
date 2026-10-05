@@ -22,6 +22,7 @@ data class AppConfig(
     @SerializedName("passenger_path") val passengerPath: String = "D:\\Photos\\{date}\\{plate}",
     @SerializedName("new_vehicle_path") val newVehiclePath: String = "D:\\Photos\\{date}\\{plate}",
     @SerializedName("sync_new_vehicle_45") val syncNewVehicle45: Boolean = true,
+    @SerializedName("auto_start_with_windows") val autoStartWithWindows: Boolean = true,
     val paths: Map<String, String>? = null,
     @SerializedName("jpeg_quality") val jpegQuality: Int = 85,
     @SerializedName("plate_color_suffix") val plateColorSuffix: Boolean = true,
