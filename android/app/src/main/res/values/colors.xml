@@ -24,6 +24,8 @@
     <color name="status_done_bg">#E8F5E9</color>
     <color name="status_done_stroke">#4CAF50</color>
     <color name="status_done_text">#2E7D32</color>
+    <color name="success">#2E7D32</color>
+    <color name="accent_red">#D32F2F</color>
 
     <!-- Empty: bg #F5F5F5, stroke #BDBDBD, text #757575 -->
     <color name="status_empty_bg">#F5F5F5</color>
