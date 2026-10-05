@@ -89,16 +89,20 @@ class PrefsManager(private val prefs: SharedPreferences) {
         set(value) { prefs.edit().putString("upload_mode", value).commit() }
 
     var photoSaveDir: String
-        get() = prefs.getString("photo_save_dir", "D:\\Photos") ?: "D:\\Photos"
+        get() = prefs.getString("photo_save_dir", "Z:\\Anh Phuong Tien") ?: "Z:\\Anh Phuong Tien"
         set(value) { prefs.edit().putString("photo_save_dir", value).commit() }
 
     var passengerPath: String
-        get() = prefs.getString("passenger_path", "D:\\Photos\\{date}\\{plate}") ?: "D:\\Photos\\{date}\\{plate}"
+        get() = prefs.getString("passenger_path", "Z:\\Anh Khoang HK CCCD\\{plate}") ?: "Z:\\Anh Khoang HK CCCD\\{plate}"
         set(value) { prefs.edit().putString("passenger_path", value).commit() }
 
     var newVehiclePath: String
-        get() = prefs.getString("new_vehicle_path", "D:\\Photos\\{date}\\{plate}") ?: "D:\\Photos\\{date}\\{plate}"
+        get() = prefs.getString("new_vehicle_path", "Z:\\Anh sau cap mien\\{plate}") ?: "Z:\\Anh sau cap mien\\{plate}"
         set(value) { prefs.edit().putString("new_vehicle_path", value).commit() }
+
+    var syncNewVehicle45: Boolean
+        get() = prefs.getBoolean("sync_new_vehicle_45", true)
+        set(value) { prefs.edit().putBoolean("sync_new_vehicle_45", value).commit() }
 
     val lanUrl: String get() = NetworkUtil.formatUrl(lanIp, serverPort)
     val tailscaleUrl: String get() = NetworkUtil.formatUrl(tailscaleIp, serverPort)
@@ -110,7 +114,7 @@ class PrefsManager(private val prefs: SharedPreferences) {
             photoSaveDir = photoSaveDir,
             passengerPath = passengerPath,
             newVehiclePath = newVehiclePath,
-            syncNewVehicle45 = true,
+            syncNewVehicle45 = syncNewVehicle45,
             jpegQuality = jpegQuality,
             plateColorSuffix = plateColorSuffix,
             photoResolution = photoResolution,

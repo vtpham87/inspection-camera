@@ -7,6 +7,8 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import com.ttdk1507d.inspectioncamera.model.Vehicle
 import com.ttdk1507d.inspectioncamera.util.PlateUtil
 import kotlinx.coroutines.Dispatchers
@@ -239,6 +241,96 @@ object FirebaseManager {
             } catch (e: Exception) {
                 NodeTestResult(node, false, 0, e.message ?: "Không phản hồi")
             }
+        }
+    }
+
+    /**
+     * Lắng nghe cấu hình thời gian thực từ máy tính trạm qua Firebase (/config)
+     */
+    fun observeConfig(onConfigChange: (Map<String, Any>) -> Unit): ValueEventListener? {
+        val node = getActiveNodeForToday()
+        return try {
+            val db = FirebaseDatabase.getInstance(node.url)
+            val ref = db.getReference("config")
+            val listener = object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    @Suppress("UNCHECKED_CAST")
+                    val value = snapshot.value as? Map<String, Any>
+                    if (value != null) {
+                        Log.d(TAG, "Đã nhận cấu hình từ Firebase [${node.name}]: $value")
+                        onConfigChange(value)
+                    }
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    Log.w(TAG, "Lỗi lắng nghe config Firebase: ${error.message}")
+                }
+            }
+            ref.addValueEventListener(listener)
+            listener
+        } catch (e: Exception) {
+            Log.e(TAG, "Lỗi khi kết nối lắng nghe config: ${e.message}", e)
+            null
+        }
+    }
+
+    /**
+     * Lấy cấu hình một lần từ Firebase (/config)
+     */
+    suspend fun fetchConfigOnce(): Map<String, Any>? = withContext(Dispatchers.IO) {
+        val node = getActiveNodeForToday()
+        try {
+            val url = URL("${node.url}/config.json")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.connectTimeout = 4000
+            conn.readTimeout = 4000
+            conn.requestMethod = "GET"
+            if (conn.responseCode in 200..299) {
+                val text = conn.inputStream.bufferedReader().use { it.readText() }
+                conn.disconnect()
+                if (text.isNotEmpty() && text != "null") {
+                    val mapType = object : TypeToken<Map<String, Any>>() {}.type
+                    Gson().fromJson<Map<String, Any>>(text, mapType)
+                } else null
+            } else {
+                conn.disconnect()
+                null
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Lỗi fetchConfigOnce: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * Gửi yêu cầu cập nhật cấu hình từ điện thoại lên máy tính trạm (/config_update và /config)
+     */
+    suspend fun sendConfigUpdate(updates: Map<String, Any>): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val jsonPayload = Gson().toJson(updates)
+            ALL_NODES.forEach { targetNode ->
+                try {
+                    val url = URL("${targetNode.url}/config_update.json")
+                    val conn = url.openConnection() as HttpURLConnection
+                    conn.connectTimeout = 4000
+                    conn.readTimeout = 4000
+                    conn.requestMethod = "PUT"
+                    conn.doOutput = true
+                    conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                    conn.outputStream.use { os ->
+                        os.write(jsonPayload.toByteArray(Charsets.UTF_8))
+                    }
+                    val code = conn.responseCode
+                    conn.disconnect()
+                    Log.d(TAG, "Sent config_update to ${targetNode.name}: code $code")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to send config_update to ${targetNode.name}: ${e.message}")
+                }
+            }
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Lỗi sendConfigUpdate: ${e.message}", e)
+            false
         }
     }
 }

@@ -136,6 +136,15 @@
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
+                    <TextView
+                        android:id="@+id/tv_settings_paths_sync_status"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="🟢 Đồng bộ trực tiếp từ phần mềm máy tính qua Firebase"
+                        android:textColor="@color/success"
+                        android:textSize="12sp" />
+
                     <com.google.android.material.textfield.TextInputLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -180,6 +189,19 @@
                             android:inputType="text"
                             android:textColor="@color/text_primary" />
                     </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_settings_refresh_pc_config"
+                        android:layout_width="wrap_content"
+                        android:layout_height="38dp"
+                        android:layout_marginTop="8dp"
+                        android:text="🔄 Tải lại cấu hình từ máy tính"
+                        android:textColor="@color/primary"
+                        android:textSize="12sp"
+                        app:cornerRadius="6dp"
+                        app:strokeColor="@color/primary"
+                        app:strokeWidth="1dp"
+                        style="@style/Widget.Material3.Button.OutlinedButton" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

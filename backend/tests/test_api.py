@@ -282,3 +282,28 @@ def test_upload_auto_seq_passenger(setup_env):
     assert r2.status_code == 200
     assert r2.json()["filename"] == "15A12345T_2.jpg"
 
+
+def test_index_settings_html(setup_env):
+    client, _ = setup_env
+    r = client.get("/")
+    assert r.status_code == 200
+    assert "HỆ THỐNG CHỤP ẢNH KIỂM ĐỊNH 15-07D" in r.text
+
+    r_settings = client.get("/settings")
+    assert r_settings.status_code == 200
+    assert "photo_save_dir" in r_settings.text
+
+
+def test_check_path_api(setup_env, tmp_path):
+    client, _ = setup_env
+    test_dir = str(tmp_path / "valid_photos")
+    r = client.post("/api/check-path", json={"path": test_dir})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["ok"] is True
+    assert data["exists"] is True
+
+    r_empty = client.post("/api/check-path", json={"path": ""})
+    assert r_empty.status_code == 200
+    assert r_empty.json()["ok"] is False
+

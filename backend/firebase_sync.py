@@ -74,6 +74,105 @@ def get_active_nodes_for_today() -> List[Dict[str, Any]]:
     return res
 
 
+def sync_config_to_firebase(config: Optional[Any] = None) -> bool:
+    """Đồng bộ cấu hình từ PC lên Firebase RTDB để các thiết bị điện thoại nhận được"""
+    try:
+        if config is None:
+            config = load_config(CONFIG_PATH)
+
+        payload = {
+            "photo_save_dir": config.photo_save_dir,
+            "passenger_path": config.passenger_path,
+            "new_vehicle_path": config.new_vehicle_path,
+            "sync_new_vehicle_45": config.sync_new_vehicle_45,
+            "server_port": config.server_port,
+            "vehicle_list_enabled": config.vehicle_list_enabled,
+            "jpeg_quality": config.jpeg_quality,
+            "photo_resolution": config.photo_resolution,
+            "plate_color_suffix": config.plate_color_suffix,
+            "timestamp": {
+                "enabled": config.timestamp.enabled,
+                "format": config.timestamp.format,
+                "font_size": config.timestamp.font_size,
+                "font_color": config.timestamp.font_color,
+                "font_bold": config.timestamp.font_bold,
+                "font_stroke_enabled": config.timestamp.font_stroke_enabled,
+                "font_stroke_color": config.timestamp.font_stroke_color,
+                "font_stroke_width": config.timestamp.font_stroke_width,
+                "background_color": config.timestamp.background_color,
+                "position": config.timestamp.position,
+            },
+            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "source": "pc",
+        }
+
+        # Đẩy lên tất cả các node để điện thoại dù kết nối tới node nào cũng có cấu hình
+        for node in FIREBASE_NODES:
+            rtdb_request(node["url"], "config", method="PUT", data=payload)
+        logger.info("Đã đồng bộ cấu hình PC lên tất cả các cụm Firebase")
+        return True
+    except Exception as e:
+        logger.error(f"Lỗi khi đồng bộ cấu hình lên Firebase: {e}", exc_info=True)
+        return False
+
+
+def sync_config_from_firebase() -> bool:
+    """Kiểm tra nếu điện thoại gửi yêu cầu cập nhật cấu hình (/config_update) lên Firebase"""
+    try:
+        updated = False
+        config = None
+        for node in FIREBASE_NODES:
+            update_data = rtdb_request(node["url"], "config_update", method="GET")
+            if update_data and isinstance(update_data, dict):
+                logger.info(f"Nhận được cập nhật cấu hình từ điện thoại trên {node['name']}: {update_data}")
+                if config is None:
+                    config = load_config(CONFIG_PATH)
+
+                # Cập nhật các trường cấu hình
+                if "photo_save_dir" in update_data and update_data["photo_save_dir"]:
+                    config.photo_save_dir = update_data["photo_save_dir"]
+                if "passenger_path" in update_data and update_data["passenger_path"]:
+                    config.passenger_path = update_data["passenger_path"]
+                if "new_vehicle_path" in update_data and update_data["new_vehicle_path"]:
+                    config.new_vehicle_path = update_data["new_vehicle_path"]
+                if "sync_new_vehicle_45" in update_data:
+                    config.sync_new_vehicle_45 = bool(update_data["sync_new_vehicle_45"])
+                if "jpeg_quality" in update_data:
+                    config.jpeg_quality = int(update_data["jpeg_quality"])
+                if "photo_resolution" in update_data:
+                    config.photo_resolution = str(update_data["photo_resolution"])
+
+                # Cập nhật timestamp nếu có
+                if "timestamp" in update_data and isinstance(update_data["timestamp"], dict):
+                    ts_data = update_data["timestamp"]
+                    if "enabled" in ts_data:
+                        config.timestamp.enabled = bool(ts_data["enabled"])
+                    if "format" in ts_data:
+                        config.timestamp.format = str(ts_data["format"])
+                    if "position" in ts_data:
+                        config.timestamp.position = str(ts_data["position"])
+                    if "font_size" in ts_data:
+                        config.timestamp.font_size = int(ts_data["font_size"])
+
+                from config import save_config
+                save_config(config, CONFIG_PATH)
+                logger.info(f"Đã áp dụng cấu hình từ điện thoại vào {CONFIG_PATH}")
+                updated = True
+
+                # Xóa config_update trên tất cả các node
+                for n in FIREBASE_NODES:
+                    rtdb_request(n["url"], "config_update", method="DELETE")
+                break
+
+        if updated and config:
+            sync_config_to_firebase(config)
+            return True
+        return False
+    except Exception as e:
+        logger.error(f"Lỗi khi đồng bộ cấu hình từ Firebase: {e}", exc_info=True)
+        return False
+
+
 def rtdb_request(base_url: str, path: str, method: str = "GET", data: Any = None) -> Any:
     url = f"{base_url.rstrip('/')}/{path.lstrip('/')}.json"
     headers = {"Content-Type": "application/json"}
@@ -169,8 +268,14 @@ def process_photo_inbox():
 
 def run_sync_loop(interval_sec: int = 10):
     logger.info(f"Bắt đầu dịch vụ Firebase Multi-Cluster Sync (chu kỳ {interval_sec}s)...")
+    try:
+        sync_config_to_firebase()
+    except Exception as e:
+        logger.error(f"Lỗi khởi tạo sync config: {e}")
+
     while True:
         try:
+            sync_config_from_firebase()
             sync_vehicles_to_firebase()
             process_photo_inbox()
         except Exception as e:

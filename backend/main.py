@@ -3,6 +3,7 @@ import sys
 from datetime import datetime
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -152,6 +153,46 @@ def check_plate(plate: str, plate_color: str | None = None, date: str | None = N
 
 
 
+class CheckPathRequest(BaseModel):
+    path: str
+
+
+@app.post("/api/check-path")
+def check_path(req: CheckPathRequest):
+    raw_path = (req.path or "").strip()
+    if not raw_path:
+        return {"ok": False, "message": "Đường dẫn không được để trống"}
+    test_path = raw_path.replace("{plate}", "15A12345T").replace("{date}", datetime.now().strftime("%Y-%m-%d"))
+    exists = os.path.exists(test_path)
+    creatable = False
+    if not exists:
+        try:
+            os.makedirs(test_path, exist_ok=True)
+            creatable = True
+        except Exception as e:
+            return {"ok": False, "exists": False, "message": f"Không thể tạo hoặc truy cập: {e}"}
+    return {
+        "ok": True,
+        "exists": exists or creatable,
+        "path": test_path,
+        "message": "Đường dẫn hợp lệ và có thể ghi ảnh!" if (exists or creatable) else "Đường dẫn không tồn tại",
+    }
+
+
+@app.post("/api/sync-config-now")
+def sync_config_now():
+    try:
+        from firebase_sync import sync_config_to_firebase
+        cfg = load_config(get_config_path())
+        ok = sync_config_to_firebase(cfg)
+        return {
+            "ok": ok,
+            "message": "Đã đồng bộ cấu hình sang Firebase thành công!" if ok else "Lỗi đồng bộ Firebase",
+        }
+    except Exception as e:
+        return {"ok": False, "message": f"Lỗi: {e}"}
+
+
 @app.get("/api/config")
 def get_config():
     return load_config(get_config_path()).model_dump()
@@ -160,7 +201,311 @@ def get_config():
 @app.post("/api/config")
 def post_config(config: PhotoConfig):
     save_config(config, get_config_path())
-    return {"ok": True, "message": "Đã lưu cấu hình"}
+    sync_status = "Đã lưu vào máy tính trạm"
+    try:
+        from firebase_sync import sync_config_to_firebase
+        ok = sync_config_to_firebase(config)
+        if ok:
+            sync_status += " và đồng bộ thành công sang điện thoại qua Firebase!"
+        else:
+            sync_status += ", nhưng đồng bộ Firebase gặp lỗi."
+    except Exception as e:
+        sync_status += f", cảnh báo Firebase: {e}"
+    return {"ok": True, "message": sync_status}
+
+
+HTML_CONTENT = """<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cấu hình Lưu ảnh & Đồng bộ - TTĐK 15-07D</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success: #16a34a;
+      --success-hover: #15803d;
+      --danger: #dc2626;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #475569;
+      --border: #cbd5e1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: var(--bg); color: var(--text-main); line-height: 1.5; padding: 20px; font-size: 15px; }
+    .container { max-width: 860px; margin: 0 auto; }
+    header { background: #ffffff; border-radius: 12px; padding: 24px; margin-bottom: 20px; border: 1px solid var(--border); box-shadow: 0 2px 4px rgba(0,0,0,0.04); }
+    h1 { font-size: 22px; font-weight: 700; color: #1e3a8a; margin-bottom: 6px; }
+    .subtitle { color: var(--text-muted); font-size: 14px; }
+    .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 9999px; color: #065f46; font-size: 13px; font-weight: 600; margin-top: 10px; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; }
+    .card { background: var(--card-bg); border-radius: 12px; padding: 24px; margin-bottom: 20px; border: 1px solid var(--border); box-shadow: 0 2px 4px rgba(0,0,0,0.04); }
+    .card-title { font-size: 17px; font-weight: 700; color: #0f172a; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+    .form-group { margin-bottom: 18px; }
+    .form-group:last-child { margin-bottom: 0; }
+    label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 14px; color: #1e293b; }
+    .input-row { display: flex; gap: 8px; }
+    input[type="text"], input[type="number"], select { width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid var(--border); border-radius: 8px; background: #ffffff; color: #0f172a; outline: none; transition: border-color 0.2s; }
+    input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
+    .helper-text { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+    .check-btn { padding: 10px 16px; background: #f1f5f9; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; color: #334155; white-space: nowrap; transition: all 0.2s; }
+    .check-btn:hover { background: #e2e8f0; color: #0f172a; }
+    .check-result { margin-top: 6px; font-size: 13px; font-weight: 600; display: none; }
+    .check-result.ok { color: var(--success); display: block; }
+    .check-result.err { color: var(--danger); display: block; }
+    .checkbox-label { display: flex; align-items: center; gap: 10px; font-weight: 500; cursor: pointer; font-size: 14px; color: #1e293b; }
+    .checkbox-label input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+    .actions { display: flex; gap: 12px; margin-top: 24px; position: sticky; bottom: 20px; background: rgba(248,250,252,0.92); backdrop-filter: blur(8px); padding: 14px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    .btn-save { flex: 2; padding: 14px 20px; background: var(--success); color: #ffffff; border: none; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-save:hover { background: var(--success-hover); }
+    .btn-sync { flex: 1; padding: 14px 16px; background: var(--primary); color: #ffffff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+    .btn-sync:hover { background: var(--primary-hover); }
+    #toast { position: fixed; top: 20px; right: 20px; z-index: 9999; padding: 14px 20px; border-radius: 8px; font-weight: 600; font-size: 14px; color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: none; max-width: 400px; line-height: 1.4; animation: slideIn 0.3s forwards; }
+    @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  </style>
+</head>
+<body>
+  <div id="toast"></div>
+  <div class="container">
+    <header>
+      <h1>📸 HỆ THỐNG CHỤP ẢNH KIỂM ĐỊNH 15-07D</h1>
+      <div class="subtitle">Cấu hình thư mục lưu ảnh trên máy tính & đồng bộ thời gian thực sang điện thoại</div>
+      <div class="status-badge">
+        <div class="status-dot"></div>
+        <span id="sync-status-text">Đang tải cấu hình máy chủ...</span>
+      </div>
+    </header>
+
+    <form id="configForm" onsubmit="saveConfiguration(event)">
+      <!-- Card 1: Thư mục lưu ảnh PC -->
+      <div class="card">
+        <div class="card-title">📂 Thư mục lưu ảnh trên máy tính (PC)</div>
+        
+        <div class="form-group">
+          <label for="photo_save_dir">1. Đường dẫn ảnh góc chụp 45° (Trước / Sau / Gầm):</label>
+          <div class="input-row">
+            <input type="text" id="photo_save_dir" placeholder="Ví dụ: Z:\\Anh Phuong Tien hoặc D:\\Photos" required>
+            <button type="button" class="check-btn" onclick="checkDirectory('photo_save_dir')">Kiểm tra</button>
+          </div>
+          <div id="photo_save_dir_res" class="check-result"></div>
+          <div class="helper-text">💡 Thư mục chuẩn để phần mềm PTCGDB v9.2 đọc và in giấy chứng nhận kiểm định.</div>
+        </div>
+
+        <div class="form-group">
+          <label for="passenger_path">2. Đường dẫn ảnh khoang hành khách / CCCD:</label>
+          <div class="input-row">
+            <input type="text" id="passenger_path" placeholder="Ví dụ: Z:\\Anh Khoang HK CCCD\\{plate}">
+            <button type="button" class="check-btn" onclick="checkDirectory('passenger_path')">Kiểm tra</button>
+          </div>
+          <div id="passenger_path_res" class="check-result"></div>
+          <div class="helper-text">💡 Biến {plate} sẽ tự động được thay bằng biển số xe khi lưu ảnh.</div>
+        </div>
+
+        <div class="form-group">
+          <label for="new_vehicle_path">3. Đường dẫn ảnh xe mới (cấp miễn):</label>
+          <div class="input-row">
+            <input type="text" id="new_vehicle_path" placeholder="Ví dụ: Z:\\Anh sau cap mien\\{plate}">
+            <button type="button" class="check-btn" onclick="checkDirectory('new_vehicle_path')">Kiểm tra</button>
+          </div>
+          <div id="new_vehicle_path_res" class="check-result"></div>
+          <div class="helper-text">💡 Lưu ảnh hồ sơ phương tiện miễn đăng kiểm lần đầu.</div>
+        </div>
+
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="sync_new_vehicle_45">
+            Tự động sao chép thêm 1 bản ảnh xe mới sang thư mục ảnh 45°
+          </label>
+        </div>
+      </div>
+
+      <!-- Card 2: Đóng dấu ảnh (Timestamp) -->
+      <div class="card">
+        <div class="card-title">🕒 Đóng dấu ngày giờ & biển số lên ảnh (Timestamp)</div>
+        
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="ts_enabled">
+            Bật tính năng đóng dấu ngày giờ kiểm định lên ảnh
+          </label>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="ts_format">Định dạng thời gian:</label>
+            <input type="text" id="ts_format" value="HH:mm:ss - dd/MM/yyyy">
+            <div class="helper-text">Ví dụ: 14:30:15 - 05/10/2026</div>
+          </div>
+          <div class="form-group">
+            <label for="ts_position">Vị trí đóng dấu:</label>
+            <select id="ts_position">
+              <option value="bottom_right">Góc dưới bên phải (Chuẩn)</option>
+              <option value="bottom_left">Góc dưới bên trái</option>
+              <option value="top_right">Góc trên bên phải</option>
+              <option value="top_left">Góc trên bên trái</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="ts_font_size">Cỡ chữ đóng dấu (px):</label>
+            <input type="number" id="ts_font_size" min="16" max="64" value="28">
+          </div>
+          <div class="form-group">
+            <label for="photo_resolution">Độ phân giải chụp:</label>
+            <select id="photo_resolution">
+              <option value="low">Tiêu chuẩn (Khuyên dùng - Nhanh, nhẹ)</option>
+              <option value="medium">Trung bình</option>
+              <option value="original">Gốc (Dung lượng lớn)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions">
+        <button type="submit" class="btn-save">
+          💾 LƯU CẤU HÌNH & ĐỒNG BỘ SANG ĐIỆN THOẠI
+        </button>
+        <button type="button" class="btn-sync" onclick="forceSyncFirebase()">
+          🔄 Đồng bộ lại Firebase
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    let currentRawConfig = {};
+
+    function showToast(msg, isError = false) {
+      const t = document.getElementById("toast");
+      t.style.display = "block";
+      t.style.background = isError ? "var(--danger)" : "var(--success)";
+      t.textContent = msg;
+      setTimeout(() => { t.style.display = "none"; }, 4000);
+    }
+
+    async function loadConfig() {
+      try {
+        const res = await fetch("/api/config");
+        if (!res.ok) throw new Error("Không thể kết nối máy chủ API");
+        const cfg = await res.json();
+        currentRawConfig = cfg;
+
+        document.getElementById("photo_save_dir").value = cfg.photo_save_dir || "";
+        document.getElementById("passenger_path").value = cfg.passenger_path || "";
+        document.getElementById("new_vehicle_path").value = cfg.new_vehicle_path || "";
+        document.getElementById("sync_new_vehicle_45").checked = !!cfg.sync_new_vehicle_45;
+
+        const ts = cfg.timestamp || {};
+        document.getElementById("ts_enabled").checked = ts.enabled !== false;
+        document.getElementById("ts_format").value = ts.format || "HH:mm:ss - dd/MM/yyyy";
+        document.getElementById("ts_position").value = ts.position || "bottom_right";
+        document.getElementById("ts_font_size").value = ts.font_size || 28;
+        document.getElementById("photo_resolution").value = cfg.photo_resolution || "low";
+
+        document.getElementById("sync-status-text").textContent = "Máy chủ 8095 sẵn sàng • Đã nạp cấu hình";
+      } catch (err) {
+        document.getElementById("sync-status-text").textContent = "Lỗi nạp cấu hình: " + err.message;
+        showToast("Lỗi nạp cấu hình: " + err.message, true);
+      }
+    }
+
+    async function checkDirectory(fieldId) {
+      const val = document.getElementById(fieldId).value.trim();
+      const resEl = document.getElementById(fieldId + "_res");
+      if (!val) {
+        resEl.className = "check-result err";
+        resEl.textContent = "Vui lòng nhập đường dẫn để kiểm tra";
+        return;
+      }
+      resEl.className = "check-result";
+      resEl.textContent = "Đang kiểm tra đường dẫn...";
+      resEl.style.display = "block";
+
+      try {
+        const resp = await fetch("/api/check-path", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: val })
+        });
+        const data = await resp.json();
+        if (data.ok) {
+          resEl.className = "check-result ok";
+          resEl.textContent = "✅ " + data.message + " (" + data.path + ")";
+        } else {
+          resEl.className = "check-result err";
+          resEl.textContent = "❌ " + data.message;
+        }
+      } catch (e) {
+        resEl.className = "check-result err";
+        resEl.textContent = "❌ Lỗi mạng khi kiểm tra";
+      }
+    }
+
+    async function saveConfiguration(e) {
+      e.preventDefault();
+      const payload = {
+        ...currentRawConfig,
+        photo_save_dir: document.getElementById("photo_save_dir").value.trim(),
+        passenger_path: document.getElementById("passenger_path").value.trim(),
+        new_vehicle_path: document.getElementById("new_vehicle_path").value.trim(),
+        sync_new_vehicle_45: document.getElementById("sync_new_vehicle_45").checked,
+        photo_resolution: document.getElementById("photo_resolution").value,
+        timestamp: {
+          ...(currentRawConfig.timestamp || {}),
+          enabled: document.getElementById("ts_enabled").checked,
+          format: document.getElementById("ts_format").value.trim(),
+          position: document.getElementById("ts_position").value,
+          font_size: parseInt(document.getElementById("ts_font_size").value) || 28
+        }
+      };
+
+      try {
+        const resp = await fetch("/api/config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const result = await resp.json();
+        if (result.ok) {
+          showToast("✅ " + result.message);
+          document.getElementById("sync-status-text").textContent = "Cấu hình đã lưu & đồng bộ Firebase lúc " + new Date().toLocaleTimeString();
+        } else {
+          showToast("❌ Lỗi: " + (result.message || "Không lưu được"), true);
+        }
+      } catch (err) {
+        showToast("❌ Lỗi kết nối khi lưu: " + err.message, true);
+      }
+    }
+
+    async function forceSyncFirebase() {
+      try {
+        const resp = await fetch("/api/sync-config-now", { method: "POST" });
+        const res = await resp.json();
+        showToast(res.ok ? "✅ " + res.message : "❌ " + res.message, !res.ok);
+      } catch (err) {
+        showToast("❌ Lỗi khi đồng bộ: " + err.message, true);
+      }
+    }
+
+    window.onload = loadConfig;
+  </script>
+</body>
+</html>
+"""
+
+
+@app.get("/", response_class=HTMLResponse)
+@app.get("/settings", response_class=HTMLResponse)
+def index_settings():
+    return HTMLResponse(content=HTML_CONTENT)
+
 
 
 if __name__ == "__main__":

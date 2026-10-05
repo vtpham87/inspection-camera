@@ -89,6 +89,7 @@ class MainActivity : AppCompatActivity() {
         setupRecyclerView()
         checkPermissions()
         scheduleOfflineWorker()
+        observeFirebaseConfig()
     }
 
     override fun onResume() {
@@ -119,6 +120,50 @@ class MainActivity : AppCompatActivity() {
     private fun stopPeriodicRefresh() {
         autoRefreshJob?.cancel()
         autoRefreshJob = null
+    }
+
+    private var firebaseConfigListener: com.google.firebase.database.ValueEventListener? = null
+
+    private fun observeFirebaseConfig() {
+        firebaseConfigListener = FirebaseManager.observeConfig { configMap ->
+            try {
+                val photoSaveDir = configMap["photo_save_dir"] as? String
+                if (!photoSaveDir.isNullOrBlank()) {
+                    prefs.photoSaveDir = photoSaveDir
+                }
+                val passengerPath = configMap["passenger_path"] as? String
+                if (!passengerPath.isNullOrBlank()) {
+                    prefs.passengerPath = passengerPath
+                }
+                val newVehiclePath = configMap["new_vehicle_path"] as? String
+                if (!newVehiclePath.isNullOrBlank()) {
+                    prefs.newVehiclePath = newVehiclePath
+                }
+                val syncNewVehicle45 = configMap["sync_new_vehicle_45"] as? Boolean
+                if (syncNewVehicle45 != null) {
+                    prefs.syncNewVehicle45 = syncNewVehicle45
+                }
+                val photoResolution = configMap["photo_resolution"] as? String
+                if (!photoResolution.isNullOrBlank()) {
+                    prefs.photoResolution = photoResolution
+                }
+                val jpegQuality = (configMap["jpeg_quality"] as? Number)?.toInt()
+                if (jpegQuality != null && jpegQuality > 0) {
+                    prefs.jpegQuality = jpegQuality
+                }
+                @Suppress("UNCHECKED_CAST")
+                val timestamp = configMap["timestamp"] as? Map<String, Any>
+                if (timestamp != null) {
+                    (timestamp["enabled"] as? Boolean)?.let { prefs.timestampEnabled = it }
+                    (timestamp["format"] as? String)?.let { prefs.timestampFormat = it }
+                    (timestamp["position"] as? String)?.let { prefs.timestampPosition = it }
+                    (timestamp["font_size"] as? Number)?.let { prefs.timestampFontSize = it.toInt() }
+                }
+                Log.d("MainActivity", "Đã nhận cấu hình từ máy tính qua Firebase: saveDir=${prefs.photoSaveDir}")
+            } catch (e: Exception) {
+                Log.w("MainActivity", "Lỗi nạp config từ Firebase: ${e.message}")
+            }
+        }
     }
 
     private fun observeFirebaseVehicles() {

@@ -41,9 +41,11 @@ class SettingsActivity : AppCompatActivity() {
 
     private lateinit var toolbar: MaterialToolbar
     private lateinit var tvCurrentCluster: TextView
+    private lateinit var tvPathsSyncStatus: TextView
     private lateinit var etPhotoSaveDir: TextInputEditText
     private lateinit var etPassengerPath: TextInputEditText
     private lateinit var etNewVehiclePath: TextInputEditText
+    private lateinit var btnRefreshPcConfig: MaterialButton
     private lateinit var switchVehicleList: MaterialSwitch
     private lateinit var btnTest: MaterialButton
     private lateinit var tvTestResult: TextView
@@ -127,9 +129,11 @@ class SettingsActivity : AppCompatActivity() {
     private fun initViews() {
         toolbar = findViewById(R.id.toolbar_settings)
         tvCurrentCluster = findViewById(R.id.tv_settings_current_cluster)
+        tvPathsSyncStatus = findViewById(R.id.tv_settings_paths_sync_status)
         etPhotoSaveDir = findViewById(R.id.et_settings_photo_save_dir)
         etPassengerPath = findViewById(R.id.et_settings_passenger_path)
         etNewVehiclePath = findViewById(R.id.et_settings_new_vehicle_path)
+        btnRefreshPcConfig = findViewById(R.id.btn_settings_refresh_pc_config)
         switchVehicleList = findViewById(R.id.switch_settings_vehicle_list)
         btnTest = findViewById(R.id.btn_settings_test)
         tvTestResult = findViewById(R.id.tv_settings_test_result)
@@ -265,6 +269,31 @@ class SettingsActivity : AppCompatActivity() {
 
         val upIdx = uploadModeKeys.indexOf(prefs.uploadMode)
         spinnerUploadMode.setSelection(if (upIdx >= 0) upIdx else 0)
+
+        lifecycleScope.launch {
+            val serverConfig = FirebaseManager.fetchConfigOnce()
+            if (serverConfig != null) {
+                val dir = serverConfig["photo_save_dir"] as? String
+                val pass = serverConfig["passenger_path"] as? String
+                val nv = serverConfig["new_vehicle_path"] as? String
+                if (!dir.isNullOrBlank()) {
+                    prefs.photoSaveDir = dir
+                    etPhotoSaveDir.setText(dir)
+                }
+                if (!pass.isNullOrBlank()) {
+                    prefs.passengerPath = pass
+                    etPassengerPath.setText(pass)
+                }
+                if (!nv.isNullOrBlank()) {
+                    prefs.newVehiclePath = nv
+                    etNewVehiclePath.setText(nv)
+                }
+                tvPathsSyncStatus.text = "🟢 Đã đồng bộ với máy tính trạm qua Firebase"
+                tvPathsSyncStatus.setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.success))
+            } else {
+                tvPathsSyncStatus.text = "⚪ Cấu hình lưu trữ cục bộ (Chưa kết nối Firebase)"
+            }
+        }
     }
 
     private fun setupListeners() {
@@ -282,6 +311,38 @@ class SettingsActivity : AppCompatActivity() {
 
         btnSave.setOnClickListener {
             saveSettings()
+        }
+
+        btnRefreshPcConfig.setOnClickListener {
+            tvPathsSyncStatus.text = "🔄 Đang tải cấu hình từ máy tính..."
+            tvPathsSyncStatus.setTextColor(ContextCompat.getColor(this, R.color.primary))
+            lifecycleScope.launch {
+                val serverConfig = FirebaseManager.fetchConfigOnce()
+                if (serverConfig != null) {
+                    val dir = serverConfig["photo_save_dir"] as? String
+                    val pass = serverConfig["passenger_path"] as? String
+                    val nv = serverConfig["new_vehicle_path"] as? String
+                    if (!dir.isNullOrBlank()) {
+                        prefs.photoSaveDir = dir
+                        etPhotoSaveDir.setText(dir)
+                    }
+                    if (!pass.isNullOrBlank()) {
+                        prefs.passengerPath = pass
+                        etPassengerPath.setText(pass)
+                    }
+                    if (!nv.isNullOrBlank()) {
+                        prefs.newVehiclePath = nv
+                        etNewVehiclePath.setText(nv)
+                    }
+                    tvPathsSyncStatus.text = "🟢 Đã đồng bộ thành công từ máy tính!"
+                    tvPathsSyncStatus.setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.success))
+                    Toast.makeText(this@SettingsActivity, "Đã tải cấu hình mới nhất từ máy tính!", Toast.LENGTH_SHORT).show()
+                } else {
+                    tvPathsSyncStatus.text = "❌ Không kết nối được Firebase"
+                    tvPathsSyncStatus.setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.accent_red))
+                    Toast.makeText(this@SettingsActivity, "Không thể tải cấu hình từ máy tính", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
 
         btnCheckUpdate.setOnClickListener {
@@ -400,20 +461,30 @@ class SettingsActivity : AppCompatActivity() {
         val currentConfig = prefs.getAppConfig()
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                val body = mapOf<String, Any>(
+                    "vehicle_list_enabled" to currentConfig.vehicleListEnabled,
+                    "server_port" to currentConfig.serverPort,
+                    "photo_save_dir" to currentConfig.photoSaveDir,
+                    "passenger_path" to currentConfig.passengerPath,
+                    "new_vehicle_path" to currentConfig.newVehiclePath,
+                    "sync_new_vehicle_45" to currentConfig.syncNewVehicle45,
+                    "jpeg_quality" to currentConfig.jpegQuality,
+                    "plate_color_suffix" to true,
+                    "photo_resolution" to currentConfig.photoResolution,
+                    "timestamp" to mapOf(
+                        "enabled" to prefs.timestampEnabled,
+                        "format" to prefs.timestampFormat,
+                        "position" to prefs.timestampPosition,
+                        "font_size" to prefs.timestampFontSize
+                    )
+                )
+
+                // Đồng bộ hai chiều lên Firebase để máy tính trạm nhận ngay lập tức
+                FirebaseManager.sendConfigUpdate(body)
+
                 val baseUrl = NetworkUtil.resolveBaseUrl(prefs)
                 if (baseUrl != null) {
                     val service = ApiClient.getService(baseUrl)
-                    val body = mapOf<String, Any>(
-                        "vehicle_list_enabled" to currentConfig.vehicleListEnabled,
-                        "server_port" to currentConfig.serverPort,
-                        "photo_save_dir" to currentConfig.photoSaveDir,
-                        "passenger_path" to currentConfig.passengerPath,
-                        "new_vehicle_path" to currentConfig.newVehiclePath,
-                        "sync_new_vehicle_45" to currentConfig.syncNewVehicle45,
-                        "jpeg_quality" to currentConfig.jpegQuality,
-                        "plate_color_suffix" to true,
-                        "photo_resolution" to currentConfig.photoResolution
-                    )
                     service.postConfig(body)
                 }
             } catch (e: Exception) {
