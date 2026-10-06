@@ -307,3 +307,34 @@ def test_check_path_api(setup_env, tmp_path):
     assert r_empty.status_code == 200
     assert r_empty.json()["ok"] is False
 
+
+def test_upload_validations(setup_env):
+    client, _ = setup_env
+    # Invalid photo type
+    r_type = client.post(
+        "/api/upload",
+        data={"plate": "15A12345", "photo_type": "hacker_photo"},
+        files={"file": ("test.jpg", FAKE_JPEG, "image/jpeg")},
+    )
+    assert r_type.status_code == 400
+    assert "Loại ảnh không hợp lệ" in r_type.json()["detail"]
+
+    # Invalid seq
+    r_seq = client.post(
+        "/api/upload",
+        data={"plate": "15A12345", "photo_type": "rear_45", "seq": 999},
+        files={"file": ("test.jpg", FAKE_JPEG, "image/jpeg")},
+    )
+    assert r_seq.status_code == 400
+    assert "Thứ tự ảnh (seq) không hợp lệ" in r_seq.json()["detail"]
+
+    # Empty file
+    r_empty = client.post(
+        "/api/upload",
+        data={"plate": "15A12345", "photo_type": "rear_45"},
+        files={"file": ("test.jpg", b"", "image/jpeg")},
+    )
+    assert r_empty.status_code == 400
+    assert "File ảnh rỗng" in r_empty.json()["detail"]
+
+

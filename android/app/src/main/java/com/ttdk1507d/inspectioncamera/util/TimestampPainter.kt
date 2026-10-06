@@ -54,7 +54,11 @@ object TimestampPainter {
             bitmap
         }
 
-        return Bitmap.createScaledBitmap(croppedBitmap, targetWidth, targetHeight, true)
+        val scaled = Bitmap.createScaledBitmap(croppedBitmap, targetWidth, targetHeight, true)
+        if (croppedBitmap != bitmap && croppedBitmap != scaled) {
+            croppedBitmap.recycle()
+        }
+        return scaled
     }
 
     fun paintTimestamp(

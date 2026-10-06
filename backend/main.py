@@ -69,8 +69,19 @@ async def upload_photo(
     seq: int | None = Form(None),
     lan_kd: int | None = Form(1),
 ):
+    if photo_type not in VALID_PHOTO_TYPES:
+        raise HTTPException(status_code=400, detail="Loại ảnh không hợp lệ")
+    if seq is not None and (seq < 1 or seq > 50):
+        raise HTTPException(status_code=400, detail="Thứ tự ảnh (seq) không hợp lệ (1-50)")
+    if lan_kd is not None and (lan_kd < 1 or lan_kd > 10):
+        raise HTTPException(status_code=400, detail="Lần kiểm định (lan_kd) không hợp lệ (1-10)")
+
     config = load_config(get_config_path())
     file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail="File ảnh rỗng")
+    if len(file_bytes) > 15 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File ảnh vượt quá 15MB")
 
     result = save_photo(file_bytes, plate, plate_color, photo_type, seq, config, lan_kd=lan_kd)
     if not result["ok"]:

@@ -175,6 +175,16 @@ object FirebaseManager {
         photoFile: File
     ): Boolean = suspendCancellableCoroutine { continuation ->
         try {
+            if (!photoFile.exists()) {
+                Log.e(TAG, "File ảnh không tồn tại: ${photoFile.absolutePath}")
+                if (continuation.isActive) continuation.resume(false)
+                return@suspendCancellableCoroutine
+            }
+            if (photoFile.length() > 7 * 1024 * 1024) {
+                Log.e(TAG, "File ảnh quá lớn (${photoFile.length()} bytes > 7MB) để tải lên Firebase RTDB")
+                if (continuation.isActive) continuation.resume(false)
+                return@suspendCancellableCoroutine
+            }
             val bytes = photoFile.readBytes()
             val base64Str = Base64.encodeToString(bytes, Base64.NO_WRAP)
 

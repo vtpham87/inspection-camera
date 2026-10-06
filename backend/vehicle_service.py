@@ -76,12 +76,16 @@ ORDER BY t.SoPhieuKD ASC
         }}
         $list += $item
     }}
-    $conn.Close()
     $json = $list | ConvertTo-Json -Compress
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     Write-Output $json
 }} catch {{
     Write-Output "[]"
+}} finally {{
+    if ($conn.State -eq [System.Data.ConnectionState]::Open) {{
+        $conn.Close()
+    }}
+    $conn.Dispose()
 }}
 """
     try:

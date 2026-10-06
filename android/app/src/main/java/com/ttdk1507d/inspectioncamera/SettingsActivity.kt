@@ -173,9 +173,9 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         val versionName = try {
-            packageManager.getPackageInfo(packageName, 0).versionName
+            packageManager.getPackageInfo(packageName, 0).versionName ?: BuildConfig.VERSION_NAME
         } catch (e: Exception) {
-            "1.1.2"
+            BuildConfig.VERSION_NAME
         }
         tvCurrentVersion.text = "Phiên bản hiện tại: v$versionName"
 
@@ -278,31 +278,36 @@ class SettingsActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val serverConfig = FirebaseManager.fetchConfigOnce()
             if (serverConfig != null) {
-                val dir = serverConfig["photo_save_dir"] as? String
-                val pass = serverConfig["passenger_path"] as? String
-                val nv = serverConfig["new_vehicle_path"] as? String
-                val autostart = serverConfig["auto_start_with_windows"] as? Boolean
-                if (!dir.isNullOrBlank()) {
-                    prefs.photoSaveDir = dir
-                    etPhotoSaveDir.setText(dir)
-                }
-                if (!pass.isNullOrBlank()) {
-                    prefs.passengerPath = pass
-                    etPassengerPath.setText(pass)
-                }
-                if (!nv.isNullOrBlank()) {
-                    prefs.newVehiclePath = nv
-                    etNewVehiclePath.setText(nv)
-                }
-                if (autostart != null) {
-                    prefs.autoStartWithWindows = autostart
-                    switchPcAutostart.isChecked = autostart
-                }
+                applyFirebaseConfig(serverConfig)
                 tvPathsSyncStatus.text = "🟢 Đã đồng bộ với máy tính trạm qua Firebase"
                 tvPathsSyncStatus.setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.success))
             } else {
                 tvPathsSyncStatus.text = "⚪ Cấu hình lưu trữ cục bộ (Chưa kết nối Firebase)"
             }
+        }
+    }
+
+    private fun applyFirebaseConfig(serverConfig: Map<String, Any?>) {
+        val dir = serverConfig["photo_save_dir"] as? String
+        val pass = serverConfig["passenger_path"] as? String
+        val nv = serverConfig["new_vehicle_path"] as? String
+        val autostart = serverConfig["auto_start_with_windows"] as? Boolean
+
+        if (!dir.isNullOrBlank() && !dir.contains("..")) {
+            prefs.photoSaveDir = dir
+            etPhotoSaveDir.setText(dir)
+        }
+        if (!pass.isNullOrBlank() && !pass.contains("..")) {
+            prefs.passengerPath = pass
+            etPassengerPath.setText(pass)
+        }
+        if (!nv.isNullOrBlank() && !nv.contains("..")) {
+            prefs.newVehiclePath = nv
+            etNewVehiclePath.setText(nv)
+        }
+        if (autostart != null) {
+            prefs.autoStartWithWindows = autostart
+            switchPcAutostart.isChecked = autostart
         }
     }
 
@@ -329,26 +334,7 @@ class SettingsActivity : AppCompatActivity() {
             lifecycleScope.launch {
                 val serverConfig = FirebaseManager.fetchConfigOnce()
                 if (serverConfig != null) {
-                    val dir = serverConfig["photo_save_dir"] as? String
-                    val pass = serverConfig["passenger_path"] as? String
-                    val nv = serverConfig["new_vehicle_path"] as? String
-                    if (!dir.isNullOrBlank()) {
-                        prefs.photoSaveDir = dir
-                        etPhotoSaveDir.setText(dir)
-                    }
-                    if (!pass.isNullOrBlank()) {
-                        prefs.passengerPath = pass
-                        etPassengerPath.setText(pass)
-                    }
-                    if (!nv.isNullOrBlank()) {
-                        prefs.newVehiclePath = nv
-                        etNewVehiclePath.setText(nv)
-                    }
-                    val autostart = serverConfig["auto_start_with_windows"] as? Boolean
-                    if (autostart != null) {
-                        prefs.autoStartWithWindows = autostart
-                        switchPcAutostart.isChecked = autostart
-                    }
+                    applyFirebaseConfig(serverConfig)
                     tvPathsSyncStatus.text = "🟢 Đã đồng bộ thành công từ máy tính!"
                     tvPathsSyncStatus.setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.success))
                     Toast.makeText(this@SettingsActivity, "Đã tải cấu hình mới nhất từ máy tính!", Toast.LENGTH_SHORT).show()
@@ -475,7 +461,7 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun syncConfigToServer() {
         val currentConfig = prefs.getAppConfig()
-        CoroutineScope(Dispatchers.IO).launch {
+        lifecycleScope.launch(Dispatchers.IO) {
             try {
                 val body = mapOf<String, Any>(
                     "vehicle_list_enabled" to currentConfig.vehicleListEnabled,
@@ -505,7 +491,7 @@ class SettingsActivity : AppCompatActivity() {
                     service.postConfig(body)
                 }
             } catch (e: Exception) {
-                // Config already saved locally — will sync next time
+                Log.w("SettingsActivity", "Lỗi đồng bộ cấu hình: ${e.message}")
             }
         }
     }
@@ -563,9 +549,9 @@ class SettingsActivity : AppCompatActivity() {
             val remoteTag = result.tag_name.trim()
             val remoteVer = remoteTag.removePrefix("v").trim()
             val localVer = try {
-                packageManager.getPackageInfo(packageName, 0).versionName ?: "1.0.0"
+                packageManager.getPackageInfo(packageName, 0).versionName ?: BuildConfig.VERSION_NAME
             } catch (e: Exception) {
-                "1.0.0"
+                BuildConfig.VERSION_NAME
             }
 
             val apkAsset = result.assets?.firstOrNull { it.name?.endsWith(".apk", ignoreCase = true) == true }

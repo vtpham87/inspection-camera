@@ -408,6 +408,9 @@ class CameraActivity : AppCompatActivity() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
                 vm?.defaultVibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val v = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                v?.vibrate(VibrationEffect.createOneShot(30, VibrationEffect.DEFAULT_AMPLITUDE))
             } else {
                 @Suppress("DEPRECATION")
                 val v = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
@@ -560,23 +563,27 @@ class CameraActivity : AppCompatActivity() {
     }
 
     private fun processAndSave(imageProxy: ImageProxy, type: PhotoType, seq: Int?) {
+        var rawBitmap: Bitmap? = null
+        var resizedBitmap: Bitmap? = null
+        var stampedBitmap: Bitmap? = null
         try {
-            val rawBitmap = imageProxyToBitmap(imageProxy)
-            imageProxy.close()
+            rawBitmap = imageProxyToBitmap(imageProxy)
 
             // 1. Resize according to appConfig.photoResolution
-            val resizedBitmap = TimestampPainter.resizeBitmap(rawBitmap, appConfig.photoResolution)
+            resizedBitmap = TimestampPainter.resizeBitmap(rawBitmap, appConfig.photoResolution)
 
             // 2. Draw timestamp if enabled
-            val stampedBitmap = if (appConfig.timestamp.enabled) {
+            stampedBitmap = if (appConfig.timestamp.enabled) {
                 TimestampPainter.paintTimestamp(resizedBitmap, appConfig.timestamp)
             } else {
-                resizedBitmap
+                null
             }
+
+            val finalBitmap = stampedBitmap ?: resizedBitmap
 
             // 3. Compress to JPEG
             val baos = ByteArrayOutputStream()
-            stampedBitmap.compress(Bitmap.CompressFormat.JPEG, appConfig.jpegQuality, baos)
+            finalBitmap.compress(Bitmap.CompressFormat.JPEG, appConfig.jpegQuality, baos)
             val jpegBytes = baos.toByteArray()
 
             // 4. Save copy to local review cache on phone
@@ -594,8 +601,26 @@ class CameraActivity : AppCompatActivity() {
                 refreshLocalPhotoStatus()
             }
         } catch (e: Exception) {
+            Log.e(TAG, "Lỗi xử lý ảnh: ${e.message}", e)
             runOnUiThread {
                 Toast.makeText(this, "Lỗi xử lý ảnh: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        } finally {
+            try {
+                imageProxy.close()
+            } catch (e: Exception) {
+                Log.e(TAG, "Lỗi đóng imageProxy: ${e.message}")
+            }
+            try {
+                rawBitmap?.recycle()
+                if (stampedBitmap != null && stampedBitmap != resizedBitmap) {
+                    resizedBitmap?.recycle()
+                    stampedBitmap?.recycle()
+                } else {
+                    resizedBitmap?.recycle()
+                }
+            } catch (e: Exception) {
+                // Ignore recycle error
             }
         }
     }
@@ -623,16 +648,16 @@ class CameraActivity : AppCompatActivity() {
             val metaJson = Gson().toJson(meta)
             metaFile.writeText(metaJson)
         } catch (e: Exception) {
-            // Non-critical queue write
+            Log.e(TAG, "Lỗi lưu pending queue: ${e.message}", e)
         }
     }
 
     private fun triggerBackgroundUpload(type: PhotoType, seq: Int?, bytes: ByteArray) {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                var uploadOk = false
-
                 val pendingDir = File(filesDir, "pending")
+                if (!pendingDir.exists()) return@launch
+
                 val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
                 val gson = Gson()
                 for (mf in metaFiles) {
@@ -640,39 +665,28 @@ class CameraActivity : AppCompatActivity() {
                         val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
                         if (meta.plate == plate && meta.photoType == type.apiName && meta.seq == seq && meta.lanKd == lanKd) {
                             val targetFile = File(pendingDir, meta.imageFileName)
-                            uploadOk = FirebaseManager.uploadPhotoToInbox(
-                                plate = plate,
-                                plateColor = plateColor,
-                                photoType = type.apiName,
-                                seq = seq ?: 1,
-                                lanKd = lanKd,
-                                photoFile = targetFile
-                            )
+                            if (targetFile.exists()) {
+                                val uploadOk = FirebaseManager.uploadPhotoToInbox(
+                                    plate = plate,
+                                    plateColor = plateColor,
+                                    photoType = type.apiName,
+                                    seq = seq ?: 1,
+                                    lanKd = lanKd,
+                                    photoFile = targetFile
+                                )
+                                if (uploadOk) {
+                                    targetFile.delete()
+                                    mf.delete()
+                                }
+                            }
                             break
                         }
                     } catch (e: Exception) {
-                        // Ignore
-                    }
-                }
-
-                if (uploadOk) {
-                    val pendingDir = File(filesDir, "pending")
-                    val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
-                    val gson = Gson()
-                    for (mf in metaFiles) {
-                        try {
-                            val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
-                            if (meta.plate == plate && meta.photoType == type.apiName && meta.seq == seq && meta.lanKd == lanKd) {
-                                File(pendingDir, meta.imageFileName).delete()
-                                mf.delete()
-                            }
-                        } catch (e: Exception) {
-                            // Ignore
-                        }
+                        Log.e(TAG, "Lỗi upload pending ảnh ${type.apiName}: ${e.message}")
                     }
                 }
             } catch (e: Exception) {
-                // Kept in pending queue
+                Log.e(TAG, "Lỗi triggerBackgroundUpload: ${e.message}")
             }
         }
     }
@@ -682,10 +696,15 @@ class CameraActivity : AppCompatActivity() {
         val bytes = ByteArray(buffer.remaining())
         buffer.get(bytes)
         val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            ?: throw IllegalStateException("Không thể decode bitmap từ ImageProxy")
         val rotation = imageProxy.imageInfo.rotationDegrees
         return if (rotation != 0) {
             val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
-            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+            val rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+            if (rotated != bitmap) {
+                bitmap.recycle()
+            }
+            rotated
         } else {
             bitmap
         }

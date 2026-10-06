@@ -44,7 +44,4 @@ interface ApiService {
 
     @POST("/api/config")
     suspend fun postConfig(@Body config: Map<String, Any>): Response<Map<String, Any>>
-
-    @POST("/api/config")
-    suspend fun saveConfig(@Body config: com.ttdk1507d.inspectioncamera.model.AppConfig): Response<Map<String, Any>>
 }

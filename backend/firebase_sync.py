@@ -128,31 +128,46 @@ def sync_config_from_firebase() -> bool:
                 if config is None:
                     config = load_config(CONFIG_PATH)
 
-                # Cập nhật các trường cấu hình
-                if "photo_save_dir" in update_data and update_data["photo_save_dir"]:
+                # Cập nhật và kiểm tra tính hợp lệ của các trường cấu hình
+                def is_safe_path(p: str) -> bool:
+                    return isinstance(p, str) and bool(p.strip()) and ".." not in p
+
+                if "photo_save_dir" in update_data and is_safe_path(update_data["photo_save_dir"]):
                     config.photo_save_dir = update_data["photo_save_dir"]
-                if "passenger_path" in update_data and update_data["passenger_path"]:
+                if "passenger_path" in update_data and is_safe_path(update_data["passenger_path"]):
                     config.passenger_path = update_data["passenger_path"]
-                if "new_vehicle_path" in update_data and update_data["new_vehicle_path"]:
+                if "new_vehicle_path" in update_data and is_safe_path(update_data["new_vehicle_path"]):
                     config.new_vehicle_path = update_data["new_vehicle_path"]
                 if "sync_new_vehicle_45" in update_data:
                     config.sync_new_vehicle_45 = bool(update_data["sync_new_vehicle_45"])
                 if "jpeg_quality" in update_data:
-                    config.jpeg_quality = int(update_data["jpeg_quality"])
+                    try:
+                        q = int(update_data["jpeg_quality"])
+                        if 10 <= q <= 100:
+                            config.jpeg_quality = q
+                    except (ValueError, TypeError):
+                        pass
                 if "photo_resolution" in update_data:
-                    config.photo_resolution = str(update_data["photo_resolution"])
+                    res_val = str(update_data["photo_resolution"]).lower()
+                    if res_val in ("original", "4k", "1080p", "720p"):
+                        config.photo_resolution = res_val
 
                 # Cập nhật timestamp nếu có
                 if "timestamp" in update_data and isinstance(update_data["timestamp"], dict):
                     ts_data = update_data["timestamp"]
                     if "enabled" in ts_data:
                         config.timestamp.enabled = bool(ts_data["enabled"])
-                    if "format" in ts_data:
+                    if "format" in ts_data and isinstance(ts_data["format"], str) and len(ts_data["format"]) < 50:
                         config.timestamp.format = str(ts_data["format"])
-                    if "position" in ts_data:
+                    if "position" in ts_data and ts_data["position"] in ("bottom_right", "bottom_left", "top_right", "top_left"):
                         config.timestamp.position = str(ts_data["position"])
                     if "font_size" in ts_data:
-                        config.timestamp.font_size = int(ts_data["font_size"])
+                        try:
+                            fs = int(ts_data["font_size"])
+                            if 10 <= fs <= 200:
+                                config.timestamp.font_size = fs
+                        except (ValueError, TypeError):
+                            pass
 
                 from config import save_config
                 save_config(config, CONFIG_PATH)

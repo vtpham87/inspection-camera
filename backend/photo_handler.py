@@ -1,6 +1,7 @@
 import os
 import re
 import shutil
+import time
 from datetime import datetime
 from pathlib import Path
 from config import PhotoConfig
@@ -111,6 +112,8 @@ def resolve_save_path(
     template = config.paths.get(photo_type, config.photo_save_dir)
     current_date = date_str.replace("-", "") if date_str is not None else datetime.now().strftime("%Y%m%d")
     clean_p, det_c, _ = clean_plate_and_color(plate, plate_color)
+    if not clean_p or not VALID_PLATE_RE.match(clean_p):
+        raise ValueError(f"Biển số không hợp lệ: {plate}")
     final_color = plate_color or det_c
     if not final_color and re.search(r"\d{5}$", clean_p):
         final_color = "T"
@@ -240,8 +243,19 @@ def save_photo(
     if not Path(real_path).is_relative_to(Path(real_dir)):
         return {"ok": False, "error": "Đường dẫn không hợp lệ"}
 
-    with open(full_path, "wb") as f:
-        f.write(file_bytes)
+    # Atomic write to avoid partial/corrupted files during concurrent writes
+    tmp_path = f"{full_path}.tmp_{os.getpid()}_{int(time.time() * 1000)}"
+    try:
+        with open(tmp_path, "wb") as f:
+            f.write(file_bytes)
+        os.replace(tmp_path, full_path)
+    except Exception:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+        raise
 
     if photo_type in ("new_vehicle", "rear_45", "front_45"):
         sync_new_vehicle_photos(plate, plate_color, config, lan_kd=lan_kd)
