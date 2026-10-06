@@ -4,6 +4,7 @@ import android.app.Dialog
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.ImageView
 import android.widget.ProgressBar
@@ -26,6 +27,7 @@ import com.ttdk1507d.inspectioncamera.api.ApiClient
 import com.ttdk1507d.inspectioncamera.firebase.FirebaseManager
 import com.ttdk1507d.inspectioncamera.model.PhotoType
 import com.ttdk1507d.inspectioncamera.util.NetworkUtil
+import com.ttdk1507d.inspectioncamera.util.PlateUtil
 import com.ttdk1507d.inspectioncamera.util.PrefsManager
 import com.ttdk1507d.inspectioncamera.worker.PendingUploadMetadata
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +44,8 @@ class ReviewActivity : AppCompatActivity() {
         const val EXTRA_PLATE = "extra_plate"
         const val EXTRA_PLATE_COLOR = "extra_plate_color"
         const val EXTRA_LAN_KD = "extra_lan_kd"
+        private const val TAG = "ReviewActivity"
+        private val gson = Gson()
     }
 
     private lateinit var prefs: PrefsManager
@@ -73,18 +77,10 @@ class ReviewActivity : AppCompatActivity() {
 
         prefs = PrefsManager(this)
         val rawPlate = intent.getStringExtra(EXTRA_PLATE) ?: ""
-        val parsed = com.ttdk1507d.inspectioncamera.util.PlateUtil.parsePlate(rawPlate)
-        plate = parsed.basePlate
-        val isOld = com.ttdk1507d.inspectioncamera.util.PlateUtil.isOldPlate(plate)
-        plateColor = if (isOld) {
-            null // Biển cũ mặc định không thêm t/v/x
-        } else {
-            intent.getStringExtra(EXTRA_PLATE_COLOR) ?: parsed.color
-        }
-        if (!isOld && plateColor == null && Regex("\\d{5}$").containsMatchIn(plate)) {
-            plateColor = "T"
-        }
-        lanKd = intent.getIntExtra(EXTRA_LAN_KD, parsed.lanKd)
+        val resolved = PlateUtil.resolveFullPlate(rawPlate, intent.getStringExtra(EXTRA_PLATE_COLOR))
+        plate = resolved.basePlate
+        plateColor = resolved.color
+        lanKd = intent.getIntExtra(EXTRA_LAN_KD, resolved.lanKd)
 
         initViews()
         setupRecyclerView()
@@ -110,7 +106,7 @@ class ReviewActivity : AppCompatActivity() {
         btnDone = findViewById(R.id.btn_review_done)
 
         toolbar.setNavigationOnClickListener { finish() }
-        tvPlate.text = com.ttdk1507d.inspectioncamera.util.PlateUtil.formatCompactPlate(plate, plateColor, lanKd)
+        tvPlate.text = PlateUtil.formatCompactPlate(plate, plateColor, lanKd)
 
         btnSync.setOnClickListener {
             uploadPendingPhotos()
@@ -184,7 +180,6 @@ class ReviewActivity : AppCompatActivity() {
         val pendingMetaList = mutableListOf<PendingUploadMetadata>()
         if (pendingDir.exists() && pendingDir.isDirectory) {
             val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
-            val gson = Gson()
             for (metaFile in metaFiles) {
                 try {
                     val meta = gson.fromJson(metaFile.readText(), PendingUploadMetadata::class.java)
@@ -196,7 +191,7 @@ class ReviewActivity : AppCompatActivity() {
                         }
                     }
                 } catch (e: Exception) {
-                    // Ignore corrupted meta
+                    Log.w(TAG, "Lỗi đọc file meta: ${metaFile.name}: ${e.message}")
                 }
             }
         }
@@ -266,7 +261,6 @@ class ReviewActivity : AppCompatActivity() {
         if (!pendingDir.exists() || !pendingDir.isDirectory) return
 
         val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
-        val gson = Gson()
         val plateMetas = mutableListOf<Pair<File, PendingUploadMetadata>>()
 
         for (mf in metaFiles) {
@@ -276,7 +270,7 @@ class ReviewActivity : AppCompatActivity() {
                     plateMetas.add(mf to meta)
                 }
             } catch (e: Exception) {
-                // Ignore
+                Log.w(TAG, "Lỗi đọc file pending meta: ${mf.name}: ${e.message}")
             }
         }
 
@@ -316,6 +310,7 @@ class ReviewActivity : AppCompatActivity() {
                             photoFile = imgFile
                         )
                     } catch (e: Exception) {
+                        Log.e(TAG, "Lỗi upload photo qua Firebase: ${e.message}", e)
                         false
                     }
                 }
@@ -387,7 +382,7 @@ class ReviewActivity : AppCompatActivity() {
                     }
                 }
             } catch (e: Exception) {
-                // If offline, proceed with local cleanup
+                Log.w(TAG, "Không thể kết nối máy chủ để xóa ảnh (sẽ dọn dẹp cục bộ): ${e.message}")
             }
 
             // 2. Delete local files
@@ -397,7 +392,6 @@ class ReviewActivity : AppCompatActivity() {
             val pendingDir = File(filesDir, "pending")
             if (pendingDir.exists()) {
                 val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
-                val gson = Gson()
                 for (mf in metaFiles) {
                     try {
                         val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
@@ -406,7 +400,7 @@ class ReviewActivity : AppCompatActivity() {
                             mf.delete()
                         }
                     } catch (e: Exception) {
-                        // Ignore
+                        Log.w(TAG, "Lỗi xóa file pending khi xóa ảnh: ${mf.name}: ${e.message}")
                     }
                 }
             }

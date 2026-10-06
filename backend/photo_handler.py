@@ -243,19 +243,27 @@ def save_photo(
     if not Path(real_path).is_relative_to(Path(real_dir)):
         return {"ok": False, "error": "Đường dẫn không hợp lệ"}
 
-    # Atomic write to avoid partial/corrupted files during concurrent writes
+    # Atomic write with retry for network drive stability (e.g. Z:\ SMB timeouts)
     tmp_path = f"{full_path}.tmp_{os.getpid()}_{int(time.time() * 1000)}"
-    try:
-        with open(tmp_path, "wb") as f:
-            f.write(file_bytes)
-        os.replace(tmp_path, full_path)
-    except Exception:
-        if os.path.exists(tmp_path):
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
-        raise
+    last_err = None
+    for attempt in range(3):
+        try:
+            with open(tmp_path, "wb") as f:
+                f.write(file_bytes)
+            os.replace(tmp_path, full_path)
+            last_err = None
+            break
+        except (OSError, IOError) as e:
+            last_err = e
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+            if attempt < 2:
+                time.sleep(0.5)
+    if last_err is not None:
+        raise last_err
 
     if photo_type in ("new_vehicle", "rear_45", "front_45"):
         sync_new_vehicle_photos(plate, plate_color, config, lan_kd=lan_kd)

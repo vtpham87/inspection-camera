@@ -1,5 +1,6 @@
 import os
 import sys
+from contextlib import asynccontextmanager
 from datetime import datetime
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,14 +34,15 @@ def get_db_path() -> str:
     return os.environ.get("PTCGDB_PATH") or DB_PATH
 
 
-app = FastAPI(title="15-07D Photo Server", version="1.0.0")
-
-@app.on_event("startup")
-def start_firebase_sync():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     import threading
     from firebase_sync import run_sync_loop
     t = threading.Thread(target=run_sync_loop, args=(10,), daemon=True)
     t.start()
+    yield
+
+app = FastAPI(title="15-07D Photo Server", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

@@ -62,6 +62,23 @@ object PlateUtil {
         return !Regex("\\d{5}$").containsMatchIn(parsed.basePlate)
     }
 
+    /**
+     * Chuẩn hóa toàn diện biển số, màu biển và lần KĐ từ input thô và intent color.
+     */
+    fun resolveFullPlate(rawPlate: String, intentColor: String? = null): PlateInfo {
+        val parsed = parsePlate(rawPlate)
+        val isOld = isOldPlate(parsed.basePlate)
+        var color: String? = if (isOld) {
+            null
+        } else {
+            intentColor ?: parsed.color
+        }
+        if (!isOld && color == null && Regex("\\d{5}$").containsMatchIn(parsed.basePlate)) {
+            color = "T"
+        }
+        return PlateInfo(parsed.basePlate, color, parsed.lanKd)
+    }
+
     fun extractColor(cleanPlate: String): Pair<String, String?> {
         val parsed = parsePlate(cleanPlate)
         return parsed.basePlate to parsed.color

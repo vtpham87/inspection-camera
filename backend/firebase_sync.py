@@ -259,6 +259,12 @@ def process_photo_inbox():
                         rtdb_request(base_url, f"photo_inbox/{photo_id}", method="DELETE")
                         continue
 
+                    # B-04: Giới hạn kích thước Base64 tránh tràn bộ nhớ server (max 20MB Base64 ~ 15MB JPEG)
+                    if len(base64_str) > 20 * 1024 * 1024:
+                        logger.error(f"[{node_name}] Ảnh {photo_id} ({plate}) vượt giới hạn 20MB Base64, từ chối tải")
+                        rtdb_request(base_url, f"photo_inbox/{photo_id}", method="DELETE")
+                        continue
+
                     file_bytes = base64.b64decode(base64_str)
                     res = save_photo(
                         file_bytes=file_bytes,
@@ -288,14 +294,20 @@ def run_sync_loop(interval_sec: int = 10):
     except Exception as e:
         logger.error(f"Lỗi khởi tạo sync config: {e}")
 
+    consecutive_errors = 0
     while True:
         try:
             sync_vehicles_to_firebase()
             sync_config_from_firebase()
             process_photo_inbox()
+            consecutive_errors = 0
+            sleep_time = interval_sec
         except Exception as e:
-            logger.error(f"Lỗi trong vòng lặp sync: {e}")
-        time.sleep(interval_sec)
+            consecutive_errors += 1
+            # Exponential backoff từ interval_sec đến tối đa 60s
+            sleep_time = min(interval_sec * (2 ** min(consecutive_errors, 5)), 60)
+            logger.error(f"Lỗi trong vòng lặp sync ({consecutive_errors} lần liên tiếp): {e}. Thử lại sau {sleep_time}s.")
+        time.sleep(sleep_time)
 
 
 if __name__ == "__main__":

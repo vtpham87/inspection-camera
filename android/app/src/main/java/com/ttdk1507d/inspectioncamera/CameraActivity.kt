@@ -74,6 +74,7 @@ class CameraActivity : AppCompatActivity() {
         const val EXTRA_FOCUS_TYPE = "extra_focus_type"
         const val EXTRA_PHOTOS_TAKEN = "photos_taken"
         const val EXTRA_LAN_KD = "extra_lan_kd"
+        private val gson = Gson()
     }
 
     private data class LocalPhotoInfo(val photoType: PhotoType, val seq: Int?)
@@ -122,18 +123,10 @@ class CameraActivity : AppCompatActivity() {
 
         prefs = PrefsManager(this)
         val rawPlate = intent.getStringExtra(EXTRA_PLATE) ?: ""
-        val parsed = PlateUtil.parsePlate(rawPlate)
-        plate = parsed.basePlate
-        val isOld = PlateUtil.isOldPlate(plate)
-        plateColor = if (isOld) {
-            null // Biển cũ mặc định không thêm t/v/x
-        } else {
-            intent.getStringExtra(EXTRA_PLATE_COLOR) ?: parsed.color
-        }
-        if (!isOld && plateColor == null && Regex("\\d{5}$").containsMatchIn(plate)) {
-            plateColor = "T"
-        }
-        lanKd = intent.getIntExtra(EXTRA_LAN_KD, parsed.lanKd)
+        val resolved = PlateUtil.resolveFullPlate(rawPlate, intent.getStringExtra(EXTRA_PLATE_COLOR))
+        plate = resolved.basePlate
+        plateColor = resolved.color
+        lanKd = intent.getIntExtra(EXTRA_LAN_KD, resolved.lanKd)
 
         if (plate.isEmpty()) {
             Toast.makeText(this, "Thiếu thông tin biển số", Toast.LENGTH_SHORT).show()
@@ -467,7 +460,6 @@ class CameraActivity : AppCompatActivity() {
         val pendingDir = File(filesDir, "pending")
         if (pendingDir.exists() && pendingDir.isDirectory) {
             val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
-            val gson = Gson()
             for (mf in metaFiles) {
                 try {
                     val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
@@ -478,7 +470,7 @@ class CameraActivity : AppCompatActivity() {
                         }
                     }
                 } catch (e: Exception) {
-                    // Ignore
+                    Log.w(TAG, "Lỗi đọc pending meta: ${mf.name}: ${e.message}")
                 }
             }
         }
@@ -645,7 +637,7 @@ class CameraActivity : AppCompatActivity() {
                 lanKd = lanKd,
                 timestamp = timestamp
             )
-            val metaJson = Gson().toJson(meta)
+            val metaJson = gson.toJson(meta)
             metaFile.writeText(metaJson)
         } catch (e: Exception) {
             Log.e(TAG, "Lỗi lưu pending queue: ${e.message}", e)
@@ -659,7 +651,6 @@ class CameraActivity : AppCompatActivity() {
                 if (!pendingDir.exists()) return@launch
 
                 val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
-                val gson = Gson()
                 for (mf in metaFiles) {
                     try {
                         val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
