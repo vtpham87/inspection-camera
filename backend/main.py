@@ -193,6 +193,26 @@ def sync_config_now():
         return {"ok": False, "message": f"Lỗi: {e}"}
 
 
+@app.post("/api/sync-vehicles-now")
+def sync_vehicles_now():
+    try:
+        from firebase_sync import sync_vehicles_to_firebase
+        sync_vehicles_to_firebase()
+        return {"ok": True, "message": "Đã đồng bộ danh sách xe lên điện thoại thành công!"}
+    except Exception as e:
+        return {"ok": False, "message": f"Lỗi đồng bộ xe: {e}"}
+
+
+@app.post("/api/restart-service")
+def restart_service():
+    import subprocess
+    try:
+        subprocess.Popen(["cscript", "//nologo", "D:\\inspection-camera\\backend\\restart_background.vbs"])
+        return {"ok": True, "message": "Đang khởi động lại dịch vụ..."}
+    except Exception as e:
+        return {"ok": False, "message": f"Lỗi khởi động lại: {e}"}
+
+
 @app.get("/api/config")
 def get_config():
     return load_config(get_config_path()).model_dump()
@@ -274,9 +294,15 @@ HTML_CONTENT = """<!DOCTYPE html>
     <header>
       <h1>📸 HỆ THỐNG CHỤP ẢNH KIỂM ĐỊNH 15-07D</h1>
       <div class="subtitle">Cấu hình thư mục lưu ảnh trên máy tính & đồng bộ thời gian thực sang điện thoại</div>
-      <div class="status-badge">
-        <div class="status-dot"></div>
-        <span id="sync-status-text">Đang tải cấu hình máy chủ...</span>
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 12px;">
+        <div class="status-badge">
+          <div class="status-dot"></div>
+          <span id="sync-status-text">Đang tải cấu hình máy chủ...</span>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="check-btn" style="background: #2563eb; color: #fff; border-color: #1d4ed8;" onclick="forceSyncVehicles()">🔄 Đồng bộ danh sách xe</button>
+          <button type="button" class="check-btn" style="background: #e2e8f0; color: #0f172a;" onclick="restartService()">⚡ Khởi động lại dịch vụ</button>
+        </div>
       </div>
     </header>
 
@@ -491,6 +517,27 @@ HTML_CONTENT = """<!DOCTYPE html>
         showToast(res.ok ? "✅ " + res.message : "❌ " + res.message, !res.ok);
       } catch (err) {
         showToast("❌ Lỗi khi đồng bộ: " + err.message, true);
+      }
+    }
+
+    async function forceSyncVehicles() {
+      try {
+        const resp = await fetch("/api/sync-vehicles-now", { method: "POST" });
+        const res = await resp.json();
+        showToast(res.ok ? "✅ " + res.message : "❌ " + res.message, !res.ok);
+      } catch (err) {
+        showToast("❌ Lỗi khi đồng bộ xe: " + err.message, true);
+      }
+    }
+
+    async function restartService() {
+      if (!confirm("Khởi động lại dịch vụ Photo Server và tiến trình đồng bộ?")) return;
+      try {
+        await fetch("/api/restart-service", { method: "POST" });
+        showToast("⚡ Đang khởi động lại dịch vụ... Trang sẽ tự làm mới sau 3 giây");
+        setTimeout(() => location.reload(), 3000);
+      } catch (err) {
+        showToast("❌ Lỗi khi gửi lệnh: " + err.message, true);
       }
     }
 
