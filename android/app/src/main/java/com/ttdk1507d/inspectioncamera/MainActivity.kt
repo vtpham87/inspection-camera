@@ -204,6 +204,16 @@ class MainActivity : AppCompatActivity() {
                 })
         } else {
             currentVehiclesList
+                .filter { vehicle -> isVehicleHasPhotos(vehicle) }
+                .map { vehicle ->
+                    if (vehicle.photosTaken.isEmpty()) {
+                        val targetPlate = if (vehicle.plateClean.isNotBlank()) vehicle.plateClean else vehicle.plate
+                        val count = getLocalPhotoCount(targetPlate, vehicle.lanKd)
+                        if (count > 0) {
+                            vehicle.copy(photosTaken = List(count) { "local_$it" })
+                        } else vehicle
+                    } else vehicle
+                }
                 .sortedWith(Comparator { v1, v2 ->
                     val t1 = v1.getEffectiveTicketInt()
                     val t2 = v2.getEffectiveTicketInt()
@@ -216,11 +226,61 @@ class MainActivity : AppCompatActivity() {
             tvEmpty.text = if (isFilterWaiting) {
                 "Không có xe nào đang chờ\n(Đã hoàn thành kiểm định hoặc chụp ảnh xong)"
             } else {
-                "Hôm nay chưa có xe kiểm định nào"
+                "Hôm nay chưa có xe nào đã chụp ảnh"
             }
         } else {
             tvEmpty.visibility = View.GONE
         }
+    }
+
+    private fun isVehicleHasPhotos(vehicle: Vehicle): Boolean {
+        if (vehicle.photosTaken.isNotEmpty()) return true
+        val targetPlate = if (vehicle.plateClean.isNotBlank()) vehicle.plateClean else vehicle.plate
+        if (hasLocalPhotos(targetPlate, vehicle.lanKd)) return true
+        return false
+    }
+
+    private fun getLocalPhotoCount(plate: String, lanKd: Int): Int {
+        if (plate.isBlank()) return 0
+        val cleanPlate = plate.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
+        val foundTypes = mutableSetOf<String>()
+
+        val dirs = listOf(
+            if (lanKd > 1) File(filesDir, "review/$cleanPlate/$lanKd") else File(filesDir, "review/$cleanPlate"),
+            File(filesDir, "review/$cleanPlate")
+        )
+        for (dir in dirs) {
+            if (dir.exists() && dir.isDirectory) {
+                val files = dir.listFiles { f -> f.extension.equals("jpg", ignoreCase = true) } ?: emptyArray()
+                for (f in files) {
+                    if (isSameDay(f.lastModified())) {
+                        foundTypes.add(f.nameWithoutExtension)
+                    }
+                }
+            }
+        }
+
+        val pendingDir = File(filesDir, "pending")
+        if (pendingDir.exists() && pendingDir.isDirectory) {
+            val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
+            val gson = Gson()
+            for (mf in metaFiles) {
+                try {
+                    val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
+                    val metaPlate = meta.plate.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
+                    if (metaPlate == cleanPlate && isSameDay(meta.timestamp)) {
+                        foundTypes.add(meta.photoType)
+                    }
+                } catch (e: Exception) {
+                    // ignore
+                }
+            }
+        }
+        return foundTypes.size
+    }
+
+    private fun hasLocalPhotos(plate: String, lanKd: Int): Boolean {
+        return getLocalPhotoCount(plate, lanKd) > 0
     }
 
     private fun isVehicleFinished(vehicle: Vehicle): Boolean {

@@ -268,7 +268,7 @@
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 android:paddingHorizontal="10dp"
-                android:text="Tất cả"
+                android:text="Đã chụp"
                 android:textSize="12sp"
                 app:cornerRadius="18dp"
                 android:textColor="@color/text_secondary"
