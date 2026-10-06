@@ -275,8 +275,8 @@ def run_sync_loop(interval_sec: int = 10):
 
     while True:
         try:
-            sync_config_from_firebase()
             sync_vehicles_to_firebase()
+            sync_config_from_firebase()
             process_photo_inbox()
         except Exception as e:
             logger.error(f"Lỗi trong vòng lặp sync: {e}")
