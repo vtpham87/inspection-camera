@@ -12,6 +12,7 @@ import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.util.Log
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.OrientationEventListener
@@ -69,6 +70,7 @@ import java.util.concurrent.Executors
 class CameraActivity : AppCompatActivity() {
 
     companion object {
+        private const val TAG = "CameraActivity"
         const val EXTRA_PLATE = "extra_plate"
         const val EXTRA_PLATE_COLOR = "extra_plate_color"
         const val EXTRA_FOCUS_TYPE = "extra_focus_type"
