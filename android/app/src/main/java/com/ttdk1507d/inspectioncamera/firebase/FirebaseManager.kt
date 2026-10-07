@@ -285,6 +285,20 @@ object FirebaseManager {
     }
 
     /**
+     * Hủy đăng ký lắng nghe cấu hình Firebase
+     */
+    fun removeConfigListener(listener: ValueEventListener?) {
+        if (listener == null) return
+        try {
+            val node = getScheduledNode()
+            val db = FirebaseDatabase.getInstance(node.url)
+            db.getReference("config").removeEventListener(listener)
+        } catch (e: Exception) {
+            Log.w(TAG, "Lỗi khi gỡ listener config: ${e.message}")
+        }
+    }
+
+    /**
      * Lấy cấu hình một lần từ Firebase (/config)
      */
     suspend fun fetchConfigOnce(): Map<String, Any>? = withContext(Dispatchers.IO) {

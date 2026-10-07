@@ -1,21 +1,15 @@
 package com.ttdk1507d.inspectioncamera.worker
 
 import android.content.Context
+import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
-import com.ttdk1507d.inspectioncamera.api.ApiClient
 import com.ttdk1507d.inspectioncamera.firebase.FirebaseManager
-import com.ttdk1507d.inspectioncamera.util.NetworkUtil
 import com.ttdk1507d.inspectioncamera.util.PrefsManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.MultipartBody
-import okhttp3.RequestBody.Companion.asRequestBody
-import okhttp3.RequestBody.Companion.toRequestBody
-import retrofit2.HttpException
 import java.io.File
 
 data class PendingUploadMetadata(
@@ -63,6 +57,13 @@ class PendingUploadWorker(
                     continue
                 }
 
+                if (imgFile.length() > 7 * 1024 * 1024) {
+                    Log.e("PendingUploadWorker", "Ảnh ${imgFile.name} vượt quá 7MB, xóa khỏi pending queue")
+                    metaFile.delete()
+                    imgFile.delete()
+                    continue
+                }
+
                 val success = FirebaseManager.uploadPhotoToInbox(
                     plate = meta.plate,
                     plateColor = meta.plateColor,
@@ -78,6 +79,7 @@ class PendingUploadWorker(
                     anyFailed = true
                 }
             } catch (e: Exception) {
+                Log.e("PendingUploadWorker", "Lỗi xử lý upload metadata ${metaFile.name}: ${e.message}", e)
                 anyFailed = true
             }
         }

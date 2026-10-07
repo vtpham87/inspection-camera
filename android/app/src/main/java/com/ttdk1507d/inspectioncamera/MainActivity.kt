@@ -50,8 +50,10 @@ import java.util.concurrent.TimeUnit
 class MainActivity : AppCompatActivity() {
 
     companion object {
+        private const val TAG = "MainActivity"
         private const val PERMISSION_REQUEST_CAMERA = 1001
         private const val AUTO_REFRESH_INTERVAL_MS = 2 * 60 * 1000L // 2 phút quét danh sách
+        private val gson = Gson()
     }
 
     private lateinit var prefs: PrefsManager
@@ -104,6 +106,14 @@ class MainActivity : AppCompatActivity() {
         stopPeriodicRefresh()
         firebaseJob?.cancel()
         firebaseJob = null
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        firebaseConfigListener?.let {
+            FirebaseManager.removeConfigListener(it)
+            firebaseConfigListener = null
+        }
     }
 
     private fun startPeriodicRefresh() {
@@ -263,7 +273,6 @@ class MainActivity : AppCompatActivity() {
         val pendingDir = File(filesDir, "pending")
         if (pendingDir.exists() && pendingDir.isDirectory) {
             val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
-            val gson = Gson()
             for (mf in metaFiles) {
                 try {
                     val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
@@ -272,7 +281,7 @@ class MainActivity : AppCompatActivity() {
                         foundTypes.add(meta.photoType)
                     }
                 } catch (e: Exception) {
-                    // ignore
+                    Log.w(TAG, "Lỗi đọc pending meta: ${mf.name}: ${e.message}")
                 }
             }
         }
@@ -321,7 +330,6 @@ class MainActivity : AppCompatActivity() {
             val pendingDir = File(filesDir, "pending")
             if (pendingDir.exists() && pendingDir.isDirectory) {
                 val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
-                val gson = Gson()
                 for (mf in metaFiles) {
                     try {
                         val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
@@ -331,7 +339,7 @@ class MainActivity : AppCompatActivity() {
                             if (meta.photoType == "front_45") hasLocalFront = true
                         }
                     } catch (e: Exception) {
-                        // ignore
+                        Log.w(TAG, "Lỗi đọc pending meta: ${mf.name}: ${e.message}")
                     }
                 }
             }

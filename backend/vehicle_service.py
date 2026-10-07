@@ -4,7 +4,10 @@ import json
 import time
 import sqlite3
 import subprocess
+import logging
 from datetime import datetime
+
+logger = logging.getLogger("vehicle_service")
 from config import PhotoConfig
 from photo_handler import extract_plate_color, resolve_save_path, build_filename
 
@@ -103,7 +106,8 @@ ORDER BY t.SoPhieuKD ASC
         _ACCESS_CACHE["timestamp"] = now
         _ACCESS_CACHE["data"] = rows
         return rows
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Lỗi truy vấn Access DB qua PowerShell: {e}")
         return _ACCESS_CACHE["data"]
 
 

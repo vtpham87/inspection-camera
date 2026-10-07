@@ -184,7 +184,7 @@ class ReviewActivity : AppCompatActivity() {
                 try {
                     val meta = gson.fromJson(metaFile.readText(), PendingUploadMetadata::class.java)
                     if (meta.plate.equals(plate, ignoreCase = true) && meta.lanKd == lanKd) {
-                        val photoType = PhotoType.values().firstOrNull { it.apiName == meta.photoType }
+                        val photoType = PhotoType.fromApiName(meta.photoType)
                         if (photoType != null) {
                             pendingSet.add(photoType to meta.seq)
                             pendingMetaList.add(meta)
@@ -335,7 +335,7 @@ class ReviewActivity : AppCompatActivity() {
 
     private fun parsePhotoReviewItem(file: File, isPending: Boolean): PhotoReviewItem? {
         val nameWithoutExt = file.nameWithoutExtension
-        for (type in PhotoType.values()) {
+        for (type in PhotoType.ALL) {
             if (nameWithoutExt.startsWith(type.apiName)) {
                 val remainder = nameWithoutExt.removePrefix(type.apiName).removePrefix("_")
                 val seq = remainder.toIntOrNull()

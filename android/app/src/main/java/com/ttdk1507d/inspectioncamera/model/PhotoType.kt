@@ -11,4 +11,10 @@ enum class PhotoType(
     CHASSIS("chassis", "Số khung / Khoang máy", "sk_"),
     PASSENGER("passenger", "Khoang hành khách", "", multiPhoto = true),
     NEW_VEHICLE("new_vehicle", "Ảnh xe mới", "", multiPhoto = true);
+
+    companion object {
+        val ALL: Array<PhotoType> = values()
+        private val BY_API_NAME: Map<String, PhotoType> = values().associateBy { it.apiName }
+        fun fromApiName(name: String?): PhotoType? = if (name != null) BY_API_NAME[name] else null
+    }
 }

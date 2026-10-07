@@ -231,7 +231,7 @@ class CameraActivity : AppCompatActivity() {
         btnBack.setOnClickListener { finish() }
 
         btnToggleLanKd.setOnClickListener {
-            lanKd = if (lanKd == 1) 2 else 1
+            lanKd = if (lanKd >= 3) 1 else lanKd + 1
             updateLanKdUI()
             refreshLocalPhotoStatus()
             Toast.makeText(this, "Đã chuyển sang: Lần $lanKd", Toast.LENGTH_SHORT).show()
@@ -446,7 +446,7 @@ class CameraActivity : AppCompatActivity() {
             val files = reviewDir.listFiles { f -> f.extension.equals("jpg", ignoreCase = true) } ?: emptyArray()
             for (file in files) {
                 val name = file.nameWithoutExtension
-                for (pt in PhotoType.values()) {
+                for (pt in PhotoType.ALL) {
                     if (name.startsWith(pt.apiName)) {
                         val rem = name.removePrefix(pt.apiName).removePrefix("_")
                         val seq = rem.toIntOrNull()
@@ -464,7 +464,7 @@ class CameraActivity : AppCompatActivity() {
                 try {
                     val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
                     if (meta.plate.equals(plate, ignoreCase = true) && meta.lanKd == lanKd) {
-                        val pt = PhotoType.values().firstOrNull { it.apiName == meta.photoType }
+                        val pt = PhotoType.fromApiName(meta.photoType)
                         if (pt != null) {
                             reviewPhotos.add(LocalPhotoInfo(pt, meta.seq))
                         }
@@ -574,9 +574,10 @@ class CameraActivity : AppCompatActivity() {
             val finalBitmap = stampedBitmap ?: resizedBitmap
 
             // 3. Compress to JPEG
-            val baos = ByteArrayOutputStream()
-            finalBitmap.compress(Bitmap.CompressFormat.JPEG, appConfig.jpegQuality, baos)
-            val jpegBytes = baos.toByteArray()
+            val jpegBytes = ByteArrayOutputStream().use { baos ->
+                finalBitmap.compress(Bitmap.CompressFormat.JPEG, appConfig.jpegQuality, baos)
+                baos.toByteArray()
+            }
 
             // 4. Save copy to local review cache on phone
             saveToLocalReview(type, seq, jpegBytes)
@@ -704,17 +705,17 @@ class CameraActivity : AppCompatActivity() {
     private fun vibrateSuccess() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-                vibratorManager.defaultVibrator.vibrate(
+                val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                vibratorManager?.defaultVibrator?.vibrate(
                     VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE)
                 )
             } else {
                 @Suppress("DEPRECATION")
-                val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
+                    vibrator?.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
                 } else {
-                    vibrator.vibrate(50)
+                    vibrator?.vibrate(50)
                 }
             }
         } catch (e: Exception) {
