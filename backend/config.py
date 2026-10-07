@@ -86,5 +86,7 @@ def save_config(config: PhotoConfig, path: str = "photo_config.json") -> None:
     dirname = os.path.dirname(path)
     if dirname:
         os.makedirs(dirname, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
+    tmp_path = f"{path}.tmp_{os.getpid()}"
+    with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(config.model_dump(), f, indent=2, ensure_ascii=False)
+    os.replace(tmp_path, path)
