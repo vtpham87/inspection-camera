@@ -231,7 +231,14 @@ def sync_vehicles_to_firebase():
             plate_clean = v.get("plate_clean") or v.get("plate")
             if plate_clean:
                 safe_key = plate_clean.replace(".", "").replace("/", "").replace("$", "").replace("#", "").replace("[", "").replace("]", "")
-                vehicles_dict[safe_key] = v
+                if safe_key not in vehicles_dict:
+                    vehicles_dict[safe_key] = v
+                else:
+                    curr = vehicles_dict[safe_key]
+                    v_key = (v.get("ticket_int") or 0, v.get("lan_kd") or 1)
+                    curr_key = (curr.get("ticket_int") or 0, curr.get("lan_kd") or 1)
+                    if v_key > curr_key:
+                        vehicles_dict[safe_key] = v
 
         current_hash = json.dumps(vehicles_dict, sort_keys=True)
         now = time.time()
