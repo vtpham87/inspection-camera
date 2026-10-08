@@ -50,7 +50,7 @@
     <!-- Side Control Panel: On the Right Side -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/bottom_control_panel"
-        android:layout_width="230dp"
+        android:layout_width="240dp"
         android:layout_height="match_parent"
         android:background="@color/surface"
         android:elevation="8dp"
@@ -116,25 +116,14 @@
 
             </LinearLayout>
 
-            <!-- Review Button -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_review"
-                android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:layout_marginBottom="8dp"
-                android:text="@string/btn_review"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:textColor="@color/text_white"
-                app:backgroundTint="@color/status_done_text"
-                app:cornerRadius="6dp" />
-
-            <!-- Capture Button 1: Rear 45° -->
+            <!-- 1: Capture Button: Ảnh phương tiện (Rear 45°) -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_rear_45"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
+                android:layout_height="46dp"
                 android:layout_marginBottom="6dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
                 android:text="@string/photo_rear_45"
                 android:textSize="14sp"
                 android:textStyle="bold"
@@ -145,12 +134,14 @@
                 app:cornerRadius="8dp"
                 style="@style/Widget.Material3.Button.OutlinedButton" />
 
-            <!-- Capture Button 2: Front 45° -->
+            <!-- 2: Capture Button: Ảnh biển số (Front 45°) -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_front_45"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
+                android:layout_height="46dp"
                 android:layout_marginBottom="6dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
                 android:text="@string/photo_front_45"
                 android:textSize="14sp"
                 android:textStyle="bold"
@@ -161,12 +152,14 @@
                 app:cornerRadius="8dp"
                 style="@style/Widget.Material3.Button.OutlinedButton" />
 
-            <!-- Capture Button 3: Passenger -->
+            <!-- 3: Capture Button: Khoang người lái (Passenger) -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_passenger"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
+                android:layout_height="46dp"
                 android:layout_marginBottom="6dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
                 android:text="@string/photo_passenger"
                 android:textSize="14sp"
                 android:textStyle="bold"
@@ -177,12 +170,14 @@
                 app:cornerRadius="8dp"
                 style="@style/Widget.Material3.Button.OutlinedButton" />
 
-            <!-- Capture Button 4: New Vehicle -->
+            <!-- 4: Capture Button: Xe mới / Sau miễn KĐ (New Vehicle) -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_new_vehicle"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginBottom="8dp"
+                android:layout_height="46dp"
+                android:layout_marginBottom="10dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
                 android:text="@string/photo_new_vehicle"
                 android:textSize="14sp"
                 android:textStyle="bold"
@@ -192,6 +187,21 @@
                 app:strokeWidth="1.5dp"
                 app:cornerRadius="8dp"
                 style="@style/Widget.Material3.Button.OutlinedButton" />
+
+            <!-- 5: Review Button: Xem lại ảnh -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_review"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:layout_marginBottom="4dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:text="@string/btn_review"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_white"
+                app:backgroundTint="@color/status_done_text"
+                app:cornerRadius="8dp" />
 
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>

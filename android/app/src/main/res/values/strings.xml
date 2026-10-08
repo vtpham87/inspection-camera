@@ -6,12 +6,12 @@
     <string name="title_review">Xem lại ảnh</string>
 
     <!-- Capture Buttons -->
-    <string name="photo_rear_45">Góc SAU 45°</string>
-    <string name="photo_front_45">Góc TRƯỚC 45°</string>
+    <string name="photo_rear_45">Ảnh phương tiện</string>
+    <string name="photo_front_45">Ảnh biển số</string>
     <string name="photo_chassis">Số khung / Khoang máy</string>
-    <string name="photo_passenger">Khoang hành khách</string>
-    <string name="photo_new_vehicle">Ảnh xe mới</string>
-    <string name="btn_review">XEM LẠI ẢNH</string>
+    <string name="photo_passenger">Khoang người lái</string>
+    <string name="photo_new_vehicle">Xe mới / Sau miễn KĐ</string>
+    <string name="btn_review">Xem lại ảnh</string>
     <string name="btn_done">HOÀN THÀNH - VỀ TRANG ĐẦU</string>
     <string name="action_done">Xong</string>
 

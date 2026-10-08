@@ -406,12 +406,12 @@ Mở app
        │    ├─ Thành công → ✅ + rung nhẹ
        │    └─ Thất bại → ❌ + lưu tạm cục bộ để retry
        │
-       ├─ Bấm nút [Góc trước 45°] → Tương tự, photo_type=front_45
-       ├─ Bấm nút [Số khung/Khoang máy] → photo_type=chassis
-       ├─ Bấm nút [Khoang hành khách] → photo_type=passenger, seq++
-       ├─ Bấm nút [Ảnh xe mới] → photo_type=new_vehicle, seq++
+       ├─ Bấm nút [Ảnh phương tiện] → photo_type=rear_45
+       ├─ Bấm nút [Ảnh biển số] → photo_type=front_45
+       ├─ Bấm nút [Khoang người lái] → photo_type=passenger, seq++
+       ├─ Bấm nút [Xe mới / Sau miễn KĐ] → photo_type=new_vehicle, seq++
        │
-       └─ Bấm [XEM LẠI ẢNH] → ReviewActivity
+       └─ Bấm [Xem lại ảnh] → ReviewActivity
             ├─ Hiển thị thumbnail từng nhóm
             ├─ [Xoá] → DELETE /api/photos
             ├─ [Chụp lại] → Quay lại CameraActivity, ghi đè

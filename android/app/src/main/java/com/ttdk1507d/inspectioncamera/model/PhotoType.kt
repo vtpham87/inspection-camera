@@ -6,11 +6,11 @@ enum class PhotoType(
     val prefix: String,
     val multiPhoto: Boolean = false
 ) {
-    REAR_45("rear_45", "Góc SAU 45°", ""),
-    FRONT_45("front_45", "Góc TRƯỚC 45°", "bs"),
+    REAR_45("rear_45", "Ảnh phương tiện", ""),
+    FRONT_45("front_45", "Ảnh biển số", "bs"),
     CHASSIS("chassis", "Số khung / Khoang máy", "sk_"),
-    PASSENGER("passenger", "Khoang hành khách", "", multiPhoto = true),
-    NEW_VEHICLE("new_vehicle", "Ảnh xe mới", "", multiPhoto = true);
+    PASSENGER("passenger", "Khoang người lái", "", multiPhoto = true),
+    NEW_VEHICLE("new_vehicle", "Xe mới / Sau miễn KĐ", "", multiPhoto = true);
 
     companion object {
         val ALL: Array<PhotoType> = values()
