@@ -53,25 +53,8 @@ DB_PATH = os.environ.get("PTCGDB_PATH") or "C:\\PTCGDB_Online\\ptcgdb.db"
 
 
 def get_active_nodes_for_today() -> List[Dict[str, Any]]:
-    """Trả về node chính của ngày hôm nay + node dự phòng"""
-    weekday = datetime.now().weekday()  # 0=T2, 1=T3, ..., 6=CN
-    primary = None
-    backup = None
-
-    for node in FIREBASE_NODES:
-        if node["id"] == "backup":
-            backup = node
-        elif weekday in node.get("days", []):
-            primary = node
-
-    # Nếu Chủ Nhật (weekday=6) hoặc không match, mặc định dùng Node 1 làm chính
-    if not primary:
-        primary = FIREBASE_NODES[0]
-
-    res = [primary]
-    if backup and backup not in res:
-        res.append(backup)
-    return res
+    """Trả về toàn bộ các node để đảm bảo tính đồng nhất 100% trên toàn bộ các cụm Firebase"""
+    return FIREBASE_NODES
 
 
 def sync_config_to_firebase(config: Optional[Any] = None) -> bool:
