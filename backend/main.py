@@ -1,11 +1,14 @@
 import os
 import sys
+import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
+
+logger = logging.getLogger("PhotoServer")
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 if PROJECT_DIR not in sys.path:
@@ -38,9 +41,12 @@ def get_db_path() -> str:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import threading
-    from firebase_sync import run_sync_loop
-    t = threading.Thread(target=run_sync_loop, args=(10,), daemon=True)
-    t.start()
+    if os.environ.get("DISABLE_FIREBASE_SYNC", "0") != "1":
+        from firebase_sync import run_sync_loop
+        t = threading.Thread(target=run_sync_loop, args=(10,), daemon=True)
+        t.start()
+    else:
+        logger.info("Firebase sync loop disabled via DISABLE_FIREBASE_SYNC=1")
     yield
 
 app = FastAPI(title="15-07D Photo Server", version="1.0.0", lifespan=lifespan)
@@ -224,7 +230,8 @@ def sync_vehicles_now():
 def restart_service():
     import subprocess
     try:
-        subprocess.Popen(["cscript", "//nologo", "D:\\inspection-camera\\backend\\restart_background.vbs"])
+        restart_script = os.path.join(PROJECT_DIR, "restart_background.vbs")
+        subprocess.Popen(["cscript", "//nologo", restart_script])
         return {"ok": True, "message": "Đang khởi động lại dịch vụ..."}
     except Exception as e:
         return {"ok": False, "message": f"Lỗi khởi động lại: {e}"}
@@ -580,4 +587,5 @@ def index_settings():
 if __name__ == "__main__":
     import uvicorn
     config = load_config(get_config_path())
-    uvicorn.run(app, host="0.0.0.0", port=config.server_port, log_level="info")
+    port = int(os.environ.get("PORT", str(config.server_port)))
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")

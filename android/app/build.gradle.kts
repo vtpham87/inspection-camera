@@ -24,6 +24,15 @@ android {
         release {
             isMinifyEnabled = false
         }
+        debug {
+            isMinifyEnabled = false
+        }
+        create("dev") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+            matchingFallbacks += listOf("debug", "release")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

@@ -1,0 +1,31 @@
+{
+  "vehicle_list_enabled": true,
+  "server_port": 8096,
+  "photo_save_dir": "D:\\Photos_Dev",
+  "passenger_path": "D:\\Photos_Dev\\KhoangHK\\{plate}",
+  "new_vehicle_path": "D:\\Photos_Dev\\SauCapMien\\{plate}",
+  "sync_new_vehicle_45": true,
+  "paths": {
+    "rear_45": "D:\\Photos_Dev",
+    "front_45": "D:\\Photos_Dev",
+    "chassis": "D:\\Photos_Dev",
+    "passenger": "D:\\Photos_Dev\\KhoangHK\\{plate}",
+    "new_vehicle": "D:\\Photos_Dev\\SauCapMien\\{plate}"
+  },
+  "jpeg_quality": 85,
+  "plate_color_suffix": true,
+  "auto_start_with_windows": false,
+  "timestamp": {
+    "enabled": true,
+    "format": "HH:mm:ss - dd/MM/yyyy",
+    "font_size": 34,
+    "font_color": "#FFFFFF",
+    "font_bold": true,
+    "font_stroke_enabled": true,
+    "font_stroke_color": "#000000",
+    "font_stroke_width": 2.0,
+    "background_color": "#80000000",
+    "position": "top_left"
+  },
+  "photo_resolution": "original"
+}

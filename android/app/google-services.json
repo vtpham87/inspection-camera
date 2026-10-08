@@ -24,6 +24,25 @@
           "other_platform_oauth_client": []
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:827537184742:android:f9bbb3834d0fd3e840a827",
+        "android_client_info": {
+          "package_name": "com.ttdk1507d.inspectioncamera.dev"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAp0wuCMSfmwiqDNIxIuXWTP1_-VxrAWBU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
     }
   ],
   "configuration_version": "1"
