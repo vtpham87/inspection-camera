@@ -23,7 +23,7 @@ def test_sync_config_from_firebase_resolutions(tmp_path):
         for input_res, expected_res in test_resolutions:
             mock_data = {"photo_resolution": input_res}
             with patch.object(firebase_sync, "rtdb_request") as mock_rtdb, \
-                 patch.object(firebase_sync, "sync_config_to_firebase") as mock_sync_to:
+                 patch.object(firebase_sync, "sync_config_to_firebase") as _mock_sync_to:
                 # Return mock_data for the first node GET config_update, None for DELETE
                 mock_rtdb.side_effect = lambda url, path, method="GET", data=None: mock_data if path == "config_update" and method == "GET" else None
 

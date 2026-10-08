@@ -26,6 +26,7 @@ import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.ttdk1507d.inspectioncamera.api.ApiClient
 import com.ttdk1507d.inspectioncamera.firebase.FirebaseManager
+import com.ttdk1507d.inspectioncamera.util.CacheManager
 import com.ttdk1507d.inspectioncamera.util.NetworkUtil
 import com.ttdk1507d.inspectioncamera.util.PrefsManager
 import kotlinx.coroutines.CoroutineScope
@@ -68,6 +69,10 @@ class SettingsActivity : AppCompatActivity() {
     // Backup & Restore
     private lateinit var btnBackup: MaterialButton
     private lateinit var btnRestore: MaterialButton
+
+    // Storage & Cache
+    private lateinit var tvCacheSize: TextView
+    private lateinit var btnClearCache: MaterialButton
 
     private lateinit var btnSave: MaterialButton
 
@@ -154,6 +159,10 @@ class SettingsActivity : AppCompatActivity() {
 
         btnBackup = findViewById(R.id.btn_settings_backup)
         btnRestore = findViewById(R.id.btn_settings_restore)
+
+        tvCacheSize = findViewById(R.id.tv_settings_cache_size)
+        btnClearCache = findViewById(R.id.btn_settings_clear_cache)
+        updateCacheSizeDisplay()
 
         btnSave = findViewById(R.id.btn_settings_save)
 
@@ -327,6 +336,23 @@ class SettingsActivity : AppCompatActivity() {
             openDocumentLauncher.launch(arrayOf("application/json", "*/*"))
         }
 
+        btnClearCache.setOnClickListener {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.clear_cache_confirm_title)
+                .setMessage(R.string.clear_cache_confirm_msg)
+                .setPositiveButton(R.string.dialog_yes) { _, _ ->
+                    val freed = CacheManager.clearAllCache(this)
+                    updateCacheSizeDisplay()
+                    Toast.makeText(
+                        this,
+                        getString(R.string.clear_cache_success, CacheManager.formatSize(freed)),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+                .setNegativeButton(R.string.dialog_no, null)
+                .show()
+        }
+
         btnSave.setOnClickListener {
             saveSettings()
         }
@@ -379,6 +405,11 @@ class SettingsActivity : AppCompatActivity() {
             val resultColor = if (allOk) R.color.status_done_text else R.color.warning
             tvTestResult.setTextColor(ContextCompat.getColor(this@SettingsActivity, resultColor))
         }
+    }
+
+    private fun updateCacheSizeDisplay() {
+        val sizeBytes = CacheManager.getCacheSizeBytes(this)
+        tvCacheSize.text = getString(R.string.cache_size_label, CacheManager.formatSize(sizeBytes))
     }
 
     private fun saveSettings() {

@@ -93,6 +93,9 @@ class MainActivity : AppCompatActivity() {
         checkPermissions()
         scheduleOfflineWorker()
         observeFirebaseConfig()
+        lifecycleScope.launch(Dispatchers.IO) {
+            com.ttdk1507d.inspectioncamera.util.CacheManager.autoCleanOldData(this@MainActivity)
+        }
     }
 
     override fun onResume() {
@@ -495,6 +498,7 @@ class MainActivity : AppCompatActivity() {
         })
 
         swipeRefresh.setOnRefreshListener {
+            FirebaseManager.reconnect()
             observeFirebaseVehicles()
         }
 

@@ -61,8 +61,17 @@
     <string name="restore_error_read">Không thể đọc dữ liệu từ tệp sao lưu</string>
     <string name="backup_error_write">Không thể ghi tệp sao lưu</string>
 
-    <!-- Section 6: Version & Update -->
-    <string name="header_version_settings">6. PHIÊN BẢN &amp; CẬP NHẬT GITHUB</string>
+    <!-- Section 6: Storage & Cache -->
+    <string name="header_storage_cache">6. BỘ NHỚ &amp; DỮ LIỆU ĐỆM</string>
+    <string name="desc_storage_cache">Dọn dẹp ảnh xem lại cục bộ và bộ nhớ tạm để giải phóng dung lượng điện thoại.</string>
+    <string name="cache_size_label">Dung lượng bộ nhớ đệm: %s</string>
+    <string name="btn_clear_cache">XÓA BỘ NHỚ ĐỆM</string>
+    <string name="clear_cache_confirm_title">Xác nhận xóa bộ nhớ đệm</string>
+    <string name="clear_cache_confirm_msg">Hành động này sẽ xóa sạch ảnh xem lại tạm trên máy và bộ nhớ cache. Các ảnh đã gửi về máy tính không bị ảnh hưởng. Bạn có muốn tiếp tục?</string>
+    <string name="clear_cache_success">Đã giải phóng %s bộ nhớ đệm</string>
+
+    <!-- Section 7: Version & Update -->
+    <string name="header_version_settings">7. PHIÊN BẢN &amp; CẬP NHẬT GITHUB</string>
     <string name="btn_check_update">KIỂM TRA CẬP NHẬT TỪ GITHUB</string>
 
     <!-- Paths Settings -->

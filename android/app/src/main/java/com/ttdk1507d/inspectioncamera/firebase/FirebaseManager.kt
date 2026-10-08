@@ -87,6 +87,21 @@ object FirebaseManager {
     }
 
     /**
+     * Ngắt và tái kết nối lại toàn bộ socket Firebase để làm mới cache và xóa kết nối stale
+     */
+    fun reconnect() {
+        try {
+            for (url in ALL_URLS) {
+                FirebaseDatabase.getInstance(url).goOffline()
+                FirebaseDatabase.getInstance(url).goOnline()
+            }
+            Log.d(TAG, "Đã tái kết nối toàn bộ cụm Firebase")
+        } catch (e: Exception) {
+            Log.e(TAG, "Lỗi reconnect Firebase: ${e.message}")
+        }
+    }
+
+    /**
      * Lắng nghe danh sách xe kiểm định hôm nay từ Firebase RTDB node /vehicles_today
      */
     fun observeVehicles(node: FirebaseNode = getScheduledNode()): Flow<List<Vehicle>> = callbackFlow {

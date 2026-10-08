@@ -13,7 +13,9 @@ class InspectionCameraApp : Application() {
             FirebaseApp.initializeApp(this)
             for (url in FirebaseManager.ALL_URLS) {
                 try {
-                    FirebaseDatabase.getInstance(url).setPersistenceEnabled(true)
+                    val db = FirebaseDatabase.getInstance(url)
+                    db.setPersistenceEnabled(true)
+                    db.setPersistenceCacheSizeBytes(10 * 1024 * 1024L) // Giới hạn tối đa 10MB LRU
                 } catch (e: Exception) {
                     Log.e("InspectionCameraApp", "Error configuring persistence for $url", e)
                 }

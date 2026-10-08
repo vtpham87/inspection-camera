@@ -54,9 +54,9 @@ def clean_plate_and_color(
             if prefix and prefix[-1].isdigit():
                 if m.group(1):
                     detected_color = m.group(1)
-                l = int(m.group(2))
-                if l > 1:
-                    detected_lan = l
+                lan_num = int(m.group(2))
+                if lan_num > 1:
+                    detected_lan = lan_num
                 s = prefix
                 continue
         m2 = re.search(r"([TVX])+$", s)

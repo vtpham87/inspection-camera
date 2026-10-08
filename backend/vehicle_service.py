@@ -42,7 +42,6 @@ _ACCESS_CACHE: dict = {"timestamp": 0.0, "data": []}
 
 def get_waiting_vehicles_from_access() -> list[dict]:
     """Query tmp_DangKyKD from PTCGDB Access DB via 32-bit PowerShell with 10s cache."""
-    global _ACCESS_CACHE
     now = time.time()
     if now - _ACCESS_CACHE["timestamp"] < 10.0 and _ACCESS_CACHE["data"]:
         return _ACCESS_CACHE["data"]
@@ -275,8 +274,6 @@ def get_vehicles_today(
                     lan_kd_val = 1
 
                 plate_num, plate_color = extract_plate_color(biendk_id)
-
-                has_l1 = len(_check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=1)) > 0
                 is_failed_earlier = (biendk_id in failed_biendk_ids) or (plate_num in failed_biendk_ids)
                 suggest_lan_2 = (lan_kd_val >= 2) or is_failed_earlier
 
@@ -377,8 +374,6 @@ def get_vehicles_today(
 
                 plate_num, plate_color = extract_plate_color(row["biendk_clean"])
                 biendk_id = row["biendk_clean"]
-
-                has_l1 = len(_check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=1)) > 0
                 is_failed_earlier = (biendk_id in failed_biendk_ids) or (plate_num in failed_biendk_ids)
                 suggest_lan_2 = (lan_kd_val >= 2) or is_failed_earlier
 
