@@ -625,6 +625,23 @@ class CameraActivity : AppCompatActivity() {
             val pendingDir = File(filesDir, "pending")
             if (!pendingDir.exists()) pendingDir.mkdirs()
 
+            // Dọn dẹp file pending cũ nếu chụp lại cùng góc và cùng số thứ tự
+            val existingMetas = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
+            for (mf in existingMetas) {
+                try {
+                    val m = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
+                    if (m.plate.equals(plate, ignoreCase = true) &&
+                        m.lanKd == lanKd &&
+                        m.photoType == type.apiName &&
+                        m.seq == seq
+                    ) {
+                        val oldImg = File(pendingDir, m.imageFileName)
+                        if (oldImg.exists()) oldImg.delete()
+                        mf.delete()
+                    }
+                } catch (_: Exception) {}
+            }
+
             val timestamp = System.currentTimeMillis()
             val imgFile = File(pendingDir, "pending_${timestamp}_${type.apiName}.jpg")
             val metaFile = File(pendingDir, "pending_${timestamp}_${type.apiName}.meta")

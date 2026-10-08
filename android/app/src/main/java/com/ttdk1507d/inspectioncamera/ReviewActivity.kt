@@ -10,6 +10,7 @@ import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -67,6 +68,7 @@ class ReviewActivity : AppCompatActivity() {
     private lateinit var btnSync: MaterialButton
     private lateinit var btnDone: MaterialButton
     private var isSyncing = false
+    private var finishAfterSync = false
 
     private lateinit var adapter: PhotoReviewAdapter
     private val reviewItems = mutableListOf<PhotoReviewItem>()
@@ -85,10 +87,6 @@ class ReviewActivity : AppCompatActivity() {
         initViews()
         setupRecyclerView()
         loadPhotos()
-
-        if (reviewItems.any { it.isPending }) {
-            uploadPendingPhotos()
-        }
     }
 
     private fun initViews() {
@@ -105,16 +103,33 @@ class ReviewActivity : AppCompatActivity() {
         btnSync = findViewById(R.id.btn_review_sync)
         btnDone = findViewById(R.id.btn_review_done)
 
-        toolbar.setNavigationOnClickListener { finish() }
+        toolbar.setNavigationOnClickListener {
+            if (isSyncing) {
+                Toast.makeText(this, "Đang đẩy ảnh về máy tính, vui lòng đợi giây lát...", Toast.LENGTH_SHORT).show()
+            } else {
+                finish()
+            }
+        }
         tvPlate.text = PlateUtil.formatCompactPlate(plate, plateColor, lanKd)
 
         btnSync.setOnClickListener {
-            uploadPendingPhotos()
+            uploadPendingPhotos(finishOnSuccess = false)
         }
 
         btnDone.setOnClickListener {
-            finishAndGoHome()
+            handleDoneClick()
         }
+
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (isSyncing) {
+                    Toast.makeText(this@ReviewActivity, "Đang đẩy ảnh về máy tính, vui lòng đợi giây lát...", Toast.LENGTH_SHORT).show()
+                } else {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                }
+            }
+        })
     }
 
     private fun finishAndGoHome() {
@@ -255,10 +270,51 @@ class ReviewActivity : AppCompatActivity() {
         }
     }
 
-    private fun uploadPendingPhotos() {
-        if (isSyncing) return
+    private fun handleDoneClick() {
+        if (isSyncing) {
+            finishAfterSync = true
+            Toast.makeText(this, "Đang đẩy ảnh về máy tính, sẽ tự động về trang đầu khi hoàn tất...", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         val pendingDir = File(filesDir, "pending")
-        if (!pendingDir.exists() || !pendingDir.isDirectory) return
+        var hasPending = false
+        if (pendingDir.exists() && pendingDir.isDirectory) {
+            val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
+            for (mf in metaFiles) {
+                try {
+                    val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
+                    if (meta.plate.equals(plate, ignoreCase = true) && meta.lanKd == lanKd) {
+                        hasPending = true
+                        break
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+
+        if (hasPending) {
+            uploadPendingPhotos(finishOnSuccess = true)
+        } else {
+            finishAndGoHome()
+        }
+    }
+
+    private fun uploadPendingPhotos(finishOnSuccess: Boolean = false) {
+        if (isSyncing) {
+            if (finishOnSuccess) finishAfterSync = true
+            return
+        }
+        if (finishOnSuccess) {
+            finishAfterSync = true
+        }
+
+        val pendingDir = File(filesDir, "pending")
+        if (!pendingDir.exists() || !pendingDir.isDirectory) {
+            if (finishAfterSync) {
+                finishAndGoHome()
+            }
+            return
+        }
 
         val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
         val plateMetas = mutableListOf<Pair<File, PendingUploadMetadata>>()
@@ -279,12 +335,18 @@ class ReviewActivity : AppCompatActivity() {
             tvSyncStatus.setTextColor(ContextCompat.getColor(this, R.color.status_done_text))
             btnSync.visibility = View.GONE
             pbSync.visibility = View.GONE
+            if (finishAfterSync) {
+                finishAndGoHome()
+            }
             return
         }
 
         isSyncing = true
         pbSync.visibility = View.VISIBLE
         btnSync.isEnabled = false
+        btnDone.isEnabled = false
+        val originalDoneText = getString(R.string.btn_done)
+        btnDone.text = "ĐANG ĐẨY ẢNH VỀ MÁY TÍNH..."
 
         lifecycleScope.launch {
             val total = plateMetas.size
@@ -297,7 +359,8 @@ class ReviewActivity : AppCompatActivity() {
                     continue
                 }
 
-                tvSyncStatus.text = "Đang đồng bộ qua Firebase (${uploadedCount + 1}/$total)..."
+                tvSyncStatus.text = "Đang đẩy ảnh về máy tính (${uploadedCount + 1}/$total)..."
+                tvSyncStatus.setTextColor(ContextCompat.getColor(this@ReviewActivity, R.color.text_primary))
 
                 val success = withContext(Dispatchers.IO) {
                     try {
@@ -325,11 +388,29 @@ class ReviewActivity : AppCompatActivity() {
             isSyncing = false
             pbSync.visibility = View.GONE
             btnSync.isEnabled = true
-            loadPhotos()
+            btnDone.isEnabled = true
+            btnDone.text = originalDoneText
 
-            if (uploadedCount > 0) {
-                Toast.makeText(this@ReviewActivity, "Đã gửi thành công $uploadedCount ảnh qua Firebase Đám mây", Toast.LENGTH_SHORT).show()
+            if (uploadedCount == total) {
+                Toast.makeText(this@ReviewActivity, "Đã gửi thành công $uploadedCount ảnh về máy tính", Toast.LENGTH_SHORT).show()
+                if (finishAfterSync) {
+                    finishAndGoHome()
+                    return@launch
+                }
+            } else if (uploadedCount > 0) {
+                val remaining = total - uploadedCount
+                Toast.makeText(this@ReviewActivity, "Đã gửi $uploadedCount/$total ảnh. Còn $remaining ảnh chưa gửi được!", Toast.LENGTH_LONG).show()
+                tvSyncStatus.text = "⚠️ Còn $remaining ảnh chưa gửi được. Bấm để thử lại."
+                tvSyncStatus.setTextColor(ContextCompat.getColor(this@ReviewActivity, R.color.status_error))
+                finishAfterSync = false
+            } else {
+                Toast.makeText(this@ReviewActivity, "Không thể gửi ảnh về máy tính. Vui lòng kiểm tra mạng!", Toast.LENGTH_LONG).show()
+                tvSyncStatus.text = getString(R.string.sync_failed)
+                tvSyncStatus.setTextColor(ContextCompat.getColor(this@ReviewActivity, R.color.status_error))
+                finishAfterSync = false
             }
+
+            loadPhotos()
         }
     }
 

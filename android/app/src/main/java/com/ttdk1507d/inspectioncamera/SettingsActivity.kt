@@ -235,7 +235,7 @@ class SettingsActivity : AppCompatActivity() {
         )
 
         val uploadModeLabels = listOf(
-            "Chỉ tải khi mở Xem lại (Khuyên dùng - Nhanh nhất)",
+            "Chỉ tải khi ấn Hoàn thành (Khuyên dùng)",
             "Tự động tải ngầm ngay khi chụp"
         )
         spinnerUploadMode.adapter = ArrayAdapter(
