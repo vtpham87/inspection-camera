@@ -233,4 +233,46 @@ class PrefsManager(private val prefs: SharedPreferences) {
             false
         }
     }
+
+    fun markPlateDoneToday(plateClean: String, lanKd: Int) {
+        val today = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())
+        val key = "done_${today}_${plateClean.uppercase()}_$lanKd"
+        prefs.edit().putLong(key, System.currentTimeMillis()).apply()
+    }
+
+    fun isPlateDoneToday(plateClean: String, lanKd: Int): Boolean {
+        val today = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())
+        val key = "done_${today}_${plateClean.uppercase()}_$lanKd"
+        return prefs.getLong(key, 0L) > 0L
+    }
+
+    fun getPlateDoneTimestamp(plateClean: String, lanKd: Int): Long {
+        val today = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())
+        val key = "done_${today}_${plateClean.uppercase()}_$lanKd"
+        return prefs.getLong(key, 0L)
+    }
+
+    fun clearPlateDoneToday(plateClean: String, lanKd: Int) {
+        val today = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())
+        val key = "done_${today}_${plateClean.uppercase()}_$lanKd"
+        prefs.edit().remove(key).apply()
+    }
+
+    fun markPhotoUploaded(plateClean: String, lanKd: Int, fileName: String) {
+        val today = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())
+        val key = "photo_up_${today}_${plateClean.uppercase()}_${lanKd}_$fileName"
+        prefs.edit().putBoolean(key, true).apply()
+    }
+
+    fun isPhotoUploaded(plateClean: String, lanKd: Int, fileName: String): Boolean {
+        val today = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())
+        val key = "photo_up_${today}_${plateClean.uppercase()}_${lanKd}_$fileName"
+        return prefs.getBoolean(key, false)
+    }
+
+    fun clearPhotoUploaded(plateClean: String, lanKd: Int, fileName: String) {
+        val today = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())
+        val key = "photo_up_${today}_${plateClean.uppercase()}_${lanKd}_$fileName"
+        prefs.edit().remove(key).apply()
+    }
 }

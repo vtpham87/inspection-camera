@@ -65,10 +65,8 @@ class ReviewActivity : AppCompatActivity() {
     private lateinit var cardSync: MaterialCardView
     private lateinit var tvSyncStatus: TextView
     private lateinit var pbSync: ProgressBar
-    private lateinit var btnSync: MaterialButton
     private lateinit var btnDone: MaterialButton
     private var isSyncing = false
-    private var finishAfterSync = false
 
     private lateinit var adapter: PhotoReviewAdapter
     private val reviewItems = mutableListOf<PhotoReviewItem>()
@@ -100,7 +98,6 @@ class ReviewActivity : AppCompatActivity() {
         cardSync = findViewById(R.id.card_review_sync)
         tvSyncStatus = findViewById(R.id.tv_review_sync_status)
         pbSync = findViewById(R.id.pb_review_sync)
-        btnSync = findViewById(R.id.btn_review_sync)
         btnDone = findViewById(R.id.btn_review_done)
 
         toolbar.setNavigationOnClickListener {
@@ -111,10 +108,6 @@ class ReviewActivity : AppCompatActivity() {
             }
         }
         tvPlate.text = PlateUtil.formatCompactPlate(plate, plateColor, lanKd)
-
-        btnSync.setOnClickListener {
-            uploadPendingPhotos(finishOnSuccess = false)
-        }
 
         btnDone.setOnClickListener {
             handleDoneClick()
@@ -189,58 +182,47 @@ class ReviewActivity : AppCompatActivity() {
     private fun loadPhotos() {
         reviewItems.clear()
 
-        // 1. Scan pending directory to find all pending (type, seq) for this plate & lanKd
-        val pendingSet = mutableSetOf<Pair<PhotoType, Int?>>()
-        val pendingDir = File(filesDir, "pending")
-        val pendingMetaList = mutableListOf<PendingUploadMetadata>()
-        if (pendingDir.exists() && pendingDir.isDirectory) {
-            val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
-            for (metaFile in metaFiles) {
-                try {
-                    val meta = gson.fromJson(metaFile.readText(), PendingUploadMetadata::class.java)
-                    if (meta.plate.equals(plate, ignoreCase = true) && meta.lanKd == lanKd) {
-                        val photoType = PhotoType.fromApiName(meta.photoType)
-                        if (photoType != null) {
-                            pendingSet.add(photoType to meta.seq)
-                            pendingMetaList.add(meta)
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Lỗi đọc file meta: ${metaFile.name}: ${e.message}")
-                }
-            }
-        }
-
-        // 2. Scan review directory for this plate & lanKd
+        // 1. Quét thư mục review của biển số và lần kiểm định
         val reviewDir = if (lanKd > 1) File(filesDir, "review/$plate/$lanKd") else File(filesDir, "review/$plate")
         if (reviewDir.exists() && reviewDir.isDirectory) {
             val files = reviewDir.listFiles { f -> f.extension.equals("jpg", ignoreCase = true) } ?: emptyArray()
             for (file in files) {
                 val item = parsePhotoReviewItem(file, isPending = false)
                 if (item != null) {
-                    val isPending = pendingSet.contains(item.photoType to item.seq)
-                    reviewItems.add(item.copy(isPending = isPending))
+                    val isUploaded = prefs.isPhotoUploaded(plate, lanKd, file.name)
+                    reviewItems.add(item.copy(isPending = !isUploaded))
                 }
             }
         }
 
-        // 3. Scan pending directory for any pending uploads not in reviewDir
-        for (meta in pendingMetaList) {
-            val imgFile = File(pendingDir, meta.imageFileName)
-            if (imgFile.exists()) {
-                val photoType = PhotoType.values().firstOrNull { it.apiName == meta.photoType }
-                if (photoType != null) {
-                    val alreadyPresent = reviewItems.any { it.photoType == photoType && it.seq == meta.seq }
-                    if (!alreadyPresent) {
-                        reviewItems.add(
-                            PhotoReviewItem(
-                                photoType = photoType,
-                                seq = meta.seq,
-                                file = imgFile,
-                                isPending = true
-                            )
-                        )
+        // 2. Quét thêm thư mục pending (nếu có ảnh từ phiên bản cũ chưa hoàn thành)
+        val pendingDir = File(filesDir, "pending")
+        if (pendingDir.exists() && pendingDir.isDirectory) {
+            val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
+            for (metaFile in metaFiles) {
+                try {
+                    val meta = gson.fromJson(metaFile.readText(), PendingUploadMetadata::class.java)
+                    if (meta.plate.equals(plate, ignoreCase = true) && meta.lanKd == lanKd) {
+                        val imgFile = File(pendingDir, meta.imageFileName)
+                        if (imgFile.exists()) {
+                            val photoType = PhotoType.fromApiName(meta.photoType)
+                            if (photoType != null) {
+                                val alreadyPresent = reviewItems.any { it.photoType == photoType && it.seq == meta.seq }
+                                if (!alreadyPresent) {
+                                    reviewItems.add(
+                                        PhotoReviewItem(
+                                            photoType = photoType,
+                                            seq = meta.seq,
+                                            file = imgFile,
+                                            isPending = true
+                                        )
+                                    )
+                                }
+                            }
+                        }
                     }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Lỗi đọc file meta: ${metaFile.name}: ${e.message}")
                 }
             }
         }
@@ -259,12 +241,9 @@ class ReviewActivity : AppCompatActivity() {
                 tvSyncStatus.text = getString(R.string.sync_all_done)
                 tvSyncStatus.setTextColor(ContextCompat.getColor(this, R.color.status_done_text))
                 pbSync.visibility = View.GONE
-                btnSync.visibility = View.GONE
             } else {
                 tvSyncStatus.text = getString(R.string.sync_pending_count, pendingCount)
                 tvSyncStatus.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
-                btnSync.visibility = View.VISIBLE
-                btnSync.text = getString(R.string.btn_sync_photos)
                 pbSync.visibility = View.GONE
             }
         }
@@ -272,92 +251,35 @@ class ReviewActivity : AppCompatActivity() {
 
     private fun handleDoneClick() {
         if (isSyncing) {
-            finishAfterSync = true
-            Toast.makeText(this, "Đang đẩy ảnh về máy tính, sẽ tự động về trang đầu khi hoàn tất...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Đang đẩy ảnh về máy tính, vui lòng đợi giây lát...", Toast.LENGTH_SHORT).show()
             return
         }
 
-        val pendingDir = File(filesDir, "pending")
-        var hasPending = false
-        if (pendingDir.exists() && pendingDir.isDirectory) {
-            val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
-            for (mf in metaFiles) {
-                try {
-                    val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
-                    if (meta.plate.equals(plate, ignoreCase = true) && meta.lanKd == lanKd) {
-                        hasPending = true
-                        break
-                    }
-                } catch (_: Exception) {}
-            }
-        }
-
-        if (hasPending) {
-            uploadPendingPhotos(finishOnSuccess = true)
+        val pendingToUpload = reviewItems.filter { it.isPending && it.file != null && it.file.exists() }
+        if (pendingToUpload.isNotEmpty()) {
+            uploadPhotosAndFinish(pendingToUpload)
         } else {
+            prefs.markPlateDoneToday(plate, lanKd)
             finishAndGoHome()
         }
     }
 
-    private fun uploadPendingPhotos(finishOnSuccess: Boolean = false) {
-        if (isSyncing) {
-            if (finishOnSuccess) finishAfterSync = true
-            return
-        }
-        if (finishOnSuccess) {
-            finishAfterSync = true
-        }
-
-        val pendingDir = File(filesDir, "pending")
-        if (!pendingDir.exists() || !pendingDir.isDirectory) {
-            if (finishAfterSync) {
-                finishAndGoHome()
-            }
-            return
-        }
-
-        val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
-        val plateMetas = mutableListOf<Pair<File, PendingUploadMetadata>>()
-
-        for (mf in metaFiles) {
-            try {
-                val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
-                if (meta.plate.equals(plate, ignoreCase = true) && meta.lanKd == lanKd) {
-                    plateMetas.add(mf to meta)
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Lỗi đọc file pending meta: ${mf.name}: ${e.message}")
-            }
-        }
-
-        if (plateMetas.isEmpty()) {
-            tvSyncStatus.text = getString(R.string.sync_all_done)
-            tvSyncStatus.setTextColor(ContextCompat.getColor(this, R.color.status_done_text))
-            btnSync.visibility = View.GONE
-            pbSync.visibility = View.GONE
-            if (finishAfterSync) {
-                finishAndGoHome()
-            }
-            return
-        }
+    private fun uploadPhotosAndFinish(items: List<PhotoReviewItem>) {
+        if (isSyncing) return
 
         isSyncing = true
         pbSync.visibility = View.VISIBLE
-        btnSync.isEnabled = false
         btnDone.isEnabled = false
         val originalDoneText = getString(R.string.btn_done)
         btnDone.text = "ĐANG ĐẨY ẢNH VỀ MÁY TÍNH..."
 
         lifecycleScope.launch {
-            val total = plateMetas.size
+            val total = items.size
             var uploadedCount = 0
 
-            for ((metaFile, meta) in plateMetas) {
-                val imgFile = File(pendingDir, meta.imageFileName)
-                if (!imgFile.exists()) {
-                    metaFile.delete()
-                    continue
-                }
+            for (item in items) {
+                val imgFile = item.file ?: continue
+                if (!imgFile.exists()) continue
 
                 tvSyncStatus.text = "Đang đẩy ảnh về máy tính (${uploadedCount + 1}/$total)..."
                 tvSyncStatus.setTextColor(ContextCompat.getColor(this@ReviewActivity, R.color.text_primary))
@@ -365,11 +287,11 @@ class ReviewActivity : AppCompatActivity() {
                 val success = withContext(Dispatchers.IO) {
                     try {
                         FirebaseManager.uploadPhotoToInbox(
-                            plate = meta.plate,
-                            plateColor = meta.plateColor,
-                            photoType = meta.photoType,
-                            seq = meta.seq ?: 1,
-                            lanKd = meta.lanKd,
+                            plate = plate,
+                            plateColor = plateColor,
+                            photoType = item.photoType.apiName,
+                            seq = item.seq ?: 1,
+                            lanKd = lanKd,
                             photoFile = imgFile
                         )
                     } catch (e: Exception) {
@@ -379,38 +301,38 @@ class ReviewActivity : AppCompatActivity() {
                 }
 
                 if (success) {
-                    imgFile.delete()
-                    metaFile.delete()
+                    prefs.markPhotoUploaded(plate, lanKd, imgFile.name)
+                    if (imgFile.parentFile?.name == "pending") {
+                        val baseName = imgFile.nameWithoutExtension
+                        val metaFile = File(imgFile.parentFile, "$baseName.meta")
+                        if (metaFile.exists()) metaFile.delete()
+                        imgFile.delete()
+                    }
                     uploadedCount++
                 }
             }
 
             isSyncing = false
             pbSync.visibility = View.GONE
-            btnSync.isEnabled = true
             btnDone.isEnabled = true
             btnDone.text = originalDoneText
 
             if (uploadedCount == total) {
+                prefs.markPlateDoneToday(plate, lanKd)
                 Toast.makeText(this@ReviewActivity, "Đã gửi thành công $uploadedCount ảnh về máy tính", Toast.LENGTH_SHORT).show()
-                if (finishAfterSync) {
-                    finishAndGoHome()
-                    return@launch
-                }
+                finishAndGoHome()
             } else if (uploadedCount > 0) {
                 val remaining = total - uploadedCount
                 Toast.makeText(this@ReviewActivity, "Đã gửi $uploadedCount/$total ảnh. Còn $remaining ảnh chưa gửi được!", Toast.LENGTH_LONG).show()
-                tvSyncStatus.text = "⚠️ Còn $remaining ảnh chưa gửi được. Bấm để thử lại."
+                tvSyncStatus.text = "⚠️ Còn $remaining ảnh chưa gửi được. Bấm Hoàn thành để thử lại."
                 tvSyncStatus.setTextColor(ContextCompat.getColor(this@ReviewActivity, R.color.error))
-                finishAfterSync = false
+                loadPhotos()
             } else {
                 Toast.makeText(this@ReviewActivity, "Không thể gửi ảnh về máy tính. Vui lòng kiểm tra mạng!", Toast.LENGTH_LONG).show()
                 tvSyncStatus.text = getString(R.string.sync_failed)
                 tvSyncStatus.setTextColor(ContextCompat.getColor(this@ReviewActivity, R.color.error))
-                finishAfterSync = false
+                loadPhotos()
             }
-
-            loadPhotos()
         }
     }
 
@@ -467,7 +389,12 @@ class ReviewActivity : AppCompatActivity() {
             }
 
             // 2. Delete local files
+            val deletedFileName = item.file?.name
             item.file?.delete()
+            if (deletedFileName != null) {
+                prefs.clearPhotoUploaded(plate, lanKd, deletedFileName)
+            }
+            prefs.clearPlateDoneToday(plate, lanKd)
 
             // 3. Delete any matching meta files in pending
             val pendingDir = File(filesDir, "pending")

@@ -115,18 +115,6 @@
                 android:visibility="gone"
                 android:layout_marginBottom="8dp" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_review_sync"
-                android:layout_width="match_parent"
-                android:layout_height="50dp"
-                android:text="@string/btn_sync_photos"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                android:textColor="@color/text_white"
-                app:backgroundTint="@color/primary"
-                app:cornerRadius="8dp"
-                android:layout_marginBottom="8dp" />
-
             <!-- Done Button to return straight to MainActivity -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_review_done"

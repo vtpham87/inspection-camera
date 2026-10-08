@@ -296,8 +296,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun isVehicleFinished(vehicle: Vehicle): Boolean {
+        if (prefs.isPlateDoneToday(vehicle.plateClean, vehicle.lanKd)) return true
         if (vehicle.isFinished()) return true
-        if (hasLocalCompletedPhotos(vehicle.plateClean, vehicle.lanKd)) return true
         return false
     }
 
@@ -307,48 +307,6 @@ class MainActivity : AppCompatActivity() {
         val calTarget = Calendar.getInstance().apply { this.timeInMillis = timeMillis }
         return calNow.get(Calendar.YEAR) == calTarget.get(Calendar.YEAR) &&
                calNow.get(Calendar.DAY_OF_YEAR) == calTarget.get(Calendar.DAY_OF_YEAR)
-    }
-
-    private fun hasLocalCompletedPhotos(plate: String, lanKd: Int): Boolean {
-        if (plate.isBlank()) return false
-        val cleanPlate = plate.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
-
-        // 1. Kiểm tra ảnh trong thư mục review (chỉ tính ảnh chụp trong ngày hôm nay)
-        val reviewDir = if (lanKd > 1) File(filesDir, "review/$cleanPlate/$lanKd") else File(filesDir, "review/$cleanPlate")
-        var hasLocalRear = false
-        var hasLocalFront = false
-
-        if (reviewDir.exists() && reviewDir.isDirectory) {
-            val files = reviewDir.listFiles { f -> f.extension.equals("jpg", ignoreCase = true) } ?: emptyArray()
-            for (f in files) {
-                if (isSameDay(f.lastModified())) {
-                    if (f.name.startsWith("rear_45")) hasLocalRear = true
-                    if (f.name.startsWith("front_45")) hasLocalFront = true
-                }
-            }
-        }
-
-        // 2. Kiểm tra ảnh trong thư mục pending (ảnh đang chờ upload trong ngày hôm nay)
-        if (!hasLocalRear || !hasLocalFront) {
-            val pendingDir = File(filesDir, "pending")
-            if (pendingDir.exists() && pendingDir.isDirectory) {
-                val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
-                for (mf in metaFiles) {
-                    try {
-                        val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
-                        val metaPlate = meta.plate.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
-                        if (metaPlate == cleanPlate && meta.lanKd == lanKd && isSameDay(meta.timestamp)) {
-                            if (meta.photoType == "rear_45") hasLocalRear = true
-                            if (meta.photoType == "front_45") hasLocalFront = true
-                        }
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Lỗi đọc pending meta: ${mf.name}: ${e.message}")
-                    }
-                }
-            }
-        }
-
-        return hasLocalRear && hasLocalFront
     }
 
     /**
@@ -380,13 +338,13 @@ class MainActivity : AppCompatActivity() {
             val hasFront = photos.any { it.startsWith("front_45") }
             if (hasRear && hasFront) return true
 
-            // Đã có đủ ảnh Lần 1 lưu cục bộ trên máy hôm nay
-            if (hasLocalCompletedPhotos(matching.plateClean, 1)) return true
+            // Đã bấm hoàn thành Lần 1 trên máy hôm nay
+            if (prefs.isPlateDoneToday(matching.plateClean, 1)) return true
         }
 
-        // 2. Kiểm tra ảnh lưu cục bộ trên máy (thư mục review hoặc pending) cho Lần 1 trong ngày
-        if (hasLocalCompletedPhotos(cleanBase, 1)) return true
-        if (hasLocalCompletedPhotos(cleanInput, 1)) return true
+        // 2. Kiểm tra SharedPreferences đã bấm hoàn thành Lần 1 trong ngày
+        if (prefs.isPlateDoneToday(cleanBase, 1)) return true
+        if (prefs.isPlateDoneToday(cleanInput, 1)) return true
 
         return false
     }

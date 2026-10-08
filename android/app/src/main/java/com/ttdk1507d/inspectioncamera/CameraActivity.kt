@@ -584,14 +584,6 @@ class CameraActivity : AppCompatActivity() {
             // 4. Save copy to local review cache on phone
             saveToLocalReview(type, seq, jpegBytes)
 
-            // 5. Save to pending queue for upload
-            saveToPendingQueue(type, seq, jpegBytes)
-
-            // 6. If uploadMode is "immediate", trigger background upload
-            if (prefs.uploadMode == "immediate") {
-                triggerBackgroundUpload(type, seq, jpegBytes)
-            }
-
             runOnUiThread {
                 refreshLocalPhotoStatus()
             }
@@ -616,88 +608,6 @@ class CameraActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 // Ignore recycle error
-            }
-        }
-    }
-
-    private fun saveToPendingQueue(type: PhotoType, seq: Int?, bytes: ByteArray) {
-        try {
-            val pendingDir = File(filesDir, "pending")
-            if (!pendingDir.exists()) pendingDir.mkdirs()
-
-            // Dọn dẹp file pending cũ nếu chụp lại cùng góc và cùng số thứ tự
-            val existingMetas = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
-            for (mf in existingMetas) {
-                try {
-                    val m = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
-                    if (m.plate.equals(plate, ignoreCase = true) &&
-                        m.lanKd == lanKd &&
-                        m.photoType == type.apiName &&
-                        m.seq == seq
-                    ) {
-                        val oldImg = File(pendingDir, m.imageFileName)
-                        if (oldImg.exists()) oldImg.delete()
-                        mf.delete()
-                    }
-                } catch (_: Exception) {}
-            }
-
-            val timestamp = System.currentTimeMillis()
-            val imgFile = File(pendingDir, "pending_${timestamp}_${type.apiName}.jpg")
-            val metaFile = File(pendingDir, "pending_${timestamp}_${type.apiName}.meta")
-
-            FileOutputStream(imgFile).use { it.write(bytes) }
-
-            val meta = PendingUploadMetadata(
-                imageFileName = imgFile.name,
-                plate = plate,
-                plateColor = plateColor,
-                photoType = type.apiName,
-                seq = seq,
-                lanKd = lanKd,
-                timestamp = timestamp
-            )
-            val metaJson = gson.toJson(meta)
-            metaFile.writeText(metaJson)
-        } catch (e: Exception) {
-            Log.e(TAG, "Lỗi lưu pending queue: ${e.message}", e)
-        }
-    }
-
-    private fun triggerBackgroundUpload(type: PhotoType, seq: Int?, bytes: ByteArray) {
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                val pendingDir = File(filesDir, "pending")
-                if (!pendingDir.exists()) return@launch
-
-                val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
-                for (mf in metaFiles) {
-                    try {
-                        val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
-                        if (meta.plate == plate && meta.photoType == type.apiName && meta.seq == seq && meta.lanKd == lanKd) {
-                            val targetFile = File(pendingDir, meta.imageFileName)
-                            if (targetFile.exists()) {
-                                val uploadOk = FirebaseManager.uploadPhotoToInbox(
-                                    plate = plate,
-                                    plateColor = plateColor,
-                                    photoType = type.apiName,
-                                    seq = seq ?: 1,
-                                    lanKd = lanKd,
-                                    photoFile = targetFile
-                                )
-                                if (uploadOk) {
-                                    targetFile.delete()
-                                    mf.delete()
-                                }
-                            }
-                            break
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Lỗi upload pending ảnh ${type.apiName}: ${e.message}")
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Lỗi triggerBackgroundUpload: ${e.message}")
             }
         }
     }
@@ -753,6 +663,8 @@ class CameraActivity : AppCompatActivity() {
             }
             val targetFile = File(reviewDir, fileName)
             FileOutputStream(targetFile).use { it.write(bytes) }
+            prefs.clearPhotoUploaded(plate, lanKd, fileName)
+            prefs.clearPlateDoneToday(plate, lanKd)
         } catch (e: Exception) {
             // Non-critical cache
         }
