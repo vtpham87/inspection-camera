@@ -30,10 +30,11 @@ class PhotoConfig(BaseModel):
     }
     jpeg_quality: int = 85
     plate_color_suffix: bool = True
+    auto_start_with_windows: bool = True
     timestamp: TimestampConfig = TimestampConfig()
     photo_resolution: str = "original"
 
-    def model_post_init(self, __context):
+    def recalculate_paths(self) -> None:
         self.plate_color_suffix = True
         root = self.photo_save_dir.rstrip("\\/")
         # Ảnh góc 45° lưu trực tiếp vào thư mục chọn, không tạo thư mục con theo ngày
@@ -49,24 +50,23 @@ class PhotoConfig(BaseModel):
                 self.new_vehicle_path = f"{root}\\{{date}}\\{{plate}}"
 
         # If passenger_path is explicitly set or customized, sync to paths
-        if self.passenger_path != "D:\\Photos\\{date}\\{plate}":
-            p_val = self.passenger_path.rstrip("\\/")
-            if "{plate}" not in p_val:
-                p_val = f"{p_val}\\{{plate}}"
+        p_val = (self.passenger_path or "").rstrip("\\/")
+        if p_val and "{plate}" not in p_val:
+            p_val = f"{p_val}\\{{plate}}"
+        if p_val:
             self.passenger_path = p_val
             self.paths["passenger"] = p_val
-        elif "passenger" in self.paths and "{plate}" not in self.paths["passenger"]:
-            self.paths["passenger"] = f"{self.paths['passenger'].rstrip(chr(92))}\\{{plate}}"
 
         # If new_vehicle_path is explicitly set or customized, sync to paths
-        if self.new_vehicle_path != "D:\\Photos\\{date}\\{plate}":
-            nv_val = self.new_vehicle_path.rstrip("\\/")
-            if "{plate}" not in nv_val:
-                nv_val = f"{nv_val}\\{{plate}}"
+        nv_val = (self.new_vehicle_path or "").rstrip("\\/")
+        if nv_val and "{plate}" not in nv_val:
+            nv_val = f"{nv_val}\\{{plate}}"
+        if nv_val:
             self.new_vehicle_path = nv_val
             self.paths["new_vehicle"] = nv_val
-        elif "new_vehicle" in self.paths and "{plate}" not in self.paths["new_vehicle"]:
-            self.paths["new_vehicle"] = f"{self.paths['new_vehicle'].rstrip(chr(92))}\\{{plate}}"
+
+    def model_post_init(self, __context):
+        self.recalculate_paths()
 
 CONFIG_DEFAULTS = PhotoConfig()
 
@@ -83,6 +83,7 @@ def load_config(path: str = "photo_config.json") -> PhotoConfig:
     return config
 
 def save_config(config: PhotoConfig, path: str = "photo_config.json") -> None:
+    config.recalculate_paths()
     dirname = os.path.dirname(path)
     if dirname:
         os.makedirs(dirname, exist_ok=True)

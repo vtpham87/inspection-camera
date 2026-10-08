@@ -4,6 +4,7 @@ from photo_handler import (
     normalize_plate,
     clean_plate_and_color,
     extract_plate_color,
+    should_omit_color_suffix,
     build_filename,
     resolve_save_path,
     validate_jpeg,
@@ -52,12 +53,38 @@ def test_extract_color_old_plate():
     assert plate_t == "11K2639"
     assert color_t is None
 
+def test_extract_color_special_series():
+    """Biển KT, LD, HC không gắn hậu tố màu dù có 5 số."""
+    for p in ["15KT12345", "15LD12345", "15HC12345", "15KT12345T", "15LD12345V", "15HC12345X"]:
+        plate, color = extract_plate_color(p)
+        assert color is None
+        assert plate.startswith("15") and plate.endswith("12345")
+
+def test_should_omit_color_suffix():
+    assert should_omit_color_suffix("15KT12345") is True
+    assert should_omit_color_suffix("15LD12345") is True
+    assert should_omit_color_suffix("15HC12345") is True
+    assert should_omit_color_suffix("15KT-123.45") is True
+    assert should_omit_color_suffix("29KT99999") is True
+    assert should_omit_color_suffix("11K2639") is True
+    assert should_omit_color_suffix("15A12345") is False
+    assert should_omit_color_suffix("15B99999") is False
+    assert should_omit_color_suffix("15C12345") is False
+
 # --- build_filename ---
 def test_filename_rear_45_with_color():
     assert build_filename("15A12345", "T", "rear_45", None, True) == "15A12345T.jpg"
 
 def test_filename_rear_45_no_color():
     assert build_filename("11K2639", None, "rear_45", None, True) == "11K2639.jpg"
+
+def test_filename_special_series_ignores_color():
+    """Biển KT, LD, HC không thêm t/v/x khi lưu file."""
+    assert build_filename("15KT12345", "T", "rear_45", None, True) == "15KT12345.jpg"
+    assert build_filename("15KT12345", "V", "rear_45", None, True) == "15KT12345.jpg"
+    assert build_filename("15LD12345", "T", "front_45", None, True) == "bs15LD12345.jpg"
+    assert build_filename("15HC12345", "X", "chassis", None, True) == "sk_15HC12345.jpg"
+    assert build_filename("15KT12345", "T", "rear_45", None, True, lan_kd=2) == "15KT12345L2.jpg"
 
 def test_filename_old_plate_ignores_color():
     """Biển cũ mặc định không thêm t/v/x dù có truyền mã màu."""
@@ -115,6 +142,13 @@ def test_resolve_save_path_color_formats(tmp_path):
     # Old 4-digit plate (no color)
     r6 = resolve_save_path("passenger", "11K2639", config)
     assert r6.endswith("11K2639")
+    # Special series KT, LD, HC (no color suffix even with 5 digits)
+    r7 = resolve_save_path("passenger", "15KT12345", config)
+    assert r7.endswith("15KT12345")
+    r8 = resolve_save_path("passenger", "15LD12345", config, plate_color="V")
+    assert r8.endswith("15LD12345")
+    r9 = resolve_save_path("passenger", "15HC12345", config, plate_color="X")
+    assert r9.endswith("15HC12345")
 
 def test_resolve_save_path_no_create_dir(tmp_path):
     config = PhotoConfig()

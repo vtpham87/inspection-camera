@@ -79,6 +79,7 @@ def sync_config_to_firebase(config: Optional[Any] = None) -> bool:
     try:
         if config is None:
             config = load_config(CONFIG_PATH)
+        config.recalculate_paths()
 
         payload = {
             "photo_save_dir": config.photo_save_dir,
@@ -87,6 +88,7 @@ def sync_config_to_firebase(config: Optional[Any] = None) -> bool:
             "sync_new_vehicle_45": config.sync_new_vehicle_45,
             "server_port": config.server_port,
             "vehicle_list_enabled": config.vehicle_list_enabled,
+            "auto_start_with_windows": getattr(config, "auto_start_with_windows", True),
             "jpeg_quality": config.jpeg_quality,
             "photo_resolution": config.photo_resolution,
             "plate_color_suffix": config.plate_color_suffix,
@@ -140,6 +142,8 @@ def sync_config_from_firebase() -> bool:
                     config.new_vehicle_path = update_data["new_vehicle_path"]
                 if "sync_new_vehicle_45" in update_data:
                     config.sync_new_vehicle_45 = bool(update_data["sync_new_vehicle_45"])
+                if "auto_start_with_windows" in update_data:
+                    config.auto_start_with_windows = bool(update_data["auto_start_with_windows"])
                 if "jpeg_quality" in update_data:
                     try:
                         q = int(update_data["jpeg_quality"])

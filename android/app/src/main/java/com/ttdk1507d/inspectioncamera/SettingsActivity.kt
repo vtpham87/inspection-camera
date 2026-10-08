@@ -279,7 +279,9 @@ class SettingsActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val serverConfig = FirebaseManager.fetchConfigOnce()
             if (serverConfig != null) {
-                applyFirebaseConfig(serverConfig)
+                if (prefs.photoSaveDir.isBlank() && etPhotoSaveDir.text.isNullOrBlank()) {
+                    applyFirebaseConfig(serverConfig)
+                }
                 tvPathsSyncStatus.text = "🟢 Đã đồng bộ với máy tính trạm qua Firebase"
                 tvPathsSyncStatus.setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.success))
             } else {

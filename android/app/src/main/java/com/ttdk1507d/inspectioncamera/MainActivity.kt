@@ -478,6 +478,8 @@ class MainActivity : AppCompatActivity() {
                                 }
                             }
                         }
+                    } else {
+                        rgPlateColor.clearCheck()
                     }
 
                     // Tự động nhận diện Lần 2 khi dữ liệu trong ngày đã có đủ

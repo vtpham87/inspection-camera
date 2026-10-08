@@ -19,6 +19,25 @@ def normalize_plate(raw: str) -> str:
     return cleaned
 
 
+def should_omit_color_suffix(plate: str) -> bool:
+    """Kiểm tra biển số có thuộc diện không thêm hậu tố màu (t/v/x) khi lưu hay không.
+
+    1. Các xe có sê-ri 2 chữ cái đặc biệt: KT (quân đội làm kinh tế), LD (liên doanh), HC (hành chính/công vụ)
+       ví dụ 15KT-123.45, 15LD-123.45, 15HC-123.45
+    2. Biển cũ (không kết thúc bằng 5 số, ví dụ 11K2639)
+    """
+    clean = re.sub(r"[.\-\s]", "", plate).upper()
+    # 1. Xe sê-ri KT, LD, HC (ví dụ 15KT, 15LD, 15HC, 29LD...)
+    if re.search(r"^\d{2}(?:KT|LD|HC)", clean):
+        return True
+    # Bóc tách hậu tố L[1-9] và màu T/V/X nếu có để kiểm tra 5 số đuôi
+    base = re.sub(r"(?:[TVX])?(?:L[1-9])?$", "", clean)
+    if re.search(r"[TVX]$", base) and len(base) > 1 and base[-2].isdigit():
+        base = base[:-1]
+    # 2. Biển cũ (không kết thúc bằng 5 số)
+    return not bool(re.search(r"\d{5}$", base))
+
+
 def clean_plate_and_color(
     plate: str,
     plate_color: str | None = None,
@@ -49,8 +68,7 @@ def clean_plate_and_color(
                 continue
         break
     color = plate_color or detected_color
-    if not re.search(r"\d{5}$", s):
-        # Biển cũ (không kết thúc bằng 5 số): mặc định không thêm t/v/x
+    if should_omit_color_suffix(s):
         color = None
     lan = lan_kd if (lan_kd and lan_kd > 1) else detected_lan
     return s, color, lan
@@ -70,7 +88,9 @@ def build_filename(
     lan_kd: int | None = 1,
 ) -> str:
     plate, plate_color, lan_kd = clean_plate_and_color(plate, plate_color, lan_kd)
-    if not plate_color and re.search(r"\d{5}$", plate):
+    if should_omit_color_suffix(plate):
+        plate_color = None
+    elif not plate_color and re.search(r"\d{5}$", plate):
         plate_color = "T"
     if lan_kd and lan_kd > 1:
         suffix = f"{plate_color or ''}L{lan_kd}"
@@ -115,7 +135,9 @@ def resolve_save_path(
     if not clean_p or not VALID_PLATE_RE.match(clean_p):
         raise ValueError(f"Biển số không hợp lệ: {plate}")
     final_color = plate_color or det_c
-    if not final_color and re.search(r"\d{5}$", clean_p):
+    if should_omit_color_suffix(clean_p):
+        final_color = None
+    elif not final_color and re.search(r"\d{5}$", clean_p):
         final_color = "T"
     folder_plate = f"{clean_p}{final_color}" if (final_color and getattr(config, "plate_color_suffix", True)) else clean_p
     path = template.replace("{date}", current_date).replace("{plate}", folder_plate)
@@ -137,7 +159,9 @@ def sync_new_vehicle_photos(
     lan_kd: int | None = 1,
 ) -> None:
     plate, plate_color, lan_kd = clean_plate_and_color(plate, plate_color, lan_kd)
-    if not plate_color and re.search(r"\d{5}$", plate):
+    if should_omit_color_suffix(plate):
+        plate_color = None
+    elif not plate_color and re.search(r"\d{5}$", plate):
         plate_color = "T"
     if not getattr(config, "sync_new_vehicle_45", True):
         return
@@ -202,7 +226,9 @@ def save_photo(
     if plate_color not in (None, "", "T", "V", "X"):
         return {"ok": False, "error": "Màu biển không hợp lệ"}
 
-    if not plate_color and re.search(r"\d{5}$", plate):
+    if should_omit_color_suffix(plate):
+        plate_color = None
+    elif not plate_color and re.search(r"\d{5}$", plate):
         plate_color = "T"
 
     # Validate photo type

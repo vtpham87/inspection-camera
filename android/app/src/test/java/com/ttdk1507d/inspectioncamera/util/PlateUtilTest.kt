@@ -111,4 +111,41 @@ class PlateUtilTest {
         assertEquals("16L3565", PlateUtil.formatCompactPlate("16L-3565", "T"))
         assertEquals("16L3565L2", PlateUtil.formatCompactPlate("16L-3565", "T", lanKd = 2))
     }
+
+    @Test
+    fun testSpecialSeriesIgnoresColor() {
+        // Biển KT, LD, HC (kể cả 5 số) không thêm t/v/x dù có truyền mã màu
+        assertTrue(PlateUtil.shouldOmitColorSuffix("15KT12345"))
+        assertTrue(PlateUtil.shouldOmitColorSuffix("15KT-123.45"))
+        assertTrue(PlateUtil.shouldOmitColorSuffix("15LD12345"))
+        assertTrue(PlateUtil.shouldOmitColorSuffix("15LD-123.45"))
+        assertTrue(PlateUtil.shouldOmitColorSuffix("15HC12345"))
+        assertTrue(PlateUtil.shouldOmitColorSuffix("15HC-123.45"))
+        assertTrue(PlateUtil.shouldOmitColorSuffix("29KT99999"))
+
+        assertEquals("15KT12345", PlateUtil.formatCompactPlate("15KT-123.45", "T"))
+        assertEquals("15KT12345", PlateUtil.formatCompactPlate("15KT-123.45", "V"))
+        assertEquals("15KT12345", PlateUtil.formatCompactPlate("15KT12345", "X"))
+        assertEquals("15KT12345L2", PlateUtil.formatCompactPlate("15KT-123.45", "T", lanKd = 2))
+
+        assertEquals("15LD12345", PlateUtil.formatCompactPlate("15LD-123.45", "T"))
+        assertEquals("15LD12345", PlateUtil.formatCompactPlate("15LD12345", "V"))
+        assertEquals("15LD12345L2", PlateUtil.formatCompactPlate("15LD-123.45", "T", lanKd = 2))
+
+        assertEquals("15HC12345", PlateUtil.formatCompactPlate("15HC-123.45", "T"))
+        assertEquals("15HC12345", PlateUtil.formatCompactPlate("15HC12345", "X"))
+        assertEquals("15HC12345L2", PlateUtil.formatCompactPlate("15HC-123.45", "T", lanKd = 2))
+
+        val resolvedKT = PlateUtil.resolveFullPlate("15KT-123.45", "T")
+        assertEquals("15KT12345", resolvedKT.basePlate)
+        assertNull(resolvedKT.color)
+
+        val resolvedLD = PlateUtil.resolveFullPlate("15LD-123.45", "V")
+        assertEquals("15LD12345", resolvedLD.basePlate)
+        assertNull(resolvedLD.color)
+
+        val resolvedHC = PlateUtil.resolveFullPlate("15HC-123.45", "X")
+        assertEquals("15HC12345", resolvedHC.basePlate)
+        assertNull(resolvedHC.color)
+    }
 }

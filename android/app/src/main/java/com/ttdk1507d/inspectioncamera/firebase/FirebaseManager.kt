@@ -350,6 +350,25 @@ object FirebaseManager {
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed to send config_update to ${targetNode.name}: ${e.message}")
                 }
+
+                // Cập nhật trực tiếp /config.json để app không bị ghi đè ngược cấu hình cũ
+                try {
+                    val urlConfig = URL("${targetNode.url}/config.json")
+                    val connConfig = urlConfig.openConnection() as HttpURLConnection
+                    connConfig.connectTimeout = 4000
+                    connConfig.readTimeout = 4000
+                    connConfig.requestMethod = "PATCH"
+                    connConfig.doOutput = true
+                    connConfig.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                    connConfig.outputStream.use { os ->
+                        os.write(jsonPayload.toByteArray(Charsets.UTF_8))
+                    }
+                    val code = connConfig.responseCode
+                    connConfig.disconnect()
+                    Log.d(TAG, "Sent config patch to ${targetNode.name}: code $code")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to patch config to ${targetNode.name}: ${e.message}")
+                }
             }
             true
         } catch (e: Exception) {

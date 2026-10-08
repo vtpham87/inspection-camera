@@ -9,7 +9,7 @@ from datetime import datetime
 
 logger = logging.getLogger("vehicle_service")
 from config import PhotoConfig
-from photo_handler import extract_plate_color, resolve_save_path, build_filename
+from photo_handler import extract_plate_color, resolve_save_path, build_filename, should_omit_color_suffix
 
 PHOTO_TYPES = ["rear_45", "front_45", "chassis", "passenger", "new_vehicle"]
 
@@ -156,7 +156,9 @@ def check_plate_status(
 
     clean_plate, detected_color = extract_plate_color(plate)
     final_color = plate_color or detected_color
-    if not final_color and re.search(r"\d{5}$", clean_plate):
+    if should_omit_color_suffix(clean_plate):
+        final_color = None
+    elif not final_color and re.search(r"\d{5}$", clean_plate):
         final_color = "T"
     biendk_id = f"{clean_plate}{final_color}" if final_color else clean_plate
 

@@ -2,6 +2,7 @@ package com.ttdk1507d.inspectioncamera.util
 
 object PlateUtil {
     private val VALID_PLATE = Regex("^[A-Z0-9]+$")
+    private val NO_COLOR_SERIES = Regex("^\\d{2}(KT|LD|HC)")
 
     data class PlateInfo(
         val basePlate: String,
@@ -18,8 +19,25 @@ object PlateUtil {
     }
 
     /**
+     * Kiểm tra biển không dùng hậu tố màu (T/V/X):
+     * 1. Sê-ri đặc biệt: KT, LD, HC (ví dụ 15KT, 15LD, 15HC)
+     * 2. Biển cũ: không kết thúc bằng 5 chữ số
+     */
+    fun shouldOmitColorSuffix(plate: String): Boolean {
+        val clean = plate.replace(Regex("[.\\-\\s]"), "").uppercase()
+        if (NO_COLOR_SERIES.containsMatchIn(clean)) return true
+        val parsed = parsePlate(clean)
+        return !Regex("\\d{5}$").containsMatchIn(parsed.basePlate)
+    }
+
+    fun isOldPlate(plate: String): Boolean {
+        return shouldOmitColorSuffix(plate)
+    }
+
+    /**
      * Tách biển số thành 3 phần: Biển thuần (basePlate), Màu biển (T/V/X hoặc null), Lần KD (1, 2, ...).
      * Loại bỏ triệt để việc lặp đuôi (ví dụ 15A12345TL2, 15A12345TL2TL2, 15A12345T, 15A12345TT...)
+     * Các biển đặc biệt KT/LD/HC và biển cũ không gán màu.
      */
     fun parsePlate(raw: String): PlateInfo {
         val clean = raw.replace(Regex("[.\\-\\s]"), "").uppercase()
@@ -52,14 +70,9 @@ object PlateUtil {
             }
             break
         }
-        val isOld = !Regex("\\d{5}$").containsMatchIn(s)
-        val finalColor = if (isOld) null else color
+        val omitColor = NO_COLOR_SERIES.containsMatchIn(s) || !Regex("\\d{5}$").containsMatchIn(s)
+        val finalColor = if (omitColor) null else color
         return PlateInfo(s, finalColor, lan)
-    }
-
-    fun isOldPlate(plate: String): Boolean {
-        val parsed = parsePlate(plate)
-        return !Regex("\\d{5}$").containsMatchIn(parsed.basePlate)
     }
 
     /**
@@ -67,13 +80,13 @@ object PlateUtil {
      */
     fun resolveFullPlate(rawPlate: String, intentColor: String? = null): PlateInfo {
         val parsed = parsePlate(rawPlate)
-        val isOld = isOldPlate(parsed.basePlate)
-        var color: String? = if (isOld) {
+        val omitColor = shouldOmitColorSuffix(parsed.basePlate)
+        var color: String? = if (omitColor) {
             null
         } else {
             intentColor ?: parsed.color
         }
-        if (!isOld && color == null && Regex("\\d{5}$").containsMatchIn(parsed.basePlate)) {
+        if (!omitColor && color == null && Regex("\\d{5}$").containsMatchIn(parsed.basePlate)) {
             color = "T"
         }
         return PlateInfo(parsed.basePlate, color, parsed.lanKd)
@@ -86,18 +99,18 @@ object PlateUtil {
 
     /**
      * Gộp biển + màu biển ngắn gọn: ví dụ 15A12345T, 15C12345V, 11K2639, hoặc 15A12345TL2 khi lanKd = 2.
-     * Biển cũ (4 số hoặc không có 5 số ở đuôi) mặc định không thêm t/v/x.
+     * Biển KT, LD, HC hoặc biển cũ mặc định không thêm t/v/x.
      */
     fun formatCompactPlate(rawPlate: String, rawColor: String?, lanKd: Int = 1): String {
         val parsed = parsePlate(rawPlate)
         val base = parsed.basePlate
-        val isOld = isOldPlate(base)
-        var color = if (isOld) {
-            null // Biển cũ mặc định không thêm t/v/x
+        val omitColor = shouldOmitColorSuffix(base)
+        var color = if (omitColor) {
+            null // Biển KT/LD/HC hoặc biển cũ mặc định không thêm t/v/x
         } else {
             (rawColor?.uppercase() ?: parsed.color)?.trim()
         }
-        if (!isOld && color.isNullOrEmpty() && Regex("\\d{5}$").containsMatchIn(base)) {
+        if (!omitColor && color.isNullOrEmpty() && Regex("\\d{5}$").containsMatchIn(base)) {
             color = "T"
         }
         val effectiveLan = if (lanKd > 1) lanKd else 1

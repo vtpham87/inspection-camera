@@ -16,6 +16,7 @@ from photo_handler import (
     save_photo,
     normalize_plate,
     extract_plate_color,
+    should_omit_color_suffix,
     build_filename,
     resolve_save_path,
     VALID_PHOTO_TYPES,
@@ -112,8 +113,11 @@ def delete_photo(req: DeleteRequest):
     plate_num, color = extract_plate_color(plate_clean)
     if req.plate_color:
         color = req.plate_color
-
-    candidate_colors = [color] if color else [None, "T", "V", "X"]
+    if should_omit_color_suffix(plate_num):
+        color = None
+        candidate_colors = [None]
+    else:
+        candidate_colors = [color] if color else [None, "T", "V", "X"]
     deleted_path = None
     matched_save_dir = None
     for c in candidate_colors:
@@ -233,6 +237,7 @@ def get_config():
 
 @app.post("/api/config")
 def post_config(config: PhotoConfig):
+    config.recalculate_paths()
     save_config(config, get_config_path())
     sync_status = "Đã lưu vào máy tính trạm"
     try:
@@ -504,6 +509,7 @@ HTML_CONTENT = """<!DOCTYPE html>
           font_size: parseInt(document.getElementById("ts_font_size").value) || 28
         }
       };
+      delete payload.paths;
 
       try {
         const resp = await fetch("/api/config", {
