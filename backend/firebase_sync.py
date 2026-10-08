@@ -211,8 +211,13 @@ def rtdb_request(base_url: str, path: str, method: str = "GET", data: Any = None
         return None
 
 
+_LAST_VEHICLES_HASH: str = ""
+_LAST_SYNC_TIME: float = 0.0
+
+
 def sync_vehicles_to_firebase():
     """Đẩy danh sách xe hôm nay lên Firebase (Node chính của ngày + Node dự phòng)"""
+    global _LAST_VEHICLES_HASH, _LAST_SYNC_TIME
     try:
         config = load_config(CONFIG_PATH)
         today = datetime.now().strftime("%Y-%m-%d")
@@ -227,10 +232,19 @@ def sync_vehicles_to_firebase():
                 safe_key = plate_clean.replace(".", "").replace("/", "").replace("$", "").replace("#", "").replace("[", "").replace("]", "")
                 vehicles_dict[safe_key] = v
 
+        current_hash = json.dumps(vehicles_dict, sort_keys=True)
+        now = time.time()
+        # Nếu không đổi và chưa qua 60s, bỏ qua để tránh spam Firebase
+        if current_hash == _LAST_VEHICLES_HASH and (now - _LAST_SYNC_TIME) < 60.0:
+            return
+
         targets = get_active_nodes_for_today()
         for node in targets:
             rtdb_request(node["url"], "vehicles_today", method="PUT", data=vehicles_dict)
             logger.info(f"Đã đồng bộ {len(vehicles_dict)} xe lên {node['name']} ({node['url']})")
+
+        _LAST_VEHICLES_HASH = current_hash
+        _LAST_SYNC_TIME = now
     except Exception as e:
         logger.error(f"Lỗi khi đồng bộ danh sách xe lên Firebase: {e}", exc_info=True)
 

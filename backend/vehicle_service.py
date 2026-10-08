@@ -79,11 +79,16 @@ ORDER BY t.SoPhieuKD ASC
         }}
         $list += $item
     }}
-    $json = $list | ConvertTo-Json -Compress
-    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-    Write-Output $json
+    if ($list.Count -eq 0) {{
+        Write-Output "[]"
+    }} else {{
+        $json = $list | ConvertTo-Json -Compress
+        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+        Write-Output $json
+    }}
 }} catch {{
-    Write-Output "[]"
+    [Console]::Error.WriteLine($_.Exception.Message)
+    Write-Output "ERROR"
 }} finally {{
     if ($conn.State -eq [System.Data.ConnectionState]::Open) {{
         $conn.Close()
@@ -96,11 +101,20 @@ ORDER BY t.SoPhieuKD ASC
             [POWERSHELL_32, "-NoProfile", "-Command", ps_script],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=12
         )
         out = res.stdout.strip()
-        if not out or out == "[]":
+        if out == "ERROR" or res.returncode != 0:
+            if res.stderr:
+                logger.warning(f"Lỗi truy vấn Access DB qua PowerShell: {res.stderr.strip()}")
+            _ACCESS_CACHE["timestamp"] = now - 5.0
             return _ACCESS_CACHE["data"]
+
+        if not out or out == "[]":
+            _ACCESS_CACHE["timestamp"] = now
+            _ACCESS_CACHE["data"] = []
+            return []
+
         data = json.loads(out)
         rows = [data] if isinstance(data, dict) else data
         _ACCESS_CACHE["timestamp"] = now
@@ -108,6 +122,7 @@ ORDER BY t.SoPhieuKD ASC
         return rows
     except Exception as e:
         logger.warning(f"Lỗi truy vấn Access DB qua PowerShell: {e}")
+        _ACCESS_CACHE["timestamp"] = now - 5.0
         return _ACCESS_CACHE["data"]
 
 

@@ -12,6 +12,8 @@ Dim sh, fso, pythonExe, targetScript
 Set sh = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 
+sh.CurrentDirectory = "D:\inspection-camera\backend"
+
 pythonExe = "D:\inspection-camera\backend\venv\Scripts\python.exe"
 If Not fso.FileExists(pythonExe) Then
     pythonExe = "C:\Users\t1507d\AppData\Local\hermes\hermes-agent\venv\Scripts\python.exe"

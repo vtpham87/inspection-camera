@@ -9,12 +9,14 @@ For Each proc in colProcesses
     proc.Terminate()
 Next
 
-WScript.Sleep 1000
+WScript.Sleep 2000
 
 On Error Goto 0
 Dim sh, fso, pythonExe, targetScript
 Set sh = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
+
+sh.CurrentDirectory = "D:\inspection-camera\backend"
 
 pythonExe = "D:\inspection-camera\backend\venv\Scripts\python.exe"
 If Not fso.FileExists(pythonExe) Then
