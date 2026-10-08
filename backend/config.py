@@ -1,6 +1,19 @@
 import os
 import json
-from pydantic import BaseModel
+from typing import Any
+from pydantic import BaseModel, field_validator
+
+RESOLUTION_MAP = {
+    "original": "original",
+    "low": "low",
+    "hd": "low",
+    "720p": "low",
+    "medium": "medium",
+    "fhd": "medium",
+    "1080p": "medium",
+    "high": "high",
+    "4k": "high",
+}
 
 class TimestampConfig(BaseModel):
     enabled: bool = True
@@ -33,6 +46,14 @@ class PhotoConfig(BaseModel):
     auto_start_with_windows: bool = True
     timestamp: TimestampConfig = TimestampConfig()
     photo_resolution: str = "original"
+
+    @field_validator("photo_resolution", mode="before")
+    @classmethod
+    def normalize_photo_resolution(cls, v: Any) -> str:
+        if isinstance(v, str):
+            key = v.lower().strip()
+            return RESOLUTION_MAP.get(key, "original")
+        return "original"
 
     def recalculate_paths(self) -> None:
         self.plate_color_suffix = True

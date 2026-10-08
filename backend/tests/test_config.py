@@ -90,3 +90,17 @@ def test_load_config_overwrites_stale_date_paths(tmp_path):
     assert loaded.paths["rear_45"] == "Z:\\Anh Phuong Tien"
     assert loaded.paths["front_45"] == "Z:\\Anh Phuong Tien"
     assert "{date}" not in loaded.paths["rear_45"]
+
+def test_photo_resolution_normalization():
+    assert PhotoConfig(photo_resolution="720p").photo_resolution == "low"
+    assert PhotoConfig(photo_resolution="hd").photo_resolution == "low"
+    assert PhotoConfig(photo_resolution="low").photo_resolution == "low"
+    assert PhotoConfig(photo_resolution="1080p").photo_resolution == "medium"
+    assert PhotoConfig(photo_resolution="fhd").photo_resolution == "medium"
+    assert PhotoConfig(photo_resolution="medium").photo_resolution == "medium"
+    assert PhotoConfig(photo_resolution="4k").photo_resolution == "high"
+    assert PhotoConfig(photo_resolution="high").photo_resolution == "high"
+    assert PhotoConfig(photo_resolution="original").photo_resolution == "original"
+    assert PhotoConfig(photo_resolution="ORIGINAL").photo_resolution == "original"
+    assert PhotoConfig(photo_resolution="UNKNOWN").photo_resolution == "original"
+

@@ -103,12 +103,41 @@ def test_post_config(setup_env):
     r = client.get("/api/config")
     cfg = r.json()
     cfg["jpeg_quality"] = 70
+    cfg["photo_resolution"] = "medium"
     r2 = client.post("/api/config", json=cfg)
     assert r2.status_code == 200
     assert r2.json()["ok"] is True
     # Verify persisted
     r3 = client.get("/api/config")
     assert r3.json()["jpeg_quality"] == 70
+    assert r3.json()["photo_resolution"] == "medium"
+
+
+def test_post_config_photo_resolution_variants(setup_env):
+    client, _ = setup_env
+    # 1. Test "high" / "4k"
+    r = client.post("/api/config", json={"photo_resolution": "4k"})
+    assert r.status_code == 200
+    r_get = client.get("/api/config")
+    assert r_get.json()["photo_resolution"] == "high"
+
+    # 2. Test "1080p" -> "medium"
+    r = client.post("/api/config", json={"photo_resolution": "1080p"})
+    assert r.status_code == 200
+    r_get = client.get("/api/config")
+    assert r_get.json()["photo_resolution"] == "medium"
+
+    # 3. Test "720p" -> "low"
+    r = client.post("/api/config", json={"photo_resolution": "720p"})
+    assert r.status_code == 200
+    r_get = client.get("/api/config")
+    assert r_get.json()["photo_resolution"] == "low"
+
+    # 4. Test "original"
+    r = client.post("/api/config", json={"photo_resolution": "original"})
+    assert r.status_code == 200
+    r_get = client.get("/api/config")
+    assert r_get.json()["photo_resolution"] == "original"
 
 
 def test_upload_lan_kd_2(setup_env):

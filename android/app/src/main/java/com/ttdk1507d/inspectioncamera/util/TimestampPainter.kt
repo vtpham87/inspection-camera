@@ -22,10 +22,10 @@ object TimestampPainter {
     }
 
     fun resizeBitmap(bitmap: Bitmap, resolution: String): Bitmap {
-        val (targetLong, targetShort) = when (resolution.lowercase()) {
+        val (targetLong, targetShort) = when (resolution.lowercase().trim()) {
             "high", "4k" -> 3840 to 2160
-            "medium", "fhd" -> 1920 to 1080
-            "low", "hd" -> 1280 to 720
+            "medium", "fhd", "1080p" -> 1920 to 1080
+            "low", "hd", "720p" -> 1280 to 720
             else -> return bitmap // "original" or unknown
         }
 

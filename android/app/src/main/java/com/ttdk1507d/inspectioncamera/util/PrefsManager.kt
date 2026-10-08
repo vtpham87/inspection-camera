@@ -15,6 +15,16 @@ class PrefsManager(private val prefs: SharedPreferences) {
 
     companion object {
         const val DEFAULT_CLOUD_URL = "https://cottage-charlotte-valuation-bestsellers.trycloudflare.com"
+
+        fun normalizeResolution(raw: String?): String {
+            return when (raw?.lowercase()?.trim()) {
+                "720p", "hd", "low" -> "low"
+                "1080p", "fhd", "medium" -> "medium"
+                "4k", "high" -> "high"
+                "original" -> "original"
+                else -> if (raw.isNullOrBlank()) "low" else raw
+            }
+        }
     }
 
     constructor(context: Context) : this(
@@ -73,8 +83,14 @@ class PrefsManager(private val prefs: SharedPreferences) {
         set(value) { prefs.edit().putBoolean("timestamp_stroke_enabled", value).commit() }
 
     var photoResolution: String
-        get() = prefs.getString("photo_resolution", "low") ?: "low"
-        set(value) { prefs.edit().putString("photo_resolution", value).commit() }
+        get() {
+            val raw = prefs.getString("photo_resolution", "low") ?: "low"
+            return normalizeResolution(raw)
+        }
+        set(value) {
+            val normalized = normalizeResolution(value)
+            prefs.edit().putString("photo_resolution", normalized).commit()
+        }
 
     var jpegQuality: Int
         get() = prefs.getInt("jpeg_quality", 85)

@@ -152,9 +152,10 @@ def sync_config_from_firebase() -> bool:
                     except (ValueError, TypeError):
                         pass
                 if "photo_resolution" in update_data:
-                    res_val = str(update_data["photo_resolution"]).lower()
-                    if res_val in ("original", "4k", "1080p", "720p"):
-                        config.photo_resolution = res_val
+                    res_raw = str(update_data["photo_resolution"]).lower().strip()
+                    from config import RESOLUTION_MAP
+                    if res_raw in RESOLUTION_MAP:
+                        config.photo_resolution = RESOLUTION_MAP[res_raw]
 
                 # Cập nhật timestamp nếu có
                 if "timestamp" in update_data and isinstance(update_data["timestamp"], dict):

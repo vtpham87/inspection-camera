@@ -403,9 +403,10 @@ HTML_CONTENT = """<!DOCTYPE html>
           <div class="form-group">
             <label for="photo_resolution">Độ phân giải chụp:</label>
             <select id="photo_resolution">
-              <option value="low">Tiêu chuẩn (Khuyên dùng - Nhanh, nhẹ)</option>
-              <option value="medium">Trung bình</option>
-              <option value="original">Gốc (Dung lượng lớn)</option>
+              <option value="low">HD (1280×720 - Tiêu chuẩn, khuyên dùng)</option>
+              <option value="medium">Full HD (1920×1080 - Trung bình)</option>
+              <option value="high">4K (3840×2160 - Nét cao)</option>
+              <option value="original">Gốc camera (Dung lượng lớn)</option>
             </select>
           </div>
         </div>
@@ -451,7 +452,9 @@ HTML_CONTENT = """<!DOCTYPE html>
         document.getElementById("ts_format").value = ts.format || "HH:mm:ss - dd/MM/yyyy";
         document.getElementById("ts_position").value = ts.position || "bottom_right";
         document.getElementById("ts_font_size").value = ts.font_size || 28;
-        document.getElementById("photo_resolution").value = cfg.photo_resolution || "low";
+        const resVal = (cfg.photo_resolution || "original").toLowerCase();
+        const resMap = { "720p": "low", "hd": "low", "1080p": "medium", "fhd": "medium", "4k": "high" };
+        document.getElementById("photo_resolution").value = resMap[resVal] || resVal || "original";
 
         document.getElementById("sync-status-text").textContent = "Máy chủ 8095 sẵn sàng • Đã nạp cấu hình";
       } catch (err) {
