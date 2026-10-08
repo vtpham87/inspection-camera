@@ -1,7 +1,4 @@
-import os
-import json
-from unittest.mock import patch, MagicMock
-import pytest
+from unittest.mock import patch
 from config import PhotoConfig, load_config, save_config
 import firebase_sync
 

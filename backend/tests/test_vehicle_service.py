@@ -1,9 +1,8 @@
-import os
 import sqlite3
 from datetime import datetime
 from unittest.mock import patch, MagicMock
 import pytest
-from vehicle_service import get_vehicles_today, _check_photos_taken, PHOTO_TYPES
+from vehicle_service import get_vehicles_today, _check_photos_taken
 from config import PhotoConfig
 
 

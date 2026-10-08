@@ -1,7 +1,6 @@
 import os
 import json
-import pytest
-from config import load_config, save_config, PhotoConfig, TimestampConfig, CONFIG_DEFAULTS
+from config import load_config, save_config, PhotoConfig, CONFIG_DEFAULTS
 
 def test_defaults_have_correct_port():
     assert CONFIG_DEFAULTS.server_port == 8095

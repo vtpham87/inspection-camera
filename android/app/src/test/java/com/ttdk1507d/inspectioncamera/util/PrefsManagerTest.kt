@@ -153,6 +153,32 @@ class PrefsManagerTest {
         assertEquals(95, prefsManager.jpegQuality)
     }
 
+    @Test
+    fun testNormalizeResolution() {
+        assertEquals("high", PrefsManager.normalizeResolution("high"))
+        assertEquals("high", PrefsManager.normalizeResolution("4k"))
+        assertEquals("high", PrefsManager.normalizeResolution("4K"))
+        assertEquals("medium", PrefsManager.normalizeResolution("medium"))
+        assertEquals("medium", PrefsManager.normalizeResolution("1080p"))
+        assertEquals("medium", PrefsManager.normalizeResolution("fhd"))
+        assertEquals("low", PrefsManager.normalizeResolution("low"))
+        assertEquals("low", PrefsManager.normalizeResolution("720p"))
+        assertEquals("low", PrefsManager.normalizeResolution("hd"))
+        assertEquals("original", PrefsManager.normalizeResolution("original"))
+        assertEquals("original", PrefsManager.normalizeResolution("unknown"))
+        assertEquals("original", PrefsManager.normalizeResolution(null))
+    }
+
+    @Test
+    fun testPhotoResolutionSetterNormalizes() {
+        prefsManager.photoResolution = "1080p"
+        assertEquals("medium", prefsManager.photoResolution)
+        prefsManager.photoResolution = "4k"
+        assertEquals("high", prefsManager.photoResolution)
+        prefsManager.photoResolution = "720p"
+        assertEquals("low", prefsManager.photoResolution)
+    }
+
     /**
      * In-memory FakeSharedPreferences implementation for JVM unit tests.
      */

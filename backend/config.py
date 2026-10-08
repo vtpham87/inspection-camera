@@ -97,7 +97,7 @@ def load_config(path: str = "photo_config.json") -> PhotoConfig:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             return PhotoConfig(**data)
-        except (json.JSONDecodeError, Exception):
+        except Exception:
             return CONFIG_DEFAULTS
     config = PhotoConfig()
     save_config(config, path)
