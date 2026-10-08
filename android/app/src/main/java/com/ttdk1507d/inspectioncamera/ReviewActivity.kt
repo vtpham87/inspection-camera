@@ -401,12 +401,12 @@ class ReviewActivity : AppCompatActivity() {
                 val remaining = total - uploadedCount
                 Toast.makeText(this@ReviewActivity, "Đã gửi $uploadedCount/$total ảnh. Còn $remaining ảnh chưa gửi được!", Toast.LENGTH_LONG).show()
                 tvSyncStatus.text = "⚠️ Còn $remaining ảnh chưa gửi được. Bấm để thử lại."
-                tvSyncStatus.setTextColor(ContextCompat.getColor(this@ReviewActivity, R.color.status_error))
+                tvSyncStatus.setTextColor(ContextCompat.getColor(this@ReviewActivity, R.color.error))
                 finishAfterSync = false
             } else {
                 Toast.makeText(this@ReviewActivity, "Không thể gửi ảnh về máy tính. Vui lòng kiểm tra mạng!", Toast.LENGTH_LONG).show()
                 tvSyncStatus.text = getString(R.string.sync_failed)
-                tvSyncStatus.setTextColor(ContextCompat.getColor(this@ReviewActivity, R.color.status_error))
+                tvSyncStatus.setTextColor(ContextCompat.getColor(this@ReviewActivity, R.color.error))
                 finishAfterSync = false
             }
 
