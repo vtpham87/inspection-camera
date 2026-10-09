@@ -40,13 +40,30 @@ def decode_d32(text: str) -> str:
 _ACCESS_CACHE: dict = {"timestamp": 0.0, "data": []}
 
 
+def ensure_access_db() -> bool:
+    """Đảm bảo ổ đĩa mạng Z: và file CSDL Access khả dụng (tự động kết nối lại nếu bị ngắt sau khi reboot)."""
+    if os.path.exists(ACCESS_DB_PATH):
+        return True
+    try:
+        subprocess.run(
+            ["cmd.exe", "/c", "net", "use", "Z:", r"\\T1507\Data", "/persistent:yes"],
+            capture_output=True,
+            timeout=5,
+        )
+    except Exception:
+        pass
+    return os.path.exists(ACCESS_DB_PATH)
+
+
 def get_waiting_vehicles_from_access() -> list[dict]:
     """Query tmp_DangKyKD from PTCGDB Access DB via 32-bit PowerShell with 10s cache."""
+    global _ACCESS_CACHE
     now = time.time()
     if now - _ACCESS_CACHE["timestamp"] < 10.0 and _ACCESS_CACHE["data"]:
         return _ACCESS_CACHE["data"]
 
-    if not os.path.exists(ACCESS_DB_PATH):
+    if not ensure_access_db():
+        logger.warning(f"Không thể truy cập CSDL Access tại {ACCESS_DB_PATH} (ổ Z: chưa sẵn sàng)")
         return []
 
     ps_script = f"""
@@ -252,7 +269,7 @@ def get_vehicles_today(
         is_today = (date == today_str)
         is_production_db = os.path.normpath(db_path).endswith("ptcgdb.db")
         waiting_raw = []
-        if is_today and is_production_db and os.path.exists(ACCESS_DB_PATH):
+        if is_today and is_production_db and ensure_access_db():
             waiting_raw = get_waiting_vehicles_from_access()
 
         results = []

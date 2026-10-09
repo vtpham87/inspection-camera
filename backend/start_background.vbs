@@ -12,7 +12,15 @@ Dim sh, fso, pythonExe, targetScript
 Set sh = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 
-sh.CurrentDirectory = "D:\inspection-camera\backend"
+' Đảm bảo ổ đĩa mạng Z: được kết nối sau khi máy tính khởi động lại
+Dim i
+For i = 1 To 10
+    If fso.FolderExists("Z:\DataPTCGDB") Then Exit For
+    sh.Run "cmd.exe /c net use Z: \\T1507\Data /persistent:yes", 0, True
+    WScript.Sleep 2000
+Next
+
+sh.CurrentDirectory = "D:\inspection-camera-prod\backend"
 
 pythonExe = "D:\inspection-camera\backend\venv\Scripts\python.exe"
 If Not fso.FileExists(pythonExe) Then
