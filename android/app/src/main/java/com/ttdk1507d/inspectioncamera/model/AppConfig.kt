@@ -11,7 +11,7 @@ data class TimestampConfig(
     @SerializedName("font_stroke_enabled") val fontStrokeEnabled: Boolean = true,
     @SerializedName("font_stroke_color") val fontStrokeColor: String = "#000000",
     @SerializedName("font_stroke_width") val fontStrokeWidth: Float = 4.0f,
-    @SerializedName("background_color") val backgroundColor: String = "#80000000",
+    @SerializedName("background_color") val backgroundColor: String = "#00000000",
     val position: String = "bottom_right"
 )
 

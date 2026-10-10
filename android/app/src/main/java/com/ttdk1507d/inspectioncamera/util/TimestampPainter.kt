@@ -92,7 +92,7 @@ object TimestampPainter {
             color = try {
                 Color.parseColor(config.backgroundColor)
             } catch (e: Exception) {
-                Color.parseColor("#80000000")
+                Color.parseColor("#00000000")
             }
         }
 

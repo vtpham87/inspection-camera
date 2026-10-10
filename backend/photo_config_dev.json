@@ -24,7 +24,7 @@
     "font_stroke_enabled": true,
     "font_stroke_color": "#000000",
     "font_stroke_width": 2.0,
-    "background_color": "#80000000",
+    "background_color": "#00000000",
     "position": "top_left"
   },
   "photo_resolution": "original"
