@@ -15,6 +15,11 @@ RESOLUTION_MAP = {
     "4k": "high",
 }
 
+CONFIG_PATH = os.environ.get("PHOTO_CONFIG_PATH") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "photo_config.json")
+DB_PATH = os.environ.get("PTCGDB_PATH") or "C:\\PTCGDB_Online\\ptcgdb.db"
+ACCESS_DB_PATH = os.environ.get("PTCGDB_ACCESS_PATH") or r"Z:\DataPTCGDB\PT90_1507D.mdb"
+SYSDB_PATH = os.environ.get("PTCGDB_MDW_PATH") or r"C:\PTCGDB\SysDb.mdw"
+
 class TimestampConfig(BaseModel):
     enabled: bool = True
     format: str = "HH:mm:ss - dd/MM/yyyy"
@@ -57,34 +62,26 @@ class PhotoConfig(BaseModel):
 
     def recalculate_paths(self) -> None:
         self.plate_color_suffix = True
-        root = self.photo_save_dir.rstrip("\\/")
-        # Ảnh góc 45° lưu trực tiếp vào thư mục chọn, không tạo thư mục con theo ngày
+        root = self.photo_save_dir.rstrip("\/")
         self.paths["rear_45"] = root
         self.paths["front_45"] = root
         self.paths["chassis"] = root
 
-        # Sync root to passenger & new_vehicle if using defaults
-        if root != "D:\\Photos":
-            if self.passenger_path == "D:\\Photos\\{date}\\{plate}":
-                self.passenger_path = f"{root}\\{{date}}\\{{plate}}"
-            if self.new_vehicle_path == "D:\\Photos\\{date}\\{plate}":
-                self.new_vehicle_path = f"{root}\\{{date}}\\{{plate}}"
+        def _sync_path(val: str, default_template: str) -> str:
+            if root != "D:\Photos" and val == default_template:
+                val = f"{root}\{{date}}\{{plate}}"
+            val = (val or "").rstrip("\/")
+            if val and "{plate}" not in val:
+                val = f"{val}\{{plate}}"
+            return val
 
-        # If passenger_path is explicitly set or customized, sync to paths
-        p_val = (self.passenger_path or "").rstrip("\\/")
-        if p_val and "{plate}" not in p_val:
-            p_val = f"{p_val}\\{{plate}}"
-        if p_val:
-            self.passenger_path = p_val
-            self.paths["passenger"] = p_val
+        self.passenger_path = _sync_path(self.passenger_path, "D:\Photos\{date}\{plate}")
+        if self.passenger_path:
+            self.paths["passenger"] = self.passenger_path
 
-        # If new_vehicle_path is explicitly set or customized, sync to paths
-        nv_val = (self.new_vehicle_path or "").rstrip("\\/")
-        if nv_val and "{plate}" not in nv_val:
-            nv_val = f"{nv_val}\\{{plate}}"
-        if nv_val:
-            self.new_vehicle_path = nv_val
-            self.paths["new_vehicle"] = nv_val
+        self.new_vehicle_path = _sync_path(self.new_vehicle_path, "D:\Photos\{date}\{{plate}}")
+        if self.new_vehicle_path:
+            self.paths["new_vehicle"] = self.new_vehicle_path
 
     def model_post_init(self, __context):
         self.recalculate_paths()

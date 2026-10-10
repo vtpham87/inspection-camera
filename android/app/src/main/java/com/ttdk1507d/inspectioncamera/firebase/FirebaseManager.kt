@@ -200,19 +200,33 @@ object FirebaseManager {
                 if (continuation.isActive) continuation.resume(false)
                 return@suspendCancellableCoroutine
             }
-            var bytes = photoFile.readBytes()
-            if (bytes.size > 7 * 1024 * 1024) {
-                Log.w(TAG, "File ảnh quá lớn (${bytes.size} bytes > 7MB). Đang nén lại trước khi upload...")
-                val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                val baos = ByteArrayOutputStream()
-                bmp.compress(Bitmap.CompressFormat.JPEG, 70, baos)
-                bytes = baos.toByteArray()
-                bmp.recycle()
-                if (bytes.size > 7 * 1024 * 1024) {
-                    Log.e(TAG, "Ảnh sau khi nén vẫn > 7MB, hủy upload Firebase.")
-                    if (continuation.isActive) continuation.resume(false)
-                    return@suspendCancellableCoroutine
+            val fileSize = photoFile.length()
+            var bytes: ByteArray
+            if (fileSize > 500 * 1024) { // 500KB threshold to prevent Firebase Base64 limits
+                Log.w(TAG, "File ảnh > 500KB (${fileSize} bytes). Nén lại (inSampleSize) trước khi upload dự phòng...")
+                val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                android.graphics.BitmapFactory.decodeFile(photoFile.absolutePath, options)
+                
+                var sampleSize = 1
+                val maxDim = 1280 // Max dimension for fallback sync to keep Base64 small
+                while ((options.outWidth / sampleSize) > maxDim || (options.outHeight / sampleSize) > maxDim) {
+                    sampleSize *= 2
                 }
+                
+                options.inJustDecodeBounds = false
+                options.inSampleSize = sampleSize
+                val bmp = android.graphics.BitmapFactory.decodeFile(photoFile.absolutePath, options)
+                
+                if (bmp != null) {
+                    val baos = java.io.ByteArrayOutputStream()
+                    bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, baos)
+                    bytes = baos.toByteArray()
+                    bmp.recycle()
+                } else {
+                    bytes = photoFile.readBytes()
+                }
+            } else {
+                bytes = photoFile.readBytes()
             }
             val base64Str = Base64.encodeToString(bytes, Base64.NO_WRAP)
 

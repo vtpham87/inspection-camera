@@ -2,6 +2,9 @@ import os
 import re
 import shutil
 import time
+import threading
+
+_SEQ_LOCK = threading.Lock()
 from datetime import datetime
 from pathlib import Path
 from config import PhotoConfig
@@ -70,6 +73,10 @@ def clean_plate_and_color(
     color = plate_color or detected_color
     if should_omit_color_suffix(s):
         color = None
+    if should_omit_color_suffix(s):
+        color = None
+    elif not color and re.search(r"\d{5}$", s):
+        color = "T"
     lan = lan_kd if (lan_kd and lan_kd > 1) else detected_lan
     return s, color, lan
 
@@ -88,10 +95,7 @@ def build_filename(
     lan_kd: int | None = 1,
 ) -> str:
     plate, plate_color, lan_kd = clean_plate_and_color(plate, plate_color, lan_kd)
-    if should_omit_color_suffix(plate):
-        plate_color = None
-    elif not plate_color and re.search(r"\d{5}$", plate):
-        plate_color = "T"
+
     if lan_kd and lan_kd > 1:
         suffix = f"{plate_color or ''}L{lan_kd}"
         if photo_type == "rear_45":
@@ -135,10 +139,7 @@ def resolve_save_path(
     if not clean_p or not VALID_PLATE_RE.match(clean_p):
         raise ValueError(f"Biển số không hợp lệ: {plate}")
     final_color = plate_color or det_c
-    if should_omit_color_suffix(clean_p):
-        final_color = None
-    elif not final_color and re.search(r"\d{5}$", clean_p):
-        final_color = "T"
+
     folder_plate = f"{clean_p}{final_color}" if (final_color and getattr(config, "plate_color_suffix", True)) else clean_p
     path = template.replace("{date}", current_date).replace("{plate}", folder_plate)
     if create_dir:
@@ -159,10 +160,7 @@ def sync_new_vehicle_photos(
     lan_kd: int | None = 1,
 ) -> None:
     plate, plate_color, lan_kd = clean_plate_and_color(plate, plate_color, lan_kd)
-    if should_omit_color_suffix(plate):
-        plate_color = None
-    elif not plate_color and re.search(r"\d{5}$", plate):
-        plate_color = "T"
+
     if not getattr(config, "sync_new_vehicle_45", True):
         return
 
@@ -226,10 +224,7 @@ def save_photo(
     if plate_color not in (None, "", "T", "V", "X"):
         return {"ok": False, "error": "Màu biển không hợp lệ"}
 
-    if should_omit_color_suffix(plate):
-        plate_color = None
-    elif not plate_color and re.search(r"\d{5}$", plate):
-        plate_color = "T"
+
 
     # Validate photo type
     if photo_type not in VALID_PHOTO_TYPES:
@@ -248,16 +243,17 @@ def save_photo(
 
     # Auto-increment seq when seq is None for multi-photo types
     if photo_type in ("passenger", "new_vehicle") and seq is None:
-        color_part = plate_color if (plate_color and config.plate_color_suffix) else ""
-        prefix = f"{plate}{plate_color or ''}L{lan_kd}" if (lan_kd and lan_kd > 1) else f"{plate}{color_part}"
-        pattern = re.compile(rf"^{re.escape(prefix)}_(\d+)\.jpg$", re.IGNORECASE)
-        existing = []
-        if os.path.exists(save_dir) and os.path.isdir(save_dir):
-            for fname in os.listdir(save_dir):
-                m = pattern.match(fname)
-                if m:
-                    existing.append(int(m.group(1)))
-        seq = max(existing) + 1 if existing else 1
+        with _SEQ_LOCK:
+            color_part = plate_color if (plate_color and config.plate_color_suffix) else ""
+            prefix = f"{plate}{plate_color or ''}L{lan_kd}" if (lan_kd and lan_kd > 1) else f"{plate}{color_part}"
+            pattern = re.compile(rf"^{re.escape(prefix)}_(\d+)\.jpg$", re.IGNORECASE)
+            existing = []
+            if os.path.exists(save_dir) and os.path.isdir(save_dir):
+                for fname in os.listdir(save_dir):
+                    m = pattern.match(fname)
+                    if m:
+                        existing.append(int(m.group(1)))
+            seq = max(existing) + 1 if existing else 1
 
     # Build filename and path
     filename = build_filename(plate, plate_color, photo_type, seq, config.plate_color_suffix, lan_kd=lan_kd)

@@ -13,7 +13,7 @@ PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 if PROJECT_DIR not in sys.path:
     sys.path.insert(0, PROJECT_DIR)
 
-from config import load_config, CONFIG_PATH, DB_PATH
+from config import load_config
 from photo_handler import save_photo
 from vehicle_service import get_vehicles_today
 
@@ -48,14 +48,14 @@ FIREBASE_NODES = [
     },
 ]
 
+CONFIG_PATH = os.environ.get("PHOTO_CONFIG_PATH") or os.path.join(PROJECT_DIR, "photo_config.json")
+DB_PATH = os.environ.get("PTCGDB_PATH") or "C:\\PTCGDB_Online\\ptcgdb.db"
 
 
 def get_active_nodes_for_today() -> List[Dict[str, Any]]:
     """Trả về toàn bộ các node để đảm bảo tính đồng nhất 100% trên toàn bộ các cụm Firebase"""
     return FIREBASE_NODES
 
-
-import concurrent.futures
 
 def sync_config_to_firebase(config: Optional[Any] = None) -> bool:
     """Đồng bộ cấu hình từ PC lên Firebase RTDB để các thiết bị điện thoại nhận được"""
@@ -64,16 +64,36 @@ def sync_config_to_firebase(config: Optional[Any] = None) -> bool:
             config = load_config(CONFIG_PATH)
         config.recalculate_paths()
 
-        payload = config.model_dump()
-        payload["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        payload["source"] = "pc"
+        payload = {
+            "photo_save_dir": config.photo_save_dir,
+            "passenger_path": config.passenger_path,
+            "new_vehicle_path": config.new_vehicle_path,
+            "sync_new_vehicle_45": config.sync_new_vehicle_45,
+            "server_port": config.server_port,
+            "vehicle_list_enabled": config.vehicle_list_enabled,
+            "auto_start_with_windows": getattr(config, "auto_start_with_windows", True),
+            "jpeg_quality": config.jpeg_quality,
+            "photo_resolution": config.photo_resolution,
+            "plate_color_suffix": config.plate_color_suffix,
+            "timestamp": {
+                "enabled": config.timestamp.enabled,
+                "format": config.timestamp.format,
+                "font_size": config.timestamp.font_size,
+                "font_color": config.timestamp.font_color,
+                "font_bold": config.timestamp.font_bold,
+                "font_stroke_enabled": config.timestamp.font_stroke_enabled,
+                "font_stroke_color": config.timestamp.font_stroke_color,
+                "font_stroke_width": config.timestamp.font_stroke_width,
+                "background_color": config.timestamp.background_color,
+                "position": config.timestamp.position,
+            },
+            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "source": "pc",
+        }
 
-        def _push_node(node):
+        # Đẩy lên tất cả các node để điện thoại dù kết nối tới node nào cũng có cấu hình
+        for node in FIREBASE_NODES:
             rtdb_request(node["url"], "config", method="PUT", data=payload)
-            
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(FIREBASE_NODES)) as executor:
-            executor.map(_push_node, FIREBASE_NODES)
-            
         logger.info("Đã đồng bộ cấu hình PC lên tất cả các cụm Firebase")
         return True
     except Exception as e:
@@ -93,18 +113,49 @@ def sync_config_from_firebase() -> bool:
                 if config is None:
                     config = load_config(CONFIG_PATH)
 
-                # Filter valid fields to avoid Pydantic extra field errors
-                valid_keys = config.model_fields.keys()
-                filtered_data = {k: v for k, v in update_data.items() if k in valid_keys}
-                
+                # Cập nhật và kiểm tra tính hợp lệ của các trường cấu hình
+                def is_safe_path(p: str) -> bool:
+                    return isinstance(p, str) and bool(p.strip()) and ".." not in p
+
+                if "photo_save_dir" in update_data and is_safe_path(update_data["photo_save_dir"]):
+                    config.photo_save_dir = update_data["photo_save_dir"]
+                if "passenger_path" in update_data and is_safe_path(update_data["passenger_path"]):
+                    config.passenger_path = update_data["passenger_path"]
+                if "new_vehicle_path" in update_data and is_safe_path(update_data["new_vehicle_path"]):
+                    config.new_vehicle_path = update_data["new_vehicle_path"]
+                if "sync_new_vehicle_45" in update_data:
+                    config.sync_new_vehicle_45 = bool(update_data["sync_new_vehicle_45"])
+                if "auto_start_with_windows" in update_data:
+                    config.auto_start_with_windows = bool(update_data["auto_start_with_windows"])
+                if "jpeg_quality" in update_data:
+                    try:
+                        q = int(update_data["jpeg_quality"])
+                        if 10 <= q <= 100:
+                            config.jpeg_quality = q
+                    except (ValueError, TypeError):
+                        pass
+                if "photo_resolution" in update_data:
+                    res_raw = str(update_data["photo_resolution"]).lower().strip()
+                    from config import RESOLUTION_MAP
+                    if res_raw in RESOLUTION_MAP:
+                        config.photo_resolution = RESOLUTION_MAP[res_raw]
+
+                # Cập nhật timestamp nếu có
                 if "timestamp" in update_data and isinstance(update_data["timestamp"], dict):
                     ts_data = update_data["timestamp"]
-                    valid_ts_keys = config.timestamp.model_fields.keys()
-                    filtered_ts = {k: v for k, v in ts_data.items() if k in valid_ts_keys}
-                    config.timestamp = config.timestamp.model_copy(update=filtered_ts)
-                    filtered_data.pop("timestamp", None)
-                    
-                config = config.model_copy(update=filtered_data)
+                    if "enabled" in ts_data:
+                        config.timestamp.enabled = bool(ts_data["enabled"])
+                    if "format" in ts_data and isinstance(ts_data["format"], str) and len(ts_data["format"]) < 50:
+                        config.timestamp.format = str(ts_data["format"])
+                    if "position" in ts_data and ts_data["position"] in ("bottom_right", "bottom_left", "top_right", "top_left"):
+                        config.timestamp.position = str(ts_data["position"])
+                    if "font_size" in ts_data:
+                        try:
+                            fs = int(ts_data["font_size"])
+                            if 10 <= fs <= 200:
+                                config.timestamp.font_size = fs
+                        except (ValueError, TypeError):
+                            pass
 
                 from config import save_config
                 save_config(config, CONFIG_PATH)
@@ -112,18 +163,13 @@ def sync_config_from_firebase() -> bool:
                 updated = True
 
                 # Xóa config_update trên tất cả các node
-                def _delete_update(n):
+                for n in FIREBASE_NODES:
                     rtdb_request(n["url"], "config_update", method="DELETE")
-                with concurrent.futures.ThreadPoolExecutor(max_workers=len(FIREBASE_NODES)) as executor:
-                    executor.map(_delete_update, FIREBASE_NODES)
                 break
 
         if updated and config:
             sync_config_to_firebase(config)
             return True
-        return False
-    except Exception as e:
-        logger.error(f"Lỗi khi đồng bộ cấu hình từ Firebase: {e}", exc_info=True)
         return False
     except Exception as e:
         logger.error(f"Lỗi khi đồng bộ cấu hình từ Firebase: {e}", exc_info=True)
@@ -179,16 +225,14 @@ def sync_vehicles_to_firebase():
 
         current_hash = json.dumps(vehicles_dict, sort_keys=True)
         now = time.time()
+        # Nếu không đổi và chưa qua 60s, bỏ qua để tránh spam Firebase
         if current_hash == _LAST_VEHICLES_HASH and (now - _LAST_SYNC_TIME) < 60.0:
             return
 
         targets = get_active_nodes_for_today()
-        def _push_vehicles(node):
+        for node in targets:
             rtdb_request(node["url"], "vehicles_today", method="PUT", data=vehicles_dict)
             logger.info(f"Đã đồng bộ {len(vehicles_dict)} xe lên {node['name']} ({node['url']})")
-            
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(targets)) as executor:
-            executor.map(_push_vehicles, targets)
 
         _LAST_VEHICLES_HASH = current_hash
         _LAST_SYNC_TIME = now
@@ -252,33 +296,27 @@ def process_photo_inbox():
         logger.error(f"Lỗi khi xử lý photo inbox: {e}", exc_info=True)
 
 
-import threading
-
-def _run_task(task_func, interval_sec):
-    consecutive_errors = 0
-    while True:
-        try:
-            task_func()
-            consecutive_errors = 0
-            sleep_time = interval_sec
-        except Exception as e:
-            consecutive_errors += 1
-            sleep_time = min(interval_sec * (2 ** min(consecutive_errors, 5)), 60)
-            logger.error(f"Lỗi vòng lặp {task_func.__name__} ({consecutive_errors} lần): {e}")
-        time.sleep(sleep_time)
-
 def run_sync_loop(interval_sec: int = 10):
-    logger.info(f"Bắt đầu dịch vụ Firebase Multi-Cluster Sync độc lập (chu kỳ {interval_sec}s)...")
+    logger.info(f"Bắt đầu dịch vụ Firebase Multi-Cluster Sync (chu kỳ {interval_sec}s)...")
     try:
         sync_config_to_firebase()
     except Exception as e:
         logger.error(f"Lỗi khởi tạo sync config: {e}")
 
-    threading.Thread(target=_run_task, args=(sync_vehicles_to_firebase, interval_sec), daemon=True).start()
-    threading.Thread(target=_run_task, args=(sync_config_from_firebase, interval_sec), daemon=True).start()
-    
-    # Chạy inbox trên main thread để giữ process không bị exit
-    _run_task(process_photo_inbox, interval_sec)
+    consecutive_errors = 0
+    while True:
+        try:
+            sync_vehicles_to_firebase()
+            sync_config_from_firebase()
+            process_photo_inbox()
+            consecutive_errors = 0
+            sleep_time = interval_sec
+        except Exception as e:
+            consecutive_errors += 1
+            # Exponential backoff từ interval_sec đến tối đa 60s
+            sleep_time = min(interval_sec * (2 ** min(consecutive_errors, 5)), 60)
+            logger.error(f"Lỗi trong vòng lặp sync ({consecutive_errors} lần liên tiếp): {e}. Thử lại sau {sleep_time}s.")
+        time.sleep(sleep_time)
 
 
 if __name__ == "__main__":

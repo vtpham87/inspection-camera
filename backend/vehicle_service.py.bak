@@ -8,11 +8,13 @@ import logging
 from datetime import datetime
 
 logger = logging.getLogger("vehicle_service")
-from config import PhotoConfig, ACCESS_DB_PATH, SYSDB_PATH
+from config import PhotoConfig
 from photo_handler import extract_plate_color, resolve_save_path, build_filename, should_omit_color_suffix
 
 PHOTO_TYPES = ["rear_45", "front_45", "chassis", "passenger", "new_vehicle"]
 
+ACCESS_DB_PATH = os.environ.get("PTCGDB_ACCESS_PATH") or r"Z:\DataPTCGDB\PT90_1507D.mdb"
+SYSDB_PATH = os.environ.get("PTCGDB_MDW_PATH") or r"C:\PTCGDB\SysDb.mdw"
 POWERSHELL_32 = r"C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe"
 
 D32_MAP = {
@@ -140,20 +142,6 @@ ORDER BY t.SoPhieuKD ASC
         return _ACCESS_CACHE["data"]
 
 
-
-_DIR_CACHE = {}
-
-def _get_dir_files(path: str) -> set:
-    now = time.time()
-    if path in _DIR_CACHE and now - _DIR_CACHE[path]["time"] < 2.0:
-        return _DIR_CACHE[path]["files"]
-    try:
-        files = set(os.listdir(path))
-    except Exception:
-        files = set()
-    _DIR_CACHE[path] = {"time": now, "files": files}
-    return files
-
 def _check_photos_taken(
     plate: str,
     plate_color: str | None,
@@ -175,14 +163,11 @@ def _check_photos_taken(
                 config.plate_color_suffix,
                 lan_kd=lan_kd,
             )
-            files = _get_dir_files(save_dir)
-            if filename in files:
+            if os.path.exists(os.path.join(save_dir, filename)):
                 taken.append(pt)
             elif date and "{date}" not in config.paths.get(pt, ""):
                 date_clean = date.replace("-", "")
-                sub_dir = os.path.join(save_dir, date_clean)
-                sub_files = _get_dir_files(sub_dir)
-                if filename in sub_files:
+                if os.path.exists(os.path.join(save_dir, date_clean, filename)):
                     taken.append(pt)
         except Exception:
             pass
@@ -263,7 +248,6 @@ def get_vehicles_today(
         date = today_str
 
     conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-    results = []
     try:
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
@@ -288,83 +272,54 @@ def get_vehicles_today(
         if is_today and is_production_db and ensure_access_db():
             waiting_raw = get_waiting_vehicles_from_access()
 
+        results = []
         seen_tickets = set()
-        
-        def _resolve_vehicle(sp, biendk_id, ketluan, giokd, raw_lankd, plate_display, brand, vtype, owner, sotem_val=""):
-            if sp in seen_tickets:
-                return None
-            
-            try:
-                lan_kd_val = int(raw_lankd) if raw_lankd is not None else 1
-            except (ValueError, TypeError):
-                lan_kd_val = 1
-            if lan_kd_val <= 0:
-                lan_kd_val = 1
 
-            plate_num, plate_color = extract_plate_color(biendk_id)
-            is_failed_earlier = (biendk_id in failed_biendk_ids) or (plate_num in failed_biendk_ids)
-            suggest_lan_2 = (lan_kd_val >= 2) or is_failed_earlier
-
-            if lan_kd_val >= 2:
-                photos_taken = _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=lan_kd_val)
-            else:
-                l2_photos = _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=2)
-                if l2_photos and suggest_lan_2:
-                    photos_taken = l2_photos
-                else:
-                    photos_taken = _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=1)
-
-            has_both_45 = ("rear_45" in photos_taken) and ("front_45" in photos_taken)
-            is_completed = bool(
-                sotem_val
-                or has_both_45
-                or (ketluan == 0)
-                or (ketluan == 1 and not suggest_lan_2 and lan_kd_val < 2)
-            )
-
-            if filter_waiting and ketluan == 1:
-                return None
-
-            seen_tickets.add(sp)
-            m = re.match(r"^(\d+)", sp.strip())
-            ticket_int = int(m.group(1)) if m else 999999
-
-            return {
-                "ticket_num": sp,
-                "sophieu": sp,
-                "ticket_int": ticket_int,
-                "plate": plate_display,
-                "plate_clean": plate_num,
-                "plate_color": plate_color,
-                "vehicle_type": vtype,
-                "brand": brand,
-                "owner": owner,
-                "time": giokd,
-                "result": ketluan,
-                "sotem": sotem_val,
-                "photos_taken": photos_taken,
-                "lan_kd": lan_kd_val,
-                "suggest_lan_2": suggest_lan_2,
-                "is_completed": is_completed,
-            }
-
-        # N+1 Fix: Pre-fetch SQLite vehicle data for waiting_raw
-        waiting_ids = list(set([r.get("BienDK_ID") for r in waiting_raw if r.get("BienDK_ID")]))
-        vehicle_map = {}
-        if waiting_ids:
-            chunk_size = 100
-            for i in range(0, len(waiting_ids), chunk_size):
-                chunk = waiting_ids[i:i+chunk_size]
-                placeholders = ",".join(["?"] * len(chunk))
-                cur.execute(f"SELECT biendk_id, biendk, nhanhieu, tenloaipt, chupt FROM vehicles WHERE biendk_id IN ({placeholders})", chunk)
-                for r in cur.fetchall():
-                    vehicle_map[r["biendk_id"]] = r
-
+        # 1. Nếu có dữ liệu hàng đợi từ tmp_DangKyKD (DanhGiaKT)
         if waiting_raw:
             for r in waiting_raw:
                 sp = r.get("SoPhieuKD") or ""
                 biendk_id = r.get("BienDK_ID") or ""
-                v_row = vehicle_map.get(biendk_id)
+                ketluan = r.get("KetLuan")
+                giokd = r.get("GioKD") or ""
+                raw_lankd = r.get("LanKD")
+                try:
+                    lan_kd_val = int(raw_lankd) if raw_lankd is not None else 1
+                except (ValueError, TypeError):
+                    lan_kd_val = 1
+                if lan_kd_val <= 0:
+                    lan_kd_val = 1
+
+                plate_num, plate_color = extract_plate_color(biendk_id)
+                is_failed_earlier = (biendk_id in failed_biendk_ids) or (plate_num in failed_biendk_ids)
+                suggest_lan_2 = (lan_kd_val >= 2) or is_failed_earlier
+
+                if lan_kd_val >= 2:
+                    photos_taken = _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=lan_kd_val)
+                else:
+                    l2_photos = _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=2)
+                    if l2_photos and suggest_lan_2:
+                        photos_taken = l2_photos
+                    else:
+                        photos_taken = _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=1)
+
+                has_both_45 = ("rear_45" in photos_taken) and ("front_45" in photos_taken)
+                is_completed = bool(
+                    has_both_45
+                    or (ketluan == 0)
+                    or (ketluan == 1 and not suggest_lan_2 and lan_kd_val < 2)
+                )
+
+                if filter_waiting and ketluan == 1:
+                    continue
+
+                seen_tickets.add(sp)
+
+                cur.execute(
+                    "SELECT biendk, nhanhieu, tenloaipt, chupt FROM vehicles WHERE biendk_clean = ? OR biendk_id = ?",
+                    (biendk_id, biendk_id),
+                )
+                v_row = cur.fetchone()
                 if v_row:
                     plate_display = v_row["biendk"]
                     brand = v_row["nhanhieu"] or ""
@@ -375,14 +330,30 @@ def get_vehicles_today(
                     brand = decode_d32(r.get("NhanHieu") or "")
                     vtype = decode_d32(r.get("TenLoaiPT") or "")
                     owner = decode_d32(r.get("ChuPT") or "")
-                
-                veh_dict = _resolve_vehicle(
-                    sp, biendk_id, r.get("KetLuan"), r.get("GioKD") or "", r.get("LanKD"),
-                    plate_display, brand, vtype, owner
-                )
-                if veh_dict:
-                    results.append(veh_dict)
 
+                m = re.match(r"^(\d+)", sp.strip())
+                ticket_int = int(m.group(1)) if m else 999999
+
+                results.append({
+                    "ticket_num": sp,
+                    "sophieu": sp,
+                    "ticket_int": ticket_int,
+                    "plate": plate_display,
+                    "plate_clean": plate_num,
+                    "plate_color": plate_color,
+                    "vehicle_type": vtype,
+                    "brand": brand,
+                    "owner": owner,
+                    "time": giokd,
+                    "result": ketluan,
+                    "sotem": "",
+                    "photos_taken": photos_taken,
+                    "lan_kd": lan_kd_val,
+                    "suggest_lan_2": suggest_lan_2,
+                    "is_completed": is_completed,
+                })
+
+        # 2. Truy vấn bổ sung từ SQLite inspections (hoặc làm nguồn chính khi không có Access/lịch sử)
         if not waiting_raw or not filter_waiting:
             where_clause = "WHERE i.ngaykd = ?"
             if filter_waiting:
@@ -395,25 +366,78 @@ def get_vehicles_today(
             cur.execute(
                 f"""
                 SELECT i.sophieu, v.biendk, v.biendk_clean, v.chupt, v.nhanhieu, v.tenloaipt,
-                       i.ngaykd, i.giokd, i.ketluan, {sotem_select}, {lankd_select}, i.biendk_id
+                       i.ngaykd, i.giokd, i.ketluan, {sotem_select}, {lankd_select}
                 FROM inspections i
                 JOIN vehicles v ON i.biendk_id = v.biendk_id
                 {where_clause}
                 """,
                 (date,),
             )
-            for row in cur.fetchall():
-                veh_dict = _resolve_vehicle(
-                    row["sophieu"] or "", row["biendk_id"] or row["biendk_clean"], row["ketluan"], row["giokd"],
-                    row["lankd"] if has_lankd else 1, row["biendk"], row["nhanhieu"], row["tenloaipt"], row["chupt"],
-                    (row["sotem"] or "").strip() if has_sotem else ""
-                )
-                if veh_dict:
-                    results.append(veh_dict)
+            rows = cur.fetchall()
 
+            for row in rows:
+                sp = row["sophieu"] or ""
+                if sp in seen_tickets:
+                    continue
+                seen_tickets.add(sp)
+
+                raw_lankd = row["lankd"] if has_lankd else 1
+                try:
+                    lan_kd_val = int(raw_lankd) if raw_lankd is not None else 1
+                except (ValueError, TypeError):
+                    lan_kd_val = 1
+                if lan_kd_val <= 0:
+                    lan_kd_val = 1
+
+                plate_num, plate_color = extract_plate_color(row["biendk_clean"])
+                biendk_id = row["biendk_clean"]
+                is_failed_earlier = (biendk_id in failed_biendk_ids) or (plate_num in failed_biendk_ids)
+                suggest_lan_2 = (lan_kd_val >= 2) or is_failed_earlier
+
+                if lan_kd_val >= 2:
+                    photos_taken = _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=lan_kd_val)
+                else:
+                    l2_photos = _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=2)
+                    if l2_photos and suggest_lan_2:
+                        photos_taken = l2_photos
+                    else:
+                        photos_taken = _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=1)
+
+                has_both_45 = ("rear_45" in photos_taken) and ("front_45" in photos_taken)
+                res_val = row["ketluan"]
+                st_val = (row["sotem"] or "").strip() if has_sotem else ""
+                is_completed = bool(
+                    st_val
+                    or has_both_45
+                    or (res_val == 0)
+                    or (res_val == 1 and not suggest_lan_2 and lan_kd_val < 2)
+                )
+
+                m = re.match(r"^(\d+)", sp.strip())
+                ticket_int = int(m.group(1)) if m else 999999
+
+                results.append({
+                    "ticket_num": sp,
+                    "sophieu": sp,
+                    "ticket_int": ticket_int,
+                    "plate": row["biendk"],
+                    "plate_clean": plate_num,
+                    "plate_color": plate_color,
+                    "vehicle_type": row["tenloaipt"],
+                    "brand": row["nhanhieu"],
+                    "owner": row["chupt"],
+                    "time": row["giokd"],
+                    "result": row["ketluan"],
+                    "sotem": row["sotem"],
+                    "photos_taken": photos_taken,
+                    "lan_kd": lan_kd_val,
+                    "suggest_lan_2": suggest_lan_2,
+                    "is_completed": is_completed,
+                })
     finally:
         conn.close()
 
+    # Sắp xếp thứ tự: "Đang chờ" (filter_waiting=True) theo số phiếu tăng dần; gần đây nhất lên đầu
     results.sort(
         key=lambda x: (x["ticket_int"], x.get("time") or ""),
         reverse=not filter_waiting,

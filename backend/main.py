@@ -26,8 +26,6 @@ from photo_handler import (
 )
 from vehicle_service import get_vehicles_today, check_plate_status
 
-CONFIG_PATH = os.environ.get("PHOTO_CONFIG_PATH") or os.path.join(PROJECT_DIR, "photo_config.json")
-DB_PATH = os.environ.get("PTCGDB_PATH") or "C:\\PTCGDB_Online\\ptcgdb.db"
 
 
 def get_config_path() -> str:

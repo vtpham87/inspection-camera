@@ -59,10 +59,13 @@ class PendingUploadWorker(
                 val meta = gson.fromJson(json, PendingUploadMetadata::class.java)
                 imgFile = File(pendingDir, meta.imageFileName)
 
-                if (!imgFile.exists() || imgFile.length() == 0L) {
-                    // Invalid/corrupted entry, clean up
+                if (!imgFile.exists()) {
                     metaFile.delete()
-                    imgFile.delete()
+                    return@async
+                }
+                if (imgFile.length() == 0L) {
+                    // File có thể đang được ghi xuống đĩa, bỏ qua để Worker thử lại ở lần sau
+                    anyFailed = true
                     return@async
                 }
 
