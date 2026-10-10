@@ -121,8 +121,8 @@ class PrefsManager(private val prefs: SharedPreferences) {
         get() = timestampConfig.format
         set(value) { timestampConfig = timestampConfig.copy(format = value) }
     var timestampFontSize: Int
-        get() = timestampConfig.fontSize.toInt()
-        set(value) { timestampConfig = timestampConfig.copy(fontSize = value.toFloat()) }
+        get() = timestampConfig.fontSize
+        set(value) { timestampConfig = timestampConfig.copy(fontSize = value) }
     var timestampPosition: String
         get() = timestampConfig.position
         set(value) { timestampConfig = timestampConfig.copy(position = value) }
