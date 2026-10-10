@@ -59,6 +59,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var prefs: PrefsManager
     private lateinit var vehicleAdapter: VehicleAdapter
     private var currentVehiclesList: List<Vehicle> = emptyList()
+    private var cachedLocalPhotoCounts = mutableMapOf<String, Int>()
     private var autoRefreshJob: Job? = null
 
     private lateinit var btnSettings: ImageButton

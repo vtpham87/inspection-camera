@@ -14,6 +14,18 @@ import java.util.Locale
 class PrefsManager(private val prefs: SharedPreferences) {
 
     companion object {
+        private var cachedDate: String = ""
+        private var lastDateCheck: Long = 0
+        
+        fun getTodayString(): String {
+            val now = System.currentTimeMillis()
+            if (now - lastDateCheck > 60 * 60 * 1000) {
+                cachedDate = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.getDefault()).format(java.util.Date())
+                lastDateCheck = now
+            }
+            return cachedDate
+        }
+
         const val DEFAULT_CLOUD_URL = "https://cottage-charlotte-valuation-bestsellers.trycloudflare.com"
 
         fun normalizeResolution(raw: String?): String {
