@@ -384,7 +384,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupRecyclerView() {
         vehicleAdapter = VehicleAdapter { vehicle ->
-            val lan = if (vehicle.lanKd >= 2 || vehicle.suggestLan2 || isVehicleFinished(vehicle)) 2 else 1
+            // If the vehicle is finished today or suggested for lan 2, but user clicks it from the list,
+            // we should still default to showing Lan 1 (since they likely want to review).
+            // They can manually switch to Lan 2 via the UI button in the camera screen.
+            val lan = if (vehicle.lanKd >= 2) vehicle.lanKd else 1
             openCamera(vehicle.plateClean, vehicle.plateColor, vehicle.photosTaken, lanKd = lan)
         }
         rvVehicles.layoutManager = LinearLayoutManager(this)
