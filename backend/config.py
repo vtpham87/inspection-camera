@@ -28,8 +28,8 @@ class TimestampConfig(BaseModel):
     font_bold: bool = True
     font_stroke_enabled: bool = True
     font_stroke_color: str = "#000000"
-    font_stroke_width: float = 2.0
-    background_color: str = "#80000000"
+    font_stroke_width: float = 4.0
+    background_color: str = "#00000000"
     position: str = "bottom_right"
 
 class PhotoConfig(BaseModel):

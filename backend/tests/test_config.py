@@ -29,8 +29,8 @@ def test_timestamp_defaults_match_spec():
     assert ts.font_bold is True
     assert ts.font_stroke_enabled is True
     assert ts.font_stroke_color == "#000000"
-    assert ts.font_stroke_width == 2.0
-    assert ts.background_color == "#80000000"
+    assert ts.font_stroke_width == 4.0
+    assert ts.background_color == "#00000000"
 
 def test_load_creates_file_if_missing(tmp_path):
     path = str(tmp_path / "config.json")
