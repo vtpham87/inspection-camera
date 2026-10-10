@@ -266,8 +266,7 @@ class CameraActivity : AppCompatActivity() {
                     }
 
                 imageCapture = ImageCapture.Builder()
-                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
-                    .setFlashMode(ImageCapture.FLASH_MODE_AUTO)
+                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                     .setTargetAspectRatio(AspectRatio.RATIO_16_9)
                     .build()
 
