@@ -140,4 +140,50 @@ object CacheManager {
             }
         }
     }
+
+    fun cleanUploadedFiles(context: Context) {
+        try {
+            val reviewDir = File(context.filesDir, "review")
+            if (reviewDir.exists() && reviewDir.isDirectory) {
+                val prefs = PrefsManager(context)
+                cleanUploadedFilesInDir(reviewDir, prefs, 60 * 60 * 1000L)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Lỗi clean uploaded files: ${e.message}")
+        }
+    }
+
+    private fun cleanUploadedFilesInDir(folder: File, prefs: PrefsManager, maxAgeMillis: Long) {
+        val list = folder.listFiles() ?: return
+        val now = System.currentTimeMillis()
+        for (f in list) {
+            if (f.isDirectory) {
+                cleanUploadedFilesInDir(f, prefs, maxAgeMillis)
+                // Xóa thư mục rỗng
+                if (f.list()?.isEmpty() == true) {
+                    f.delete()
+                }
+            } else if (f.isFile && f.extension.equals("jpg", ignoreCase = true)) {
+                // Determine plate and lanKd from path
+                val parts = f.absolutePath.split(File.separator)
+                val reviewIndex = parts.indexOf("review")
+                if (reviewIndex != -1 && parts.size > reviewIndex + 1) {
+                    val plate = parts[reviewIndex + 1]
+                    var lanKd = 1
+                    if (parts.size > reviewIndex + 3) { 
+                        lanKd = parts[reviewIndex + 2].toIntOrNull() ?: 1
+                    }
+                    
+                    if (prefs.isPhotoUploaded(plate, lanKd, f.name)) {
+                        val age = now - f.lastModified()
+                        if (age > maxAgeMillis) {
+                            f.delete()
+                            prefs.clearPhotoUploaded(plate, lanKd, f.name)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 }

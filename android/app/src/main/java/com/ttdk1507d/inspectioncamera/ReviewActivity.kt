@@ -302,6 +302,7 @@ class ReviewActivity : AppCompatActivity() {
 
                 if (success) {
                     prefs.markPhotoUploaded(plate, lanKd, imgFile.name)
+                    imgFile.setLastModified(System.currentTimeMillis())
                     if (imgFile.parentFile?.name == "pending") {
                         val baseName = imgFile.nameWithoutExtension
                         val metaFile = File(imgFile.parentFile, "$baseName.meta")

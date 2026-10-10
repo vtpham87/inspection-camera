@@ -8,6 +8,7 @@ import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import com.ttdk1507d.inspectioncamera.firebase.FirebaseManager
 import com.ttdk1507d.inspectioncamera.util.PrefsManager
+import com.ttdk1507d.inspectioncamera.util.CacheManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.async
@@ -38,11 +39,13 @@ class PendingUploadWorker(
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val pendingDir = File(appContext.filesDir, "pending")
         if (!pendingDir.exists() || !pendingDir.isDirectory) {
+            CacheManager.cleanUploadedFiles(appContext)
             return@withContext Result.success()
         }
 
-        val metaFiles = pendingDir.listFiles { file -> file.extension == "meta" } ?: emptyArray()
+                val metaFiles = pendingDir.listFiles { file -> file.extension == "meta" } ?: emptyArray()
         if (metaFiles.isEmpty()) {
+            CacheManager.cleanUploadedFiles(appContext)
             return@withContext Result.success()
         }
 
@@ -94,6 +97,9 @@ class PendingUploadWorker(
             } // map
             jobs.awaitAll()
         } // coroutineScope
+
+        // Thực hiện xóa ảnh đã upload quá 60 phút
+        CacheManager.cleanUploadedFiles(appContext)
 
         if (anyFailed) {
             Result.retry()
