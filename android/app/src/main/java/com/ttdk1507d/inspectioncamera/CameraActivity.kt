@@ -91,10 +91,12 @@ class CameraActivity : AppCompatActivity() {
     private lateinit var previewView: PreviewView
     private lateinit var tvPlate: TextView
     private lateinit var btnToggleLanKd: MaterialButton
+    private lateinit var btnTorch: MaterialButton
     private lateinit var btnBack: ImageButton
 
     // AE/AF Views & State
     private var camera: Camera? = null
+    private var isTorchOn = false
     private lateinit var ivFocusRing: ImageView
     private lateinit var tvAeAfLock: TextView
     private var isAeAfLocked = false
@@ -200,6 +202,7 @@ class CameraActivity : AppCompatActivity() {
         previewView = findViewById(R.id.preview_view)
         tvPlate = findViewById(R.id.tv_camera_plate)
         btnToggleLanKd = findViewById(R.id.btn_toggle_lan_kd)
+        btnTorch = findViewById(R.id.btn_torch)
         btnBack = findViewById(R.id.btn_camera_back)
 
         ivFocusRing = findViewById(R.id.iv_camera_focus)
@@ -231,6 +234,27 @@ class CameraActivity : AppCompatActivity() {
 
     private fun setupListeners() {
         btnBack.setOnClickListener { finish() }
+
+        btnTorch.setOnClickListener {
+            isTorchOn = !isTorchOn
+            btnTorch.text = if (isTorchOn) "💡 SÁNG" else "💡 TẮT"
+            btnTorch.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(if (isTorchOn) "#4CAF50" else "#555555"))
+            camera?.cameraControl?.enableTorch(isTorchOn)
+            
+            // Adjust Exposure (EV) to brighten up slightly more in low light
+            try {
+                camera?.cameraInfo?.exposureState?.let { state ->
+                    if (state.isExposureCompensationSupported) {
+                        val maxIndex = state.exposureCompensationRange.upper
+                        val current = state.exposureCompensationIndex
+                        // Bump EV by 1 or 2 when torch is ON
+                        camera?.cameraControl?.setExposureCompensationIndex(if (isTorchOn) Math.min(maxIndex, current + 2) else 0)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
 
         btnToggleLanKd.setOnClickListener {
             lanKd = if (lanKd >= 3) 1 else lanKd + 1
