@@ -43,13 +43,9 @@ class VehicleAdapter(
         private val tvTicket: TextView = itemView.findViewById(R.id.tv_item_ticket)
 
         fun bind(vehicle: Vehicle) {
-            // Hiển thị biển số sạch: nếu có hậu tố màu dính liền (15C-442.34T) thì bỏ chữ T/V/X để tránh lặp với badge
+            // Hiển thị biển số sạch thông qua PlateUtil
             val rawPlate = vehicle.plate.trim()
-            val displayPlate = if (rawPlate.length > 5 && (rawPlate.endsWith("T", true) || rawPlate.endsWith("V", true) || rawPlate.endsWith("X", true))) {
-                rawPlate.dropLast(1)
-            } else {
-                rawPlate
-            }
+            val displayPlate = com.ttdk1507d.inspectioncamera.util.PlateUtil.parsePlate(rawPlate).basePlate
             tvPlate.text = displayPlate
 
             // Badge màu biển trực quan

@@ -10,6 +10,9 @@ import com.ttdk1507d.inspectioncamera.firebase.FirebaseManager
 import com.ttdk1507d.inspectioncamera.util.PrefsManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import java.io.File
 
 data class PendingUploadMetadata(
@@ -43,7 +46,10 @@ class PendingUploadWorker(
 
         var anyFailed = false
 
-        for (metaFile in metaFiles) {
+        coroutineScope {
+            val jobs = metaFiles.map { metaFile ->
+                async {
+
             var imgFile: File? = null
             try {
                 val json = metaFile.readText()
@@ -54,15 +60,10 @@ class PendingUploadWorker(
                     // Invalid/corrupted entry, clean up
                     metaFile.delete()
                     imgFile.delete()
-                    continue
+                    return@async
                 }
 
-                if (imgFile.length() > 7 * 1024 * 1024) {
-                    Log.e("PendingUploadWorker", "Ảnh ${imgFile.name} vượt quá 7MB, xóa khỏi pending queue")
-                    metaFile.delete()
-                    imgFile.delete()
-                    continue
-                }
+                // File > 7MB sẽ được FirebaseManager tự động nén
 
                 val success = FirebaseManager.uploadPhotoToInbox(
                     plate = meta.plate,
@@ -82,7 +83,10 @@ class PendingUploadWorker(
                 Log.e("PendingUploadWorker", "Lỗi xử lý upload metadata ${metaFile.name}: ${e.message}", e)
                 anyFailed = true
             }
-        }
+                } // async
+            } // map
+            jobs.awaitAll()
+        } // coroutineScope
 
         if (anyFailed) {
             Result.retry()

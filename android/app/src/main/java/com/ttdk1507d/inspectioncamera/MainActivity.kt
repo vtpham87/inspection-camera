@@ -207,7 +207,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyCurrentFilter() {
-        val filtered = if (isFilterWaiting) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val newCache = mutableMapOf<String, Int>()
+            for (vehicle in currentVehiclesList) {
+                val targetPlate = if (vehicle.plateClean.isNotBlank()) vehicle.plateClean else vehicle.plate
+                newCache[targetPlate + "_" + vehicle.lanKd] = getLocalPhotoCount(targetPlate, vehicle.lanKd)
+            }
+            cachedLocalPhotoCounts.clear()
+            cachedLocalPhotoCounts.putAll(newCache)
+            
+            val filtered = if (isFilterWaiting) {
             currentVehiclesList
                 .filter { vehicle -> !isVehicleFinished(vehicle) }
                 .sortedWith(Comparator { v1, v2 ->
@@ -221,7 +230,7 @@ class MainActivity : AppCompatActivity() {
                 .map { vehicle ->
                     if (vehicle.photosTaken.isEmpty()) {
                         val targetPlate = if (vehicle.plateClean.isNotBlank()) vehicle.plateClean else vehicle.plate
-                        val count = getLocalPhotoCount(targetPlate, vehicle.lanKd)
+                        val count = cachedLocalPhotoCounts[targetPlate + "_" + vehicle.lanKd] ?: 0
                         if (count > 0) {
                             vehicle.copy(photosTaken = List(count) { "local_$it" })
                         } else vehicle
@@ -233,7 +242,8 @@ class MainActivity : AppCompatActivity() {
                     if (t1 != t2) t2.compareTo(t1) else v2.time.compareTo(v1.time)
                 })
         }
-        vehicleAdapter.updateList(filtered)
+        withContext(Dispatchers.Main) {
+                vehicleAdapter.updateList(filtered)
         if (filtered.isEmpty()) {
             tvEmpty.visibility = View.VISIBLE
             tvEmpty.text = if (isFilterWaiting) {
@@ -244,12 +254,14 @@ class MainActivity : AppCompatActivity() {
         } else {
             tvEmpty.visibility = View.GONE
         }
+            } // withContext Main
+        } // launch IO
     }
 
     private fun isVehicleHasPhotos(vehicle: Vehicle): Boolean {
         if (vehicle.photosTaken.isNotEmpty()) return true
         val targetPlate = if (vehicle.plateClean.isNotBlank()) vehicle.plateClean else vehicle.plate
-        if (hasLocalPhotos(targetPlate, vehicle.lanKd)) return true
+        if ((cachedLocalPhotoCounts[targetPlate + "_" + vehicle.lanKd] ?: 0) > 0) return true
         return false
     }
 

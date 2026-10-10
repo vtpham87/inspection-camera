@@ -12,6 +12,9 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 object TimestampPainter {
+    private var cachedFormatter: java.text.SimpleDateFormat? = null
+    private var cachedFormatString: String? = null
+
 
     fun formatTimestamp(date: Date = Date(), pattern: String = "HH:mm:ss - dd/MM/yyyy"): String {
         return try {

@@ -2,6 +2,9 @@ package com.ttdk1507d.inspectioncamera.firebase
 
 import android.os.Build
 import android.util.Base64
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import java.io.ByteArrayOutputStream
 import android.util.Log
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -195,12 +198,20 @@ object FirebaseManager {
                 if (continuation.isActive) continuation.resume(false)
                 return@suspendCancellableCoroutine
             }
-            if (photoFile.length() > 7 * 1024 * 1024) {
-                Log.e(TAG, "File ảnh quá lớn (${photoFile.length()} bytes > 7MB) để tải lên Firebase RTDB")
-                if (continuation.isActive) continuation.resume(false)
-                return@suspendCancellableCoroutine
+            var bytes = photoFile.readBytes()
+            if (bytes.size > 7 * 1024 * 1024) {
+                Log.w(TAG, "File ảnh quá lớn (${bytes.size} bytes > 7MB). Đang nén lại trước khi upload...")
+                val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                val baos = ByteArrayOutputStream()
+                bmp.compress(Bitmap.CompressFormat.JPEG, 70, baos)
+                bytes = baos.toByteArray()
+                bmp.recycle()
+                if (bytes.size > 7 * 1024 * 1024) {
+                    Log.e(TAG, "Ảnh sau khi nén vẫn > 7MB, hủy upload Firebase.")
+                    if (continuation.isActive) continuation.resume(false)
+                    return@suspendCancellableCoroutine
+                }
             }
-            val bytes = photoFile.readBytes()
             val base64Str = Base64.encodeToString(bytes, Base64.NO_WRAP)
 
             val db = getDatabase(node)

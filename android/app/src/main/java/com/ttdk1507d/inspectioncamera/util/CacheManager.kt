@@ -101,7 +101,7 @@ object CacheManager {
             if (f.isDirectory) {
                 cleanOldFiles(f)
                 // Xóa thư mục rỗng
-                if (f.listFiles()?.isEmpty() == true) {
+                if (f.list()?.isEmpty() == true) {
                     f.delete()
                 }
             } else if (f.isFile) {
@@ -118,7 +118,7 @@ object CacheManager {
         for (f in list) {
             if (f.isDirectory) {
                 cleanOldCacheFiles(f, maxAgeMillis)
-                if (f.listFiles()?.isEmpty() == true) {
+                if (f.list()?.isEmpty() == true) {
                     f.delete()
                 }
             } else if (f.isFile) {

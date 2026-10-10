@@ -440,7 +440,7 @@ class CameraActivity : AppCompatActivity() {
         refreshLocalPhotoStatus()
     }
 
-    private fun refreshLocalPhotoStatus() {
+    private fun refreshLocalPhotoStatus() {lifecycleScope.launch(Dispatchers.IO) {
         val reviewPhotos = mutableListOf<LocalPhotoInfo>()
 
         val reviewDir = if (lanKd > 1) File(filesDir, "review/$plate/$lanKd") else File(filesDir, "review/$plate")
@@ -477,7 +477,9 @@ class CameraActivity : AppCompatActivity() {
             }
         }
 
-        val existingPhotos = reviewPhotos.distinct()
+        
+            withContext(Dispatchers.Main) {
+                val existingPhotos = reviewPhotos.distinct()
 
         for (pt in PhotoType.values()) {
             capturedStatus[pt] = existingPhotos.any { it.photoType == pt }
@@ -493,6 +495,8 @@ class CameraActivity : AppCompatActivity() {
         updateButtonUI(btnFront45, PhotoType.FRONT_45, capturedStatus[PhotoType.FRONT_45] == true)
         updateButtonUI(btnPassenger, PhotoType.PASSENGER, capturedStatus[PhotoType.PASSENGER] == true, passengerCount)
         updateButtonUI(btnNewVehicle, PhotoType.NEW_VEHICLE, capturedStatus[PhotoType.NEW_VEHICLE] == true, newVehicleCount)
+            }
+        }
     }
 
     private fun updateButtonUI(button: MaterialButton, type: PhotoType, isDone: Boolean, count: Int = 0) {
@@ -584,9 +588,7 @@ class CameraActivity : AppCompatActivity() {
             // 4. Save copy to local review cache on phone
             saveToLocalReview(type, seq, jpegBytes)
 
-            runOnUiThread {
-                refreshLocalPhotoStatus()
-            }
+            refreshLocalPhotoStatus()
         } catch (e: Exception) {
             Log.e(TAG, "Lỗi xử lý ảnh: ${e.message}", e)
             runOnUiThread {
