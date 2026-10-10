@@ -45,6 +45,24 @@
             android:textStyle="bold"
             android:visibility="gone" />
 
+    
+        <!-- Torch Button Overlay -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_torch"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="16dp"
+            android:layout_marginEnd="16dp"
+            android:paddingHorizontal="16dp"
+            android:text="💡 ĐÈN"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_white"
+            app:backgroundTint="#80000000"
+            app:strokeColor="#FFFFFF"
+            app:strokeWidth="1dp"
+            app:cornerRadius="20dp" />
     </FrameLayout>
 
     <!-- Side Control Panel: On the Right Side -->
@@ -96,23 +114,6 @@
                     android:textSize="17sp"
                     android:textStyle="bold"
                     android:paddingHorizontal="4dp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_torch"
-                    android:layout_width="wrap_content"
-                    android:layout_height="34dp"
-                    android:minWidth="0dp"
-                    android:layout_marginEnd="8dp"
-                    android:paddingHorizontal="8dp"
-                    android:paddingVertical="0dp"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:text="💡 TẮT"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/text_white"
-                    app:backgroundTint="#555555"
-                    app:cornerRadius="6dp" />
 
                 <!-- Toggle Lan 1 / Lan 2 Button -->
                 <com.google.android.material.button.MaterialButton

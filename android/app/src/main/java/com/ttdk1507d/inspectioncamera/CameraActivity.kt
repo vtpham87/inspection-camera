@@ -238,7 +238,7 @@ class CameraActivity : AppCompatActivity() {
         btnTorch.setOnClickListener {
             isTorchOn = !isTorchOn
             btnTorch.text = if (isTorchOn) "💡 SÁNG" else "💡 TẮT"
-            btnTorch.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(if (isTorchOn) "#4CAF50" else "#555555"))
+            btnTorch.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(if (isTorchOn) "#4CAF50" else "#80000000"))
             camera?.cameraControl?.enableTorch(isTorchOn)
             
             // Adjust Exposure (EV) to brighten up slightly more in low light
