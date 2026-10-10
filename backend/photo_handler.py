@@ -138,7 +138,7 @@ def resolve_save_path(
     clean_p, det_c, _ = clean_plate_and_color(plate, plate_color)
     if not clean_p or not VALID_PLATE_RE.match(clean_p):
         raise ValueError(f"Biển số không hợp lệ: {plate}")
-    final_color = plate_color or det_c
+    final_color = det_c
 
     folder_plate = f"{clean_p}{final_color}" if (final_color and getattr(config, "plate_color_suffix", True)) else clean_p
     path = template.replace("{date}", current_date).replace("{plate}", folder_plate)

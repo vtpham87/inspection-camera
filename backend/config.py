@@ -28,8 +28,8 @@ class TimestampConfig(BaseModel):
     font_bold: bool = True
     font_stroke_enabled: bool = True
     font_stroke_color: str = "#000000"
-    font_stroke_width: float = 4.0
-    background_color: str = "#00000000"
+    font_stroke_width: float = 2.0
+    background_color: str = "#80000000"
     position: str = "bottom_right"
 
 class PhotoConfig(BaseModel):
@@ -62,24 +62,24 @@ class PhotoConfig(BaseModel):
 
     def recalculate_paths(self) -> None:
         self.plate_color_suffix = True
-        root = self.photo_save_dir.rstrip("\/")
+        root = self.photo_save_dir.rstrip("\\/")
         self.paths["rear_45"] = root
         self.paths["front_45"] = root
         self.paths["chassis"] = root
 
         def _sync_path(val: str, default_template: str) -> str:
-            if root != "D:\Photos" and val == default_template:
-                val = f"{root}\{{date}}\{{plate}}"
-            val = (val or "").rstrip("\/")
+            if root != "D:\\Photos" and val == default_template:
+                val = f"{root}\\{{date}}\\{{plate}}"
+            val = (val or "").rstrip("\\/")
             if val and "{plate}" not in val:
-                val = f"{val}\{{plate}}"
+                val = f"{val}\\{{plate}}"
             return val
 
-        self.passenger_path = _sync_path(self.passenger_path, "D:\Photos\{date}\{plate}")
+        self.passenger_path = _sync_path(self.passenger_path, "D:\\Photos\\{date}\\{plate}")
         if self.passenger_path:
             self.paths["passenger"] = self.passenger_path
 
-        self.new_vehicle_path = _sync_path(self.new_vehicle_path, "D:\Photos\{date}\{{plate}}")
+        self.new_vehicle_path = _sync_path(self.new_vehicle_path, "D:\\Photos\\{date}\\{plate}")
         if self.new_vehicle_path:
             self.paths["new_vehicle"] = self.new_vehicle_path
 
