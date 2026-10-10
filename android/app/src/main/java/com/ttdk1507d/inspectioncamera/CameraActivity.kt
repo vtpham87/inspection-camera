@@ -91,7 +91,7 @@ class CameraActivity : AppCompatActivity() {
     private lateinit var previewView: PreviewView
     private lateinit var tvPlate: TextView
     private lateinit var btnToggleLanKd: MaterialButton
-    private lateinit var btnTorch: MaterialButton
+    private lateinit var btnTorch: ImageButton
     private lateinit var btnBack: ImageButton
 
     // AE/AF Views & State
@@ -237,8 +237,13 @@ class CameraActivity : AppCompatActivity() {
 
         btnTorch.setOnClickListener {
             isTorchOn = !isTorchOn
-            btnTorch.text = if (isTorchOn) "💡 SÁNG" else "💡 TẮT"
-            btnTorch.backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(if (isTorchOn) "#4CAF50" else "#80000000"))
+            if (isTorchOn) {
+                btnTorch.setColorFilter(android.graphics.Color.parseColor("#FFEB3B")) // Yellow (sáng)
+                btnTorch.alpha = 1.0f
+            } else {
+                btnTorch.setColorFilter(android.graphics.Color.parseColor("#AAAAAA")) // Gray (mờ)
+                btnTorch.alpha = 0.5f
+            }
             camera?.cameraControl?.enableTorch(isTorchOn)
             
             // Adjust Exposure (EV) to brighten up slightly more in low light
