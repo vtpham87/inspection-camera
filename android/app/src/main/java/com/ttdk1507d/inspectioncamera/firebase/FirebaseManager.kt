@@ -43,6 +43,7 @@ data class NodeTestResult(
 )
 
 object FirebaseManager {
+    private val listenerMap = mutableMapOf<ValueEventListener, DatabaseReference>()
     private const val TAG = "FirebaseManager"
 
     val NODE_1 = FirebaseNode(
@@ -303,6 +304,7 @@ object FirebaseManager {
                 }
             }
             ref.addValueEventListener(listener)
+            listenerMap[listener] = ref
             listener
         } catch (e: Exception) {
             Log.e(TAG, "Lỗi khi kết nối lắng nghe config: ${e.message}", e)
@@ -316,9 +318,8 @@ object FirebaseManager {
     fun removeConfigListener(listener: ValueEventListener?) {
         if (listener == null) return
         try {
-            val node = getScheduledNode()
-            val db = FirebaseDatabase.getInstance(node.url)
-            db.getReference("config").removeEventListener(listener)
+            val ref = listenerMap.remove(listener)
+            ref?.removeEventListener(listener)
         } catch (e: Exception) {
             Log.w(TAG, "Lỗi khi gỡ listener config: ${e.message}")
         }

@@ -176,7 +176,7 @@ class ReviewActivity : AppCompatActivity() {
         }
         btnClose.setOnClickListener { dialog.dismiss() }
         ivFull.setOnClickListener { dialog.dismiss() }
-        dialog.show()
+        if (!isFinishing && !isDestroyed) dialog.show()
     }
 
     private fun loadPhotos() {

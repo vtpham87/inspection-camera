@@ -13,6 +13,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import java.io.File
 
 data class PendingUploadMetadata(
@@ -46,10 +48,11 @@ class PendingUploadWorker(
 
         var anyFailed = false
 
+        val semaphore = Semaphore(2)
         coroutineScope {
             val jobs = metaFiles.map { metaFile ->
                 async {
-
+                    semaphore.withPermit {
             var imgFile: File? = null
             try {
                 val json = metaFile.readText()
@@ -83,6 +86,7 @@ class PendingUploadWorker(
                 Log.e("PendingUploadWorker", "Lỗi xử lý upload metadata ${metaFile.name}: ${e.message}", e)
                 anyFailed = true
             }
+                    } // withPermit
                 } // async
             } // map
             jobs.awaitAll()

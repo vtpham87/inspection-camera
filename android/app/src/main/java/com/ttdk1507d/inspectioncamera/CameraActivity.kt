@@ -589,7 +589,7 @@ class CameraActivity : AppCompatActivity() {
             saveToLocalReview(type, seq, jpegBytes)
 
             refreshLocalPhotoStatus()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Lỗi xử lý ảnh: ${e.message}", e)
             runOnUiThread {
                 Toast.makeText(this, "Lỗi xử lý ảnh: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -618,15 +618,27 @@ class CameraActivity : AppCompatActivity() {
         val buffer = imageProxy.planes[0].buffer
         val bytes = ByteArray(buffer.remaining())
         buffer.get(bytes)
-        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+        
+        var sampleSize = 1
+        val maxDim = 3840 // enough for 4K limit before TimestampPainter resize
+        while ((options.outWidth / sampleSize) > maxDim || (options.outHeight / sampleSize) > maxDim) {
+            sampleSize *= 2
+        }
+        
+        options.inJustDecodeBounds = false
+        options.inSampleSize = sampleSize
+        
+        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
             ?: throw IllegalStateException("Không thể decode bitmap từ ImageProxy")
+            
         val rotation = imageProxy.imageInfo.rotationDegrees
         return if (rotation != 0) {
             val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
             val rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-            if (rotated != bitmap) {
-                bitmap.recycle()
-            }
+            if (rotated != bitmap) { bitmap.recycle() }
             rotated
         } else {
             bitmap
