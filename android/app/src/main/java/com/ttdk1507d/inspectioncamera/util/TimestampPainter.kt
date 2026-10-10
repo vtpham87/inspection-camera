@@ -115,6 +115,7 @@ object TimestampPainter {
                 isFakeBoldText = config.fontBold
                 style = Paint.Style.STROKE
                 strokeWidth = scaledStrokeWidth
+                strokeJoin = Paint.Join.ROUND
                 color = try {
                     Color.parseColor(config.fontStrokeColor)
                 } catch (e: Exception) {

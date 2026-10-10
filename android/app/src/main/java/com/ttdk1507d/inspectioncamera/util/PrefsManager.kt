@@ -74,25 +74,15 @@ class PrefsManager(private val prefs: SharedPreferences) {
         get() = prefs.getBoolean("firebase_enabled", true)
         set(value) { prefs.edit().putBoolean("firebase_enabled", value).commit() }
 
-    var timestampEnabled: Boolean
-        get() = prefs.getBoolean("timestamp_enabled", true)
-        set(value) { prefs.edit().putBoolean("timestamp_enabled", value).commit() }
+    
 
-    var timestampFormat: String
-        get() = prefs.getString("timestamp_format", "HH:mm:ss - dd/MM/yyyy") ?: "HH:mm:ss - dd/MM/yyyy"
-        set(value) { prefs.edit().putString("timestamp_format", value).commit() }
+    
 
-    var timestampFontSize: Int
-        get() = prefs.getInt("timestamp_font_size", 28)
-        set(value) { prefs.edit().putInt("timestamp_font_size", value).commit() }
+    
 
-    var timestampPosition: String
-        get() = prefs.getString("timestamp_position", "bottom_right") ?: "bottom_right"
-        set(value) { prefs.edit().putString("timestamp_position", value).commit() }
+    
 
-    var timestampStrokeEnabled: Boolean
-        get() = prefs.getBoolean("timestamp_stroke_enabled", true)
-        set(value) { prefs.edit().putBoolean("timestamp_stroke_enabled", value).commit() }
+    
 
     var photoResolution: String
         get() {
@@ -111,6 +101,35 @@ class PrefsManager(private val prefs: SharedPreferences) {
     var plateColorSuffix: Boolean
         get() = prefs.getBoolean("plate_color_suffix", true)
         set(value) { prefs.edit().putBoolean("plate_color_suffix", value).commit() }
+
+    var timestampConfig: TimestampConfig
+        get() {
+            val json = prefs.getString("timestamp_config_json", null)
+            return if (json != null) {
+                try {
+                    Gson().fromJson(json, TimestampConfig::class.java)
+                } catch(e: Exception) { TimestampConfig() }
+            } else TimestampConfig()
+        }
+        set(value) {
+            prefs.edit().putString("timestamp_config_json", Gson().toJson(value)).commit()
+        }
+    var timestampEnabled: Boolean
+        get() = timestampConfig.enabled
+        set(value) { timestampConfig = timestampConfig.copy(enabled = value) }
+    var timestampFormat: String
+        get() = timestampConfig.format
+        set(value) { timestampConfig = timestampConfig.copy(format = value) }
+    var timestampFontSize: Int
+        get() = timestampConfig.fontSize.toInt()
+        set(value) { timestampConfig = timestampConfig.copy(fontSize = value.toFloat()) }
+    var timestampPosition: String
+        get() = timestampConfig.position
+        set(value) { timestampConfig = timestampConfig.copy(position = value) }
+    var timestampStrokeEnabled: Boolean
+        get() = timestampConfig.fontStrokeEnabled
+        set(value) { timestampConfig = timestampConfig.copy(fontStrokeEnabled = value) }
+
 
     var uploadMode: String
         get() = prefs.getString("upload_mode", "review") ?: "review"
@@ -151,13 +170,7 @@ class PrefsManager(private val prefs: SharedPreferences) {
             jpegQuality = jpegQuality,
             plateColorSuffix = plateColorSuffix,
             photoResolution = photoResolution,
-            timestamp = TimestampConfig(
-                enabled = timestampEnabled,
-                format = timestampFormat,
-                fontSize = timestampFontSize,
-                fontStrokeEnabled = timestampStrokeEnabled,
-                position = timestampPosition
-            )
+            timestamp = timestampConfig
         )
     }
 
@@ -172,11 +185,7 @@ class PrefsManager(private val prefs: SharedPreferences) {
         jpegQuality = config.jpegQuality
         plateColorSuffix = config.plateColorSuffix
         photoResolution = config.photoResolution
-        timestampEnabled = config.timestamp.enabled
-        timestampFormat = config.timestamp.format
-        timestampFontSize = config.timestamp.fontSize
-        timestampStrokeEnabled = config.timestamp.fontStrokeEnabled
-        timestampPosition = config.timestamp.position
+        timestampConfig = config.timestamp
     }
 
     fun exportBackupConfig(): BackupConfig {
@@ -192,11 +201,7 @@ class PrefsManager(private val prefs: SharedPreferences) {
             photoSaveDir = photoSaveDir,
             passengerPath = passengerPath,
             newVehiclePath = newVehiclePath,
-            timestampEnabled = timestampEnabled,
-            timestampFormat = timestampFormat,
-            timestampPosition = timestampPosition,
-            timestampFontSize = timestampFontSize,
-            timestampStrokeEnabled = timestampStrokeEnabled,
+            timestampConfigJson = Gson().toJson(timestampConfig),
             photoResolution = photoResolution,
             jpegQuality = jpegQuality,
             uploadMode = uploadMode
@@ -213,11 +218,10 @@ class PrefsManager(private val prefs: SharedPreferences) {
         photoSaveDir = config.photoSaveDir
         passengerPath = config.passengerPath
         newVehiclePath = config.newVehiclePath
-        timestampEnabled = config.timestampEnabled
-        timestampFormat = config.timestampFormat
-        timestampPosition = config.timestampPosition
-        timestampFontSize = config.timestampFontSize
-        timestampStrokeEnabled = config.timestampStrokeEnabled
+        try {
+            val tsConfig = Gson().fromJson(config.timestampConfigJson ?: "", TimestampConfig::class.java)
+            if (tsConfig != null) timestampConfig = tsConfig
+        } catch(e: Exception) {}
         photoResolution = config.photoResolution
         jpegQuality = config.jpegQuality
         uploadMode = config.uploadMode
