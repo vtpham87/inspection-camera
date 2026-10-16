@@ -1,8 +1,6 @@
 package com.ttdk1507d.inspectioncamera.util
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertThrows
+import org.junit.Assert.*
 import org.junit.Test
 
 class PlateUtilTest {
