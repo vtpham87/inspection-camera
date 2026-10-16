@@ -42,6 +42,10 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Run Android Unit Tests
+        working-directory: android
+        run: ./gradlew testDebugUnitTest
+
       - name: Decode Release Keystore (if configured)
         if: ${{ env.RELEASE_KEYSTORE_BASE64 != '' }}
         run: |

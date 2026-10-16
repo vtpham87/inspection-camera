@@ -190,6 +190,7 @@ def fetch_waiting_from_access_raw() -> list[dict] | None:
         return None
 
     ps_script = f"""
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $connStr = "Driver={{Microsoft Access Driver (*.mdb)}};Dbq={_ps_dq(active_path)};SystemDB={_ps_dq(SYSDB_PATH)};Uid=$($env:PTCGDB_PS_USER);Pwd=$($env:PTCGDB_PS_PWD);"
 $conn = New-Object System.Data.Odbc.OdbcConnection($connStr)
 try {{
@@ -203,9 +204,9 @@ ORDER BY t.SoPhieuKD ASC
 "@
     $cmd.CommandText = $ps_cmd
     $reader = $cmd.ExecuteReader()
-    $list = @()
+    $list = [System.Collections.Generic.List[object]]::new()
     while ($reader.Read()) {{
-        $item = [PSCustomObject]@{{
+        $list.Add([PSCustomObject]@{{
             SoPhieuKD = $reader['SoPhieuKD']
             BienDK_ID = $reader['BienDK_ID']
             GioKD     = if ($reader['GioKD'] -ne [DBNull]::Value) {{ $reader['GioKD'].ToString('HH:mm:ss') }} else {{ '' }}
@@ -215,14 +216,12 @@ ORDER BY t.SoPhieuKD ASC
             TenLoaiPT = if ($reader['TenLoaiPT'] -ne [DBNull]::Value) {{ $reader['TenLoaiPT'].ToString() }} else {{ '' }}
             NhanHieu  = if ($reader['NhanHieu'] -ne [DBNull]::Value) {{ $reader['NhanHieu'].ToString() }} else {{ '' }}
             ChuPT     = if ($reader['ChuPT'] -ne [DBNull]::Value) {{ $reader['ChuPT'].ToString() }} else {{ '' }}
-        }}
-        $list += $item
+        }})
     }}
     if ($list.Count -eq 0) {{
         Write-Output "[]"
     }} else {{
         $json = $list | ConvertTo-Json -Compress
-        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
         Write-Output $json
     }}
 }} catch {{
@@ -240,6 +239,8 @@ ORDER BY t.SoPhieuKD ASC
             [POWERSHELL_32, "-NoProfile", "-Command", ps_script],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=12,
             # Truyền thông tin đăng nhập qua biến môi trường của tiến trình con (không nằm trong dòng lệnh)
             env={**os.environ, "PTCGDB_PS_USER": ACCESS_DB_USER, "PTCGDB_PS_PWD": ACCESS_DB_PASSWORD},

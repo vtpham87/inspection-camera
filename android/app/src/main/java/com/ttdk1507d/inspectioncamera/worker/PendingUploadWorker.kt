@@ -88,7 +88,7 @@ class PendingUploadWorker(
             return true
         }
 
-        val imgFile = File(pendingDir, meta.imageFileName)
+        val imgFile = File(pendingDir, File(meta.imageFileName).name) // chỉ lấy tên file: meta không được trỏ ra ngoài thư mục pending
         if (!imgFile.exists()) {
             metaFile.delete()
             return true

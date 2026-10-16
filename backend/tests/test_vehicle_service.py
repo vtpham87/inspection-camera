@@ -550,7 +550,26 @@ def test_run_task_backs_off_when_task_returns_false(monkeypatch):
 
     monkeypatch.setattr(fs.time, "sleep", fake_sleep)
     try:
-        fs._run_task(lambda: False, 5)
+        fs._run_task(lambda: False, 5, fail_on_false=True)
     except KeyboardInterrupt:
         pass
     assert sleeps == [10, 20, 40]
+
+
+def test_run_task_false_is_not_failure_by_default(monkeypatch):
+    """sync_config_from_firebase trả False khi chưa có cập nhật: không được giãn chu kỳ."""
+    import firebase_sync as fs
+
+    sleeps = []
+
+    def fake_sleep(sec):
+        sleeps.append(sec)
+        if len(sleeps) >= 3:
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(fs.time, "sleep", fake_sleep)
+    try:
+        fs._run_task(lambda: False, 10)
+    except KeyboardInterrupt:
+        pass
+    assert sleeps == [10, 10, 10]

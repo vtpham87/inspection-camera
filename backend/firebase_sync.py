@@ -7,17 +7,19 @@ import os
 import sys
 import threading
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 if PROJECT_DIR not in sys.path:
     sys.path.insert(0, PROJECT_DIR)
 
-from config import load_config, save_config, PhotoConfig, CONFIG_PATH, DB_PATH, FIREBASE_AUTH, validate_save_path, firebase_disabled
+from config import load_config, save_config, CONFIG_LOCK, PhotoConfig, CONFIG_PATH, DB_PATH, FIREBASE_AUTH, validate_save_path, firebase_disabled
 from photo_handler import save_photo
 from vehicle_service import get_vehicles_today
 
@@ -143,21 +145,22 @@ def sync_config_from_firebase() -> bool:
             if not (update_data and isinstance(update_data, dict)):
                 continue
             logger.info(f"Nhận được cập nhật cấu hình từ điện thoại trên {node['name']}: {update_data}")
-            try:
-                config = _apply_remote_config(load_config(CONFIG_PATH), update_data)
-            except Exception as e:
-                logger.error(f"Cấu hình từ điện thoại không hợp lệ, bỏ qua: {e}")
-                config = None
+            with CONFIG_LOCK:  # đọc-sửa-ghi nguyên tử, không giẫm POST /api/config
+                try:
+                    config = _apply_remote_config(load_config(CONFIG_PATH), update_data)
+                except Exception as e:
+                    logger.error(f"Cấu hình từ điện thoại không hợp lệ, bỏ qua: {e}")
+                    config = None
 
-            # Xoá config_update trên tất cả các node dù hợp lệ hay không (tránh xử lý lặp vô hạn)
-            def _delete_update(n):
-                rtdb_request(n["url"], "config_update", method="DELETE")
-            with concurrent.futures.ThreadPoolExecutor(max_workers=len(FIREBASE_NODES)) as executor:
-                list(executor.map(_delete_update, FIREBASE_NODES))
+                # Xoá config_update trên tất cả các node dù hợp lệ hay không (tránh xử lý lặp vô hạn)
+                def _delete_update(n):
+                    rtdb_request(n["url"], "config_update", method="DELETE")
+                with concurrent.futures.ThreadPoolExecutor(max_workers=len(FIREBASE_NODES)) as executor:
+                    list(executor.map(_delete_update, FIREBASE_NODES))
 
-            if config is None:
-                return False
-            save_config(config, CONFIG_PATH)
+                if config is None:
+                    return False
+                save_config(config, CONFIG_PATH)
             logger.info(f"Đã áp dụng cấu hình từ điện thoại vào {CONFIG_PATH}")
             sync_config_to_firebase(config)
             return True
@@ -167,22 +170,54 @@ def sync_config_from_firebase() -> bool:
         return False
 
 
+_firebase_session: Optional[requests.Session] = None
+_firebase_session_lock = threading.Lock()
+
+
+def get_firebase_session() -> requests.Session:
+    """Trả về requests.Session dùng chung với HTTP Keep-Alive và connection pooling."""
+    global _firebase_session
+    if _firebase_session is None:
+        with _firebase_session_lock:
+            if _firebase_session is None:
+                s = requests.Session()
+                retries = Retry(total=3, backoff_factor=0.3, status_forcelist=[500, 502, 503, 504], raise_on_status=False)
+                adapter = HTTPAdapter(pool_connections=10, pool_maxsize=20, max_retries=retries)
+                s.mount("https://", adapter)
+                s.mount("http://", adapter)
+                _firebase_session = s
+    return _firebase_session
+
+
+def close_firebase_session() -> None:
+    """Đóng Firebase session khi tắt ứng dụng hoặc chạy test cleanup."""
+    global _firebase_session
+    with _firebase_session_lock:
+        if _firebase_session is not None:
+            try:
+                _firebase_session.close()
+            except Exception:
+                pass
+            _firebase_session = None
+
+
 def _rtdb_call(base_url: str, path: str, method: str = "GET", data: Any = None, query: str = "") -> Any:
-    """Gọi RTDB REST; ném exception khi lỗi mạng/HTTP."""
+    """Gọi RTDB REST qua Session HTTPS tái sử dụng; ném exception khi lỗi mạng/HTTP."""
     if FIREBASE_AUTH:
         query += ("&" if "?" in query else "?") + "auth=" + urllib.parse.quote(FIREBASE_AUTH, safe="")
     url = f"{base_url.rstrip('/')}/{path.lstrip('/')}.json{query}"
     headers = {"Content-Type": "application/json"}
     req_body = None
     if data is not None:
-        req_body = json.dumps(data).encode("utf-8")
+        req_body = json.dumps(data, ensure_ascii=False).encode("utf-8")
 
-    req = urllib.request.Request(url, data=req_body, headers=headers, method=method)
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        content = resp.read().decode("utf-8")
-        if content and content != "null":
-            return json.loads(content)
-        return None
+    session = get_firebase_session()
+    resp = session.request(method=method, url=url, data=req_body, headers=headers, timeout=10)
+    resp.raise_for_status()
+    content = resp.text
+    if content and content.strip() != "null":
+        return json.loads(content)
+    return None
 
 
 def rtdb_request(base_url: str, path: str, method: str = "GET", data: Any = None) -> Any:
@@ -242,7 +277,7 @@ def sync_vehicles_to_firebase(force: bool = False):
                     if v_key > curr_key:
                         vehicles_dict[safe_key] = v
 
-        current_hash = hashlib.md5(json.dumps(vehicles_dict, sort_keys=True).encode("utf-8")).hexdigest()
+        current_hash = hashlib.md5(json.dumps(vehicles_dict, sort_keys=True).encode("utf-8"), usedforsecurity=False).hexdigest()
         now = time.time()
         if not force and current_hash == _LAST_VEHICLES_HASH and (now - _LAST_SYNC_TIME) < 60.0:
             return
@@ -299,15 +334,21 @@ def process_photo_inbox():
     """Tải và lưu trữ ảnh do KĐV chụp gửi vào /photo_inbox trên TẤT CẢ các cụm Firebase"""
     try:
         config = load_config(CONFIG_PATH)
-        for node in FIREBASE_NODES:
+        # Chỉ lấy danh sách khoá (shallow) rồi tải từng ảnh: tránh kéo toàn bộ base64 của mọi ảnh trong một request.
+        # Hỏi các cụm song song: một cụm treo (timeout 10s) không làm chậm cả chu kỳ.
+        def _list_keys(node):
+            try:
+                return _rtdb_call(node["url"], "photo_inbox", query="?shallow=true")
+            except Exception as e:
+                logger.error(f"[{node['name']}] Không đọc được photo_inbox: {e}")
+                return None
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(FIREBASE_NODES)) as executor:
+            listings = list(executor.map(_list_keys, FIREBASE_NODES))
+
+        for node, keys in zip(FIREBASE_NODES, listings, strict=True):
             base_url = node["url"]
             node_name = node["name"]
-            # Chỉ lấy danh sách khoá (shallow) rồi tải từng ảnh: tránh kéo toàn bộ base64 của mọi ảnh trong một request
-            try:
-                keys = _rtdb_call(base_url, "photo_inbox", query="?shallow=true")
-            except Exception as e:
-                logger.error(f"[{node_name}] Không đọc được photo_inbox: {e}")
-                continue
             if not keys or not isinstance(keys, dict):
                 continue
 
@@ -365,7 +406,7 @@ def process_photo_inbox():
                 except OSError as e:
                     # Lỗi ghi đĩa/ổ mạng (vd Z: rớt) là tạm thời: KHÔNG tính vào số lần lỗi, giữ ảnh trong inbox
                     # và thử lại ở chu kỳ sau. Dừng cụm này để không dồn dập khi ổ đang hỏng.
-                    logger.warning(f"[{node_name}] Lỗi ghi ảnh {photo_id} (tạm thời, sẽ thử lại): {e}")
+                    logger.warning(f"[{node_name}] Lỗi ghi ảnh/mạng với {photo_id} (tạm thời, sẽ thử lại): {e}")
                     break
                 except Exception as e:
                     _inbox_register_failure(base_url, node_name, photo_id, item, str(e))
@@ -373,13 +414,14 @@ def process_photo_inbox():
         logger.error(f"Lỗi khi xử lý photo inbox: {e}", exc_info=True)
 
 
-def _run_task(task_func, interval_sec, interval_fn=None):
+def _run_task(task_func, interval_sec, interval_fn=None, fail_on_false=False):
     consecutive_errors = 0
     while True:
         try:
             result = task_func()
-            if result is False:
-                # Tác vụ báo lỗi bằng giá trị trả về (vd sync_waiting_vehicles_to_sqlite): cũng phải giãn chu kỳ,
+            if fail_on_false and result is False:
+                # Tác vụ báo lỗi bằng giá trị trả về (chỉ sync_waiting_vehicles_to_sqlite): cũng phải giãn chu kỳ,
+                # (không áp cho tác vụ khác: sync_config_from_firebase trả False khi đơn giản là chưa có cập nhật)
                 # nếu không sẽ gọi PowerShell/ODBC mỗi 5 giây khi Access hoặc ổ Z: đang hỏng.
                 consecutive_errors += 1
                 sleep_time = min(interval_sec * (2 ** min(consecutive_errors, 5)), 60)
@@ -406,7 +448,7 @@ def run_sync_loop(interval_sec: int = 10):
         logger.warning(f"Lỗi khởi tạo sync_waiting_vehicles_to_sqlite: {e}")
 
     threading.Thread(
-        target=_run_task, args=(sync_waiting_vehicles_to_sqlite, 5, waiting_sync_interval), daemon=True
+        target=_run_task, args=(sync_waiting_vehicles_to_sqlite, 5, waiting_sync_interval, True), daemon=True
     ).start()
     threading.Thread(target=_run_task, args=(sync_vehicles_to_firebase, interval_sec), daemon=True).start()
     threading.Thread(target=_run_task, args=(sync_config_from_firebase, interval_sec), daemon=True).start()

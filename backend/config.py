@@ -2,6 +2,7 @@ import os
 import re
 import json
 import logging
+import threading
 from typing import Any
 from pydantic import BaseModel, field_validator
 
@@ -61,6 +62,8 @@ def validate_save_path(value: str, field: str = "path") -> str:
         raise ValueError(f"{field}: phải là đường dẫn ổ đĩa tuyệt đối (vd Z:\\...)")
     if any(part == ".." for part in re.split(r"[\\/]+", v)):
         raise ValueError(f"{field}: không được chứa '..'")
+    if ":" in v[2:]:
+        raise ValueError(f"{field}: chứa ký tự ':' không hợp lệ (tránh luồng dữ liệu NTFS)")
     if re.search(r'[<>"|?*\x00-\x1f]', v.replace("{plate}", "").replace("{date}", "")):
         raise ValueError(f"{field}: chứa ký tự không hợp lệ")
     if v[:2].upper() not in ALLOWED_SAVE_ROOTS:
@@ -136,34 +139,64 @@ class PhotoConfig(BaseModel):
 
 CONFIG_DEFAULTS = PhotoConfig()
 
+# Khoá tái nhập: bảo vệ chuỗi đọc-sửa-ghi cấu hình giữa API (/api/config) và luồng đồng bộ Firebase nền.
+CONFIG_LOCK = threading.RLock()
+# Bộ nhớ đệm theo đường dẫn: (chữ ký file, cấu hình hợp lệ gần nhất). Tránh mở file + parse JSON + validate ở mỗi request.
+_CONFIG_CACHE: dict[str, tuple[tuple[int, int, int], "PhotoConfig"]] = {}
+
+
+def _file_signature(path: str) -> tuple[int, int, int] | None:
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    return (st.st_mtime_ns, st.st_size, st.st_ino)  # save_config ghi nguyên tử bằng os.replace nên st_ino đổi theo mỗi lần lưu
+
+
 def load_config(path: str = CONFIG_PATH) -> PhotoConfig:
-    if os.path.exists(path):
+    """Đọc cấu hình (có đệm theo chữ ký file). Luôn trả bản sao: người gọi được phép sửa tại chỗ.
+
+    File hỏng/đang ghi dở -> giữ cấu hình hợp lệ gần nhất thay vì rơi về mặc định (D:\\Photos) làm ảnh lưu sai chỗ.
+    """
+    sig = _file_signature(path)
+    if sig is None:
+        config = PhotoConfig()
+        save_config(config, path)
+        return config
+    with CONFIG_LOCK:
+        cached = _CONFIG_CACHE.get(path)
+        if cached and cached[0] == sig:
+            return cached[1].model_copy(deep=True)
         try:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            return PhotoConfig(**data)
+            config = PhotoConfig(**data)
         except Exception as e:
-            # Trả về bản sao mới (không dùng chung CONFIG_DEFAULTS vì đối tượng này có thể bị sửa tại chỗ)
-            logger.warning("Không đọc được cấu hình %s, dùng mặc định: %s", path, e)
-            return PhotoConfig()
-    config = PhotoConfig()
-    save_config(config, path)
-    return config
+            fallback = cached[1] if cached else PhotoConfig()
+            logger.warning(
+                "Không đọc được cấu hình %s (%s), dùng %s", path, e,
+                "bản hợp lệ gần nhất" if cached else "mặc định",
+            )
+            config = fallback
+        _CONFIG_CACHE[path] = (sig, config)  # đệm cả khi lỗi để không parse/log lại ở mỗi request tới khi file đổi
+        return config.model_copy(deep=True)
+
 
 def save_config(config: PhotoConfig, path: str = "photo_config.json") -> None:
     config.recalculate_paths()
     dirname = os.path.dirname(path)
     if dirname:
         os.makedirs(dirname, exist_ok=True)
-    tmp_path = f"{path}.tmp_{os.getpid()}"
-    try:
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(config.model_dump(), f, indent=2, ensure_ascii=False)
-        os.replace(tmp_path, path)
-    except Exception:
-        if os.path.exists(tmp_path):
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
-        raise
+    tmp_path = f"{path}.tmp_{os.getpid()}_{threading.get_ident()}"
+    with CONFIG_LOCK:
+        try:
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(config.model_dump(), f, indent=2, ensure_ascii=False)
+            os.replace(tmp_path, path)
+        except Exception:
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+            raise

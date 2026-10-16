@@ -73,7 +73,7 @@ _LOOPBACK_HOSTS = ("127.0.0.1", "::1", "localhost")
 
 
 def require_api_key(request: Request) -> None:
-    """Yêu cầu header X-API-Key cho truy cập từ xa. Loopback (máy chủ) được miễn; API_KEY trống = tắt kiểm tra."""
+    """Yêu cầu header X-API-Key cho truy cập từ xa. Loopback (máy chủ) được miễn; API_KEY trống = tắt kiểm tra (có cảnh báo)."""
     if not API_KEY:
         return
     client_host = request.client.host if request.client else ""
@@ -84,14 +84,14 @@ def require_api_key(request: Request) -> None:
         raise HTTPException(status_code=401, detail="Thiếu hoặc sai khoá API")
 
 
-_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_DATE_RE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")  # chỉ chữ số ASCII (\d của Python nhận cả chữ số Unicode)
 
 
 def _validate_date(value: str | None) -> str | None:
     """Chỉ nhận YYYY-MM-DD hợp lệ (giá trị này được ghép vào đường dẫn lưu ảnh)."""
     if value is None:
         return None
-    if not _DATE_RE.match(value):
+    if not _DATE_RE.fullmatch(value):
         raise HTTPException(status_code=400, detail="Ngày không hợp lệ (định dạng YYYY-MM-DD)")
     try:
         datetime.strptime(value, "%Y-%m-%d")
@@ -126,7 +126,7 @@ def health():
 @app.get("/api/debug-access")
 def debug_access(request: Request):
     client_host = request.client.host if request.client else ""
-    if client_host not in ("127.0.0.1", "::1", "localhost"):
+    if client_host not in _LOOPBACK_HOSTS:
         raise HTTPException(status_code=403, detail="Chỉ truy cập được từ máy chủ")
     from vehicle_service import (
         ACCESS_DB_PATH,

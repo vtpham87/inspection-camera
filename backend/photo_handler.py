@@ -3,12 +3,20 @@ import re
 import shutil
 import time
 import threading
+import uuid
 from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
 from config import PhotoConfig
 
-_SEQ_LOCK = threading.Lock()
+_SEQ_LOCK = threading.Lock()  # giữ tên cũ (tương thích); khoá thực tế theo từng thư mục+tiền tố ở _seq_lock()
+_SEQ_LOCKS: dict[str, threading.Lock] = {}
+
+
+def _seq_lock(key: str) -> threading.Lock:
+    """Khoá riêng cho từng (thư mục, tiền tố biển số): ảnh của xe khác nhau không phải chờ nhau khi ổ mạng chậm."""
+    with _SEQ_LOCK:
+        return _SEQ_LOCKS.setdefault(key, threading.Lock())
 
 MAX_FILE_SIZE = 15 * 1024 * 1024  # 15MB: dùng chung cho /api/upload và Firebase inbox (base64 <= 20MB)
 JPEG_MAGIC = b"\xff\xd8\xff"
@@ -165,32 +173,33 @@ def sync_new_vehicle_photos(
     if not has_nv:
         return
 
-    rear_dir = resolve_save_path("rear_45", plate, config, create_dir=False, plate_color=plate_color)
-    front_dir = resolve_save_path("front_45", plate, config, create_dir=False, plate_color=plate_color)
-
-    # Sync matching rear_45 photo
-    if os.path.exists(rear_dir):
+    for ptype in ("rear_45", "front_45"):
+        src_dir = resolve_save_path(ptype, plate, config, create_dir=False, plate_color=plate_color)
+        if not os.path.exists(src_dir):
+            continue
         try:
-            fname = build_filename(plate, plate_color, "rear_45", None, config.plate_color_suffix, lan_kd=lan_kd)
-            src = os.path.join(rear_dir, fname)
-            dst = os.path.join(new_veh_dir, fname)
-            if os.path.exists(src) and os.path.getsize(src) > 10:
-                if not os.path.exists(dst) or os.path.getsize(dst) < 10:
-                    shutil.copy2(src, dst)
+            fname = build_filename(plate, plate_color, ptype, None, config.plate_color_suffix, lan_kd=lan_kd)
         except ValueError:
-            pass
+            continue
+        src = os.path.join(src_dir, fname)
+        dst = os.path.join(new_veh_dir, fname)
+        if os.path.exists(src) and os.path.getsize(src) > 10:
+            if not os.path.exists(dst) or os.path.getsize(dst) < 10:
+                _atomic_copy(src, dst)
 
-    # Sync matching front_45 photo
-    if os.path.exists(front_dir):
+
+def _atomic_copy(src: str, dst: str) -> None:
+    """Chép qua file tạm rồi os.replace: không để lại bản chép dở trên ổ mạng khi rớt giữa chừng."""
+    tmp = f"{dst}.tmp_{uuid.uuid4().hex}"
+    try:
+        shutil.copy2(src, tmp)
+        os.replace(tmp, dst)
+    except OSError:
         try:
-            fname = build_filename(plate, plate_color, "front_45", None, config.plate_color_suffix, lan_kd=lan_kd)
-            src = os.path.join(front_dir, fname)
-            dst = os.path.join(new_veh_dir, fname)
-            if os.path.exists(src) and os.path.getsize(src) > 10:
-                if not os.path.exists(dst) or os.path.getsize(dst) < 10:
-                    shutil.copy2(src, dst)
-        except ValueError:
+            os.remove(tmp)
+        except OSError:
             pass
+        raise
 
 
 def save_photo(
@@ -232,9 +241,11 @@ def save_photo(
 
     # Khi tự tăng seq, giữ khoá suốt bước chọn seq + ghi file để 2 request song song không trùng seq
     auto_seq = photo_type in ("passenger", "new_vehicle") and seq is None
-    with (_SEQ_LOCK if auto_seq else nullcontext()):
+    seq_prefix = f"{plate}L{lan_kd}" if (lan_kd and lan_kd > 1) else plate
+    seq_guard = _seq_lock(f"{os.path.normcase(save_dir)}|{seq_prefix}") if auto_seq else nullcontext()
+    with seq_guard:
         if auto_seq:
-            prefix = f"{plate}L{lan_kd}" if (lan_kd and lan_kd > 1) else plate
+            prefix = seq_prefix
             pattern = re.compile(rf"^{re.escape(prefix)}_(\d+)\.jpg$", re.IGNORECASE)
             existing = []
             if os.path.exists(save_dir) and os.path.isdir(save_dir):
@@ -255,7 +266,7 @@ def save_photo(
             return {"ok": False, "error": "Đường dẫn không hợp lệ"}
 
         # Atomic write with retry for network drive stability (e.g. Z:\ SMB timeouts)
-        tmp_path = f"{full_path}.tmp_{os.getpid()}_{int(time.time() * 1000)}"
+        tmp_path = f"{full_path}.tmp_{uuid.uuid4().hex}"  # duy nhất cho mỗi lần ghi (2 request cùng đích không giẫm nhau)
         last_err = None
         for attempt in range(3):
             try:
@@ -264,7 +275,7 @@ def save_photo(
                 os.replace(tmp_path, full_path)
                 last_err = None
                 break
-            except (OSError, IOError) as e:
+            except OSError as e:
                 last_err = e
                 if os.path.exists(tmp_path):
                     try:

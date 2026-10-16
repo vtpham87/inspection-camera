@@ -5,6 +5,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.ttdk1507d.inspectioncamera.R
 import com.ttdk1507d.inspectioncamera.model.Vehicle
@@ -15,8 +16,43 @@ class VehicleAdapter(
 ) : RecyclerView.Adapter<VehicleAdapter.VehicleViewHolder>() {
 
     fun updateList(newList: List<Vehicle>) {
-        vehicles = newList
-        notifyDataSetChanged()
+        // Sao chép snapshot độc lập để tránh mutate in-place trên các trường var của data class Vehicle
+        val snapshotNew = newList.map { it.copy(photosTaken = ArrayList(it.photosTaken)) }
+        val diffCallback = VehicleDiffCallback(vehicles, snapshotNew)
+        val diffResult = DiffUtil.calculateDiff(diffCallback)
+        vehicles = snapshotNew
+        diffResult.dispatchUpdatesTo(this)
+    }
+
+    private class VehicleDiffCallback(
+        private val oldList: List<Vehicle>,
+        private val newList: List<Vehicle>
+    ) : DiffUtil.Callback() {
+        override fun getOldListSize(): Int = oldList.size
+        override fun getNewListSize(): Int = newList.size
+
+        override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            val old = oldList[oldItemPosition]
+            val new = newList[newItemPosition]
+            val oldKey = (old.plateClean.ifBlank { old.plate }).trim() + "_" + old.lanKd
+            val newKey = (new.plateClean.ifBlank { new.plate }).trim() + "_" + new.lanKd
+            return oldKey.equals(newKey, ignoreCase = true)
+        }
+
+        override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            val old = oldList[oldItemPosition]
+            val new = newList[newItemPosition]
+            return old.plate == new.plate &&
+                    old.plateColor == new.plateColor &&
+                    old.lanKd == new.lanKd &&
+                    old.suggestLan2 == new.suggestLan2 &&
+                    old.photosTaken == new.photosTaken &&
+                    old.ticketNum == new.ticketNum &&
+                    old.sophieu == new.sophieu &&
+                    old.sotem == new.sotem &&
+                    old.result == new.result &&
+                    old.isCompleted == new.isCompleted
+        }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VehicleViewHolder {

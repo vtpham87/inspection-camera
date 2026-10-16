@@ -5,6 +5,8 @@
 # Lớp dữ liệu (de)serialize bằng Gson / Firebase getValue(): giữ nguyên tên lớp, trường, constructor.
 -keep class com.ttdk1507d.inspectioncamera.model.** { *; }
 -keep class com.ttdk1507d.inspectioncamera.worker.PendingUploadMetadata { *; }
+-keep class com.ttdk1507d.inspectioncamera.SettingsActivity$GitHubRelease { *; }
+-keep class com.ttdk1507d.inspectioncamera.SettingsActivity$GitHubAsset { *; }
 -keepclassmembers class * {
     @com.google.gson.annotations.SerializedName <fields>;
 }

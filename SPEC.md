@@ -2,7 +2,7 @@
 
 **Dự án:** inspection-camera
 **Trạm:** Trung tâm Đăng kiểm xe cơ giới 15-07D Hải Phòng
-**Phiên bản tài liệu:** 2.1 (đồng bộ app Android `v1.6.0`, backend `1.6.0`)
+**Phiên bản tài liệu:** 2.1 (đồng bộ app Android `v1.6.1`, backend `1.6.0`)
 **Cập nhật:** 2026-10-14
 
 > Tài liệu này là **nguồn sự thật duy nhất** cho API, cấu hình, quy tắc đặt tên, cơ chế đồng bộ.

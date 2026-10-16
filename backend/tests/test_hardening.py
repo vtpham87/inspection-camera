@@ -214,3 +214,59 @@ def test_vehicle_push_failure_does_not_update_hash(tmp_path, monkeypatch):
 def test_upload_and_firebase_share_size_limit():
     import main, photo_handler
     assert main.MAX_FILE_SIZE == photo_handler.MAX_FILE_SIZE == 15 * 1024 * 1024
+
+
+def test_load_config_caches_and_keeps_last_good(tmp_path):
+    import json
+    from config import PhotoConfig, load_config, save_config
+
+    path = str(tmp_path / "cfg.json")
+    cfg = PhotoConfig()
+    cfg.photo_save_dir = "Z:\\Anh"
+    save_config(cfg, path)
+    first = load_config(path)
+    assert first.photo_save_dir == "Z:\\Anh"
+    first.photo_save_dir = "X:\\sua-tai-cho"  # sửa bản trả về không làm bẩn đệm
+    assert load_config(path).photo_save_dir == "Z:\\Anh"
+    with open(path, "w", encoding="utf-8") as f:  # file hỏng/ghi dở: giữ bản hợp lệ gần nhất, không rơi về D:\Photos
+        f.write("{khong-phai-json")
+    assert load_config(path).photo_save_dir == "Z:\\Anh"
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({**PhotoConfig().model_dump(), "photo_save_dir": "Z:\\Moi"}, f)
+    assert load_config(path).photo_save_dir == "Z:\\Moi"
+
+
+def test_validate_date_rejects_non_ascii_digits():
+    import pytest
+    from fastapi import HTTPException
+    from main import _validate_date
+
+    assert _validate_date("2026-10-17") == "2026-10-17"
+    for bad in ("٢٠٢٦-١٠-١٧", "2026-10-17\n", "2026-13-40"):
+        with pytest.raises(HTTPException):
+            _validate_date(bad)
+
+
+def test_validate_save_path_rejects_ntfs_stream():
+    import pytest
+    from config import validate_save_path
+
+    assert validate_save_path("Z:\\Anh\\{plate}") == "Z:\\Anh\\{plate}"
+    with pytest.raises(ValueError):
+        validate_save_path("Z:\\Anh:stream")
+
+
+def test_save_photo_auto_seq_parallel_unique(tmp_path):
+    import concurrent.futures
+    from config import PhotoConfig
+    from photo_handler import save_photo
+
+    cfg = PhotoConfig()
+    cfg.photo_save_dir = str(tmp_path)
+    cfg.passenger_path = str(tmp_path / "{plate}")
+    cfg.recalculate_paths()
+    jpg = b"\xff\xd8\xff" + b"0" * 32
+    with concurrent.futures.ThreadPoolExecutor(8) as ex:
+        res = list(ex.map(lambda _: save_photo(jpg, "29A12345", None, "passenger", None, cfg), range(8)))
+    names = {r["filename"] for r in res}
+    assert all(r["ok"] for r in res) and len(names) == 8

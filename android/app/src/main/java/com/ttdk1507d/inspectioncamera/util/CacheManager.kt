@@ -9,6 +9,7 @@ import java.util.Locale
 
 object CacheManager {
     private const val TAG = "CacheManager"
+    private val NON_ALNUM_REGEX = Regex("[^a-zA-Z0-9]")
     const val UPLOADED_PHOTO_RETENTION_MS = 15 * 60 * 1000L // 15 phút
 
     fun getCacheSizeBytes(context: Context): Long {
@@ -86,6 +87,9 @@ object CacheManager {
 
             // 3. Tự động dọn dẹp các ảnh review đã upload quá 15 phút (xe đã cấp tem)
             cleanUploadedFiles(context)
+
+            // 4. Xoá khoá SharedPreferences theo ngày của các ngày đã qua
+            PrefsManager(context).purgeStaleDailyKeys()
         } catch (e: Exception) {
             Log.e(TAG, "Lỗi auto clean: ${e.message}")
         }
@@ -173,7 +177,7 @@ object CacheManager {
                 val reviewIndex = parts.indexOf("review")
                 if (reviewIndex != -1 && parts.size > reviewIndex + 1) {
                     val rawPlate = parts[reviewIndex + 1]
-                    val plate = rawPlate.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
+                    val plate = rawPlate.replace(NON_ALNUM_REGEX, "").uppercase()
                     var lanKd = 1
                     if (parts.size > reviewIndex + 3) { 
                         lanKd = parts[reviewIndex + 2].toIntOrNull() ?: 1

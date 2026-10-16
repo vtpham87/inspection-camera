@@ -408,8 +408,11 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun updateCacheSizeDisplay() {
-        val sizeBytes = CacheManager.getCacheSizeBytes(this)
-        tvCacheSize.text = getString(R.string.cache_size_label, CacheManager.formatSize(sizeBytes))
+        // Duyệt đệ quy thư mục cache có thể chậm: tính ở luồng IO, chỉ gán chữ ở Main
+        lifecycleScope.launch {
+            val sizeBytes = withContext(Dispatchers.IO) { CacheManager.getCacheSizeBytes(applicationContext) }
+            tvCacheSize.text = getString(R.string.cache_size_label, CacheManager.formatSize(sizeBytes))
+        }
     }
 
     private fun saveSettings() {
@@ -531,16 +534,16 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private data class GitHubRelease(
-        val tag_name: String? = null,
-        val name: String? = null,
-        val body: String? = null,
-        val assets: List<GitHubAsset>? = null
+        @com.google.gson.annotations.SerializedName("tag_name") val tag_name: String? = null,
+        @com.google.gson.annotations.SerializedName("name") val name: String? = null,
+        @com.google.gson.annotations.SerializedName("body") val body: String? = null,
+        @com.google.gson.annotations.SerializedName("assets") val assets: List<GitHubAsset>? = null
     )
 
     private data class GitHubAsset(
-        val name: String? = null,
-        val browser_download_url: String? = null,
-        val size: Long = 0
+        @com.google.gson.annotations.SerializedName("name") val name: String? = null,
+        @com.google.gson.annotations.SerializedName("browser_download_url") val browser_download_url: String? = null,
+        @com.google.gson.annotations.SerializedName("size") val size: Long = 0
     )
 
     private fun checkForGitHubUpdates() {

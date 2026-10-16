@@ -55,13 +55,16 @@ class MainActivity : AppCompatActivity() {
         private const val TAG = "MainActivity"
         private const val PERMISSION_REQUEST_CAMERA = 1001
         private const val AUTO_REFRESH_INTERVAL_MS = 2 * 60 * 1000L // 2 phút quét danh sách
+        private const val CLEANUP_MIN_INTERVAL_MS = 60 * 1000L
         private val gson = Gson()
     }
 
     private lateinit var prefs: PrefsManager
     private lateinit var vehicleAdapter: VehicleAdapter
-    private var currentVehiclesList: List<Vehicle> = emptyList()
-    private var cachedLocalPhotoCounts = mutableMapOf<String, Int>()
+    // Danh sách bất biến + snapshot bất biến: được ghi ở luồng này, đọc ở luồng khác (filterJob chạy trên IO)
+    @Volatile private var currentVehiclesList: List<Vehicle> = emptyList()
+    @Volatile private var cachedLocalPhotoCounts: Map<String, Int> = emptyMap()
+    @Volatile private var lastUploadedCleanupMs = 0L
     private var autoRefreshJob: Job? = null
 
     private lateinit var btnSettings: ImageButton
@@ -217,28 +220,33 @@ class MainActivity : AppCompatActivity() {
     private fun applyCurrentFilter() {
         filterJob?.cancel()
         filterJob = lifecycleScope.launch(Dispatchers.IO) {
+            val vehicles = currentVehiclesList // một snapshot cho toàn bộ lượt lọc (danh sách có thể bị thay giữa chừng)
             // Cập nhật trạng thái cấp tem cho các xe để phục vụ dọn dẹp ảnh
-            for (vehicle in currentVehiclesList) {
+            for (vehicle in vehicles) {
                 val targetPlate = if (vehicle.plateClean.isNotBlank()) vehicle.plateClean else vehicle.plate
                 if (vehicle.hasCertIssued()) {
                     prefs.markCertIssued(targetPlate, vehicle.lanKd, true)
                 }
             }
 
-            // Tự động dọn dẹp các ảnh đã upload của xe đã cấp tem quá 15 phút
-            CacheManager.cleanUploadedFiles(applicationContext)
+            // Tự động dọn dẹp các ảnh đã upload của xe đã cấp tem quá 15 phút (ngưỡng 15 phút nên quét tối đa 1 lần/phút,
+            // thay vì quét đĩa ở mọi lần Firebase đẩy danh sách xe)
+            val nowMs = System.currentTimeMillis()
+            if (nowMs - lastUploadedCleanupMs > CLEANUP_MIN_INTERVAL_MS) {
+                lastUploadedCleanupMs = nowMs
+                CacheManager.cleanUploadedFiles(applicationContext)
+            }
 
             val newCache = mutableMapOf<String, Int>()
             val pendingMetas = readPendingMetas() // đọc + parse Gson một lần, không lặp lại cho từng xe
-            for (vehicle in currentVehiclesList) {
+            for (vehicle in vehicles) {
                 val targetPlate = if (vehicle.plateClean.isNotBlank()) vehicle.plateClean else vehicle.plate
                 newCache[targetPlate + "_" + vehicle.lanKd] = getLocalPhotoCount(targetPlate, vehicle.lanKd, pendingMetas)
             }
-            cachedLocalPhotoCounts.clear()
-            cachedLocalPhotoCounts.putAll(newCache)
+            cachedLocalPhotoCounts = newCache // gán nguyên snapshot, không sửa map đang được lượt lọc khác đọc
             
             val filtered = if (isFilterWaiting) {
-            currentVehiclesList
+            vehicles
                 .filter { vehicle -> !isVehicleFinished(vehicle) }
                 .sortedWith(Comparator { v1, v2 ->
                     val t1 = v1.getEffectiveTicketInt()
@@ -246,7 +254,7 @@ class MainActivity : AppCompatActivity() {
                     if (t1 != t2) t1.compareTo(t2) else v1.time.compareTo(v2.time)
                 })
         } else {
-            currentVehiclesList
+            vehicles
                 .filter { vehicle ->
                     val hasPhotos = isVehicleHasPhotos(vehicle)
                     if (!hasPhotos) return@filter false
@@ -318,7 +326,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun getLocalPhotoCount(plate: String, lanKd: Int, pendingMetas: List<PendingUploadMetadata>): Int {
         if (plate.isBlank()) return 0
-        val cleanPlate = plate.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
+        val cleanPlate = plate.replace(NON_ALNUM_REGEX, "").uppercase()
         val foundTypes = mutableSetOf<String>()
 
         val dirs = listOf(
@@ -337,7 +345,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         for (meta in pendingMetas) {
-            val metaPlate = meta.plate.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
+            val metaPlate = meta.plate.replace(NON_ALNUM_REGEX, "").uppercase()
             if (metaPlate == cleanPlate && isSameDay(meta.timestamp)) {
                 foundTypes.add(meta.photoType)
             }
@@ -375,7 +383,7 @@ class MainActivity : AppCompatActivity() {
         // 1. Tìm trong danh sách xe tiếp nhận / đồng bộ hôm nay
         val matchingList = currentVehiclesList.filter {
             val itClean = it.plateClean.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
-            val itPlate = it.plate.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
+            val itPlate = it.plate.replace(NON_ALNUM_REGEX, "").uppercase()
             itClean == cleanBase || itClean == cleanInput || itPlate == cleanBase || itPlate == cleanInput
         }
 
@@ -482,7 +490,7 @@ class MainActivity : AppCompatActivity() {
                     if (!isOld) {
                         val matchedVehicle = currentVehiclesList.firstOrNull {
                             val itClean = it.plateClean.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
-                            val itPlate = it.plate.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
+                            val itPlate = it.plate.replace(NON_ALNUM_REGEX, "").uppercase()
                             itClean == basePlate || itClean == cleaned || itPlate == basePlate || itPlate == cleaned
                         }
                         val finalPlateColor = color ?: matchedVehicle?.plateColor
@@ -686,3 +694,5 @@ class MainActivity : AppCompatActivity() {
         )
     }
 }
+
+private val NON_ALNUM_REGEX = Regex("[^a-zA-Z0-9]")

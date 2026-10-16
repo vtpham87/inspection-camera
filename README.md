@@ -2,7 +2,7 @@
 
 Hệ thống chụp và đồng bộ ảnh kiểm định xe cơ giới cho TTĐK 15-07D Hải Phòng: ứng dụng Android cho đăng kiểm viên (ĐKV) tại dây chuyền, backend FastAPI trên máy tính Windows nội bộ, và cụm Firebase Realtime Database 4 node để đồng bộ.
 
-**Phiên bản:** Android `v1.6.0` · Backend `1.6.0` (cổng `:8095`)
+**Phiên bản:** Android `v1.6.1` · Backend `1.6.0` (cổng `:8095`)
 
 > **API, cấu hình `photo_config.json`, quy tắc đặt tên file, cơ chế Firebase/offline/dọn dẹp:** xem [`SPEC.md`](SPEC.md) (nguồn sự thật duy nhất). Lịch sử phiên bản: [`CHANGELOG.md`](CHANGELOG.md). README này chỉ hướng dẫn cài đặt và vận hành.
 
@@ -21,7 +21,7 @@ Hệ thống chụp và đồng bộ ảnh kiểm định xe cơ giới cho TTĐ
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                 Android App (Kotlin v1.6.0)                 │
+│                 Android App (Kotlin v1.6.1)                 │
 │  - CameraX (chụp & watermark thời gian)                     │
 │  - Firebase Realtime Database (cụm 4 node)                  │
 │  - Gửi ảnh qua hòm thư Firebase (inbox_photos)              │
