@@ -1,0 +1,31 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "vehicles_today": {
+      ".read": "auth != null",
+      ".write": false
+    },
+    "config": {
+      ".read": "auth != null",
+      ".write": false
+    },
+    "config_update": {
+      ".read": false,
+      ".write": "auth != null",
+      ".validate": "newData.hasChildren() || !newData.exists()"
+    },
+    "photo_inbox": {
+      ".read": false,
+      "$id": {
+        ".write": "auth != null",
+        ".validate": "newData.hasChildren(['plate','photo_type','image_base64']) && newData.child('image_base64').isString() && newData.child('image_base64').val().length < 2000000"
+      }
+    },
+    "photo_inbox_failed": {
+      ".read": false,
+      ".write": false
+    }
+  }
+}

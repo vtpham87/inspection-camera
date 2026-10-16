@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Chi chia se thu muc tai APK cap nhat (SettingsActivity.installApk) -->
+    <external-files-path name="download_files" path="Download/" />
+    <!-- Du phong khi getExternalFilesDir() tra ve null -->
+    <cache-path name="internal_cache" path="." />
+</paths>

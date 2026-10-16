@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.pyc
+backend/venv/
+backend/photo_config.json
+.pytest_cache/
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/data/
+*.apk
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Build artifacts
+dist/
+
+# Temporary & agent artifacts
+.superpowers/
+agent/
+*.log
+*.tmp
+
+
+# Android Signing Secrets (Never commit)
+*.jks
+*.keystore
+keystore.properties
+
+# Bien moi truong cuc bo (mat khau, khoa API)
+backend/env_local.bat

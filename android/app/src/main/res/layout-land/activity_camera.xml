@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <!-- Camera Preview Container: 100% Unobstructed Full Screen on Left Side -->
+    <FrameLayout
+        android:id="@+id/layout_preview_container"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/bottom_control_panel">
+
+        <androidx.camera.view.PreviewView
+            android:id="@+id/preview_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- AE/AF Focus Ring Indicator -->
+        <ImageView
+            android:id="@+id/iv_camera_focus"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:src="@drawable/bg_focus_ring"
+            android:visibility="gone"
+            android:contentDescription="Điểm lấy nét" />
+
+        <!-- AE/AF Lock Badge -->
+        <TextView
+            android:id="@+id/tv_camera_ae_af_lock"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|center_horizontal"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_plate_badge"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="4dp"
+            android:text="🔒 ĐÃ KHÓA AE/AF"
+            android:textColor="@color/primary"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+    
+        <!-- Torch Button Overlay -->
+        <ImageButton
+            android:id="@+id/btn_torch"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="16dp"
+            android:layout_marginEnd="16dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_flash"
+            android:scaleType="centerInside"
+            android:padding="8dp"
+            android:alpha="0.5"
+            app:tint="#AAAAAA"
+            android:contentDescription="Đèn Flash" />
+    </FrameLayout>
+
+    <!-- Side Control Panel: On the Right Side -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/bottom_control_panel"
+        android:layout_width="240dp"
+        android:layout_height="match_parent"
+        android:background="@color/surface"
+        android:elevation="8dp"
+        android:fillViewport="true"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="8dp">
+
+            <!-- Top Header inside Buttons Panel: Back Button + Plate & Color -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_plate_badge"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="6dp"
+                android:layout_marginBottom="8dp">
+
+                <ImageButton
+                    android:id="@+id/btn_camera_back"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Quay lại"
+                    android:src="@drawable/ic_arrow_back"
+                    app:tint="@color/primary" />
+
+                <!-- Plate & Color Text -->
+                <TextView
+                    android:id="@+id/tv_camera_plate"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:fontFamily="monospace"
+                    android:textColor="@color/primary"
+                    android:textSize="17sp"
+                    android:textStyle="bold"
+                    android:paddingHorizontal="4dp" />
+
+                <!-- Toggle Lan 1 / Lan 2 Button -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_toggle_lan_kd"
+                    android:layout_width="wrap_content"
+                    android:layout_height="34dp"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="0dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:text="Lần 1"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_white"
+                    app:backgroundTint="@color/primary"
+                    app:cornerRadius="6dp" />
+
+            </LinearLayout>
+
+            <!-- 1: Capture Button: Ảnh phương tiện (Rear 45°) -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_rear_45"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:layout_marginBottom="6dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:text="@string/photo_rear_45"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                app:backgroundTint="@color/status_empty_bg"
+                app:strokeColor="@color/status_empty_stroke"
+                app:strokeWidth="1.5dp"
+                app:cornerRadius="8dp"
+                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+            <!-- 2: Capture Button: Ảnh biển số (Front 45°) -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_front_45"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:layout_marginBottom="6dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:text="@string/photo_front_45"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                app:backgroundTint="@color/status_empty_bg"
+                app:strokeColor="@color/status_empty_stroke"
+                app:strokeWidth="1.5dp"
+                app:cornerRadius="8dp"
+                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+            <!-- 3: Capture Button: Khoang người lái (Passenger) -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_passenger"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:layout_marginBottom="6dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:text="@string/photo_passenger"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                app:backgroundTint="@color/status_empty_bg"
+                app:strokeColor="@color/status_empty_stroke"
+                app:strokeWidth="1.5dp"
+                app:cornerRadius="8dp"
+                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+            <!-- 4: Capture Button: Xe mới / Sau miễn KĐ (New Vehicle) -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_new_vehicle"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:layout_marginBottom="10dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:text="@string/photo_new_vehicle"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                app:backgroundTint="@color/status_empty_bg"
+                app:strokeColor="@color/status_empty_stroke"
+                app:strokeWidth="1.5dp"
+                app:cornerRadius="8dp"
+                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+            <!-- 5: Review Button: Xem lại ảnh -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_review"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:layout_marginBottom="4dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:text="@string/btn_review"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_white"
+                app:backgroundTint="@color/status_done_text"
+                app:cornerRadius="8dp" />
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- Uploading / Processing Overlay -->
+    <FrameLayout
+        android:id="@+id/layout_camera_loading"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#80000000"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_plate_badge"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="24dp">
+
+            <ProgressBar
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:indeterminateTint="@color/primary" />
+
+            <TextView
+                android:id="@+id/tv_camera_loading_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/uploading"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

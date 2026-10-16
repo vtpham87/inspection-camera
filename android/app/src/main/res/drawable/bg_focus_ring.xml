@@ -1,0 +1,22 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp"
+    android:height="64dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+
+  <!-- Outer Ring (White with shadow) -->
+  <path
+      android:strokeColor="#FFFFFF"
+      android:strokeWidth="2"
+      android:fillColor="#00000000"
+      android:pathData="M 6,18 L 6,6 L 18,6
+                        M 46,6 L 58,6 L 58,18
+                        M 58,46 L 58,58 L 46,58
+                        M 18,58 L 6,58 L 6,46" />
+
+  <!-- Center Target Dot -->
+  <path
+      android:fillColor="#FFFFFF"
+      android:pathData="M 32,30 A 2,2 0 1,0 32,34 A 2,2 0 1,0 32,30 Z" />
+
+</vector>

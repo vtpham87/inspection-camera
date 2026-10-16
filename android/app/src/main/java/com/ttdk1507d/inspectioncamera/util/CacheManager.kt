@@ -1,0 +1,197 @@
+package com.ttdk1507d.inspectioncamera.util
+
+import android.content.Context
+import android.util.Log
+import com.ttdk1507d.inspectioncamera.firebase.FirebaseManager
+import java.io.File
+import java.util.Calendar
+import java.util.Locale
+
+object CacheManager {
+    private const val TAG = "CacheManager"
+    const val UPLOADED_PHOTO_RETENTION_MS = 15 * 60 * 1000L // 15 phút
+
+    fun getCacheSizeBytes(context: Context): Long {
+        var total = 0L
+        try {
+            context.cacheDir?.let { total += getFolderSize(it) }
+            context.externalCacheDir?.let { total += getFolderSize(it) }
+            val reviewDir = File(context.filesDir, "review")
+            if (reviewDir.exists()) {
+                total += getFolderSize(reviewDir)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Lỗi tính dung lượng cache: ${e.message}")
+        }
+        return total
+    }
+
+    fun formatSize(bytes: Long): String {
+        if (bytes <= 0) return "0 B"
+        val kb = bytes / 1024.0
+        val mb = kb / 1024.0
+        return when {
+            mb >= 1.0 -> String.format(Locale.US, "%.1f MB", mb)
+            kb >= 1.0 -> String.format(Locale.US, "%.1f KB", kb)
+            else -> "$bytes B"
+        }
+    }
+
+    private fun getFolderSize(folder: File): Long {
+        if (!folder.exists()) return 0L
+        var size = 0L
+        val files = folder.listFiles() ?: return 0L
+        for (f in files) {
+            size += if (f.isDirectory) getFolderSize(f) else f.length()
+        }
+        return size
+    }
+
+    fun clearAllCache(context: Context): Long {
+        val before = getCacheSizeBytes(context)
+        try {
+            // 1. Clear context.cacheDir
+            deleteContents(context.cacheDir)
+
+            // 2. Clear context.externalCacheDir
+            context.externalCacheDir?.let { deleteContents(it) }
+
+            // 3. Clear review directory
+            val reviewDir = File(context.filesDir, "review")
+            if (reviewDir.exists()) {
+                reviewDir.deleteRecursively()
+            }
+
+            // 4. Force Firebase reconnect & refresh
+            FirebaseManager.reconnect()
+        } catch (e: Exception) {
+            Log.e(TAG, "Lỗi xóa cache: ${e.message}")
+        }
+        return before
+    }
+
+    fun autoCleanOldData(context: Context) {
+        try {
+            // 1. Tự động dọn dẹp các ảnh review cũ hơn ngày hôm nay
+            val reviewDir = File(context.filesDir, "review")
+            if (reviewDir.exists() && reviewDir.isDirectory) {
+                cleanOldFiles(reviewDir)
+            }
+
+            // 2. Tự động xóa file tạm trong cacheDir cũ hơn 24 giờ
+            val cacheDir = context.cacheDir
+            if (cacheDir != null && cacheDir.exists()) {
+                cleanOldCacheFiles(cacheDir, 24 * 60 * 60 * 1000L)
+            }
+
+            // 3. Tự động dọn dẹp các ảnh review đã upload quá 15 phút (xe đã cấp tem)
+            cleanUploadedFiles(context)
+        } catch (e: Exception) {
+            Log.e(TAG, "Lỗi auto clean: ${e.message}")
+        }
+    }
+
+    private fun isToday(timeMillis: Long): Boolean {
+        if (timeMillis <= 0) return false
+        val calNow = Calendar.getInstance()
+        val calTarget = Calendar.getInstance().apply { this.timeInMillis = timeMillis }
+        return calNow.get(Calendar.YEAR) == calTarget.get(Calendar.YEAR) &&
+               calNow.get(Calendar.DAY_OF_YEAR) == calTarget.get(Calendar.DAY_OF_YEAR)
+    }
+
+    private fun cleanOldFiles(folder: File) {
+        val list = folder.listFiles() ?: return
+        for (f in list) {
+            if (f.isDirectory) {
+                cleanOldFiles(f)
+                // Xóa thư mục rỗng
+                if (f.list()?.isEmpty() == true) {
+                    f.delete()
+                }
+            } else if (f.isFile) {
+                if (!isToday(f.lastModified())) {
+                    f.delete()
+                }
+            }
+        }
+    }
+
+    private fun cleanOldCacheFiles(folder: File, maxAgeMillis: Long) {
+        val now = System.currentTimeMillis()
+        val list = folder.listFiles() ?: return
+        for (f in list) {
+            if (f.isDirectory) {
+                cleanOldCacheFiles(f, maxAgeMillis)
+                if (f.list()?.isEmpty() == true) {
+                    f.delete()
+                }
+            } else if (f.isFile) {
+                if (now - f.lastModified() > maxAgeMillis) {
+                    f.delete()
+                }
+            }
+        }
+    }
+
+    private fun deleteContents(folder: File?) {
+        if (folder == null || !folder.exists()) return
+        val files = folder.listFiles() ?: return
+        for (f in files) {
+            if (f.isDirectory) {
+                f.deleteRecursively()
+            } else {
+                f.delete()
+            }
+        }
+    }
+
+    fun cleanUploadedFiles(context: Context) {
+        try {
+            val reviewDir = File(context.filesDir, "review")
+            if (reviewDir.exists() && reviewDir.isDirectory) {
+                val prefs = PrefsManager(context)
+                cleanUploadedFilesInDir(reviewDir, prefs, UPLOADED_PHOTO_RETENTION_MS)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Lỗi clean uploaded files: ${e.message}")
+        }
+    }
+
+    private fun cleanUploadedFilesInDir(folder: File, prefs: PrefsManager, maxAgeMillis: Long) {
+        val list = folder.listFiles() ?: return
+        val now = System.currentTimeMillis()
+        for (f in list) {
+            if (f.isDirectory) {
+                cleanUploadedFilesInDir(f, prefs, maxAgeMillis)
+                // Xóa thư mục rỗng
+                if (f.list()?.isEmpty() == true) {
+                    f.delete()
+                }
+            } else if (f.isFile && f.extension.equals("jpg", ignoreCase = true)) {
+                // Determine plate and lanKd from path
+                val parts = f.absolutePath.split(File.separator)
+                val reviewIndex = parts.indexOf("review")
+                if (reviewIndex != -1 && parts.size > reviewIndex + 1) {
+                    val rawPlate = parts[reviewIndex + 1]
+                    val plate = rawPlate.replace(Regex("[^a-zA-Z0-9]"), "").uppercase()
+                    var lanKd = 1
+                    if (parts.size > reviewIndex + 3) { 
+                        lanKd = parts[reviewIndex + 2].toIntOrNull() ?: 1
+                    }
+                    
+                    val isUploaded = prefs.isPhotoUploaded(plate, lanKd, f.name) || prefs.isPlateDoneToday(plate, lanKd)
+                    val isCert = prefs.isCertIssued(plate, lanKd)
+                    // Chỉ xóa ảnh của xe đã cấp tem (đạt) sau 15 phút. Xe chưa cấp tem giữ lại ảnh.
+                    if (isUploaded && isCert) {
+                        val age = now - f.lastModified()
+                        if (age > maxAgeMillis) {
+                            f.delete()
+                            prefs.clearPhotoUploaded(plate, lanKd, f.name)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+}
