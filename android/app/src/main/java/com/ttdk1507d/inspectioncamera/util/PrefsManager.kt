@@ -49,7 +49,7 @@ class PrefsManager(private val prefs: SharedPreferences) {
                 "1080p", "fhd", "medium" -> "medium"
                 "4k", "high" -> "high"
                 "original" -> "original"
-                else -> if (raw.isNullOrBlank()) "low" else raw
+                else -> "original"
             }
         }
     }
