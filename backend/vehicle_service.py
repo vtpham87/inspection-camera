@@ -9,7 +9,7 @@ import threading
 from datetime import datetime
 
 logger = logging.getLogger("vehicle_service")
-from config import PhotoConfig, ACCESS_DB_PATH, SYSDB_PATH, DB_PATH, ACCESS_DB_USER, ACCESS_DB_PASSWORD
+from config import PhotoConfig, ACCESS_DB_PATH, SYSDB_PATH, DB_PATH, WATCHER_DB_PATH, ACCESS_DB_USER, ACCESS_DB_PASSWORD
 from photo_handler import extract_plate_color, resolve_save_path, build_filename, should_omit_color_suffix
 
 PHOTO_TYPES = ["rear_45", "front_45", "chassis", "passenger", "new_vehicle"]
@@ -448,10 +448,43 @@ def get_waiting_vehicles_from_sqlite(db_path: str = DB_PATH) -> list[dict]:
         return []
 
 
+def get_waiting_vehicles_from_watcher(watcher_db: str = WATCHER_DB_PATH) -> list[dict]:
+    """Đọc trực tiếp từ file waiting_vehicles.db do access_watcher.py tạo ra."""
+    if not os.path.exists(watcher_db):
+        return []
+    try:
+        conn = sqlite3.connect(f"file:{watcher_db}?mode=ro", uri=True, timeout=3.0)
+        conn.row_factory = sqlite3.Row
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='waiting_vehicles'")
+            if cur.fetchone()[0] == 0:
+                return []
+            cur.execute("""
+                SELECT sophieu, biendk_id, biendk, giokd, ketluan, lankd,
+                       nhanhieu, tenloaipt, chupt, updated_at
+                FROM waiting_vehicles
+                ORDER BY sophieu ASC
+            """)
+            rows = [dict(r) for r in cur.fetchall()]
+            return rows
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.warning(f"[watcher] Lỗi đọc watcher DB: {e}")
+        return []
+
+
 def get_waiting_vehicles_from_access(db_path: str = DB_PATH) -> list[dict] | None:
-    """Truy vấn danh sách xe chờ. Ưu tiên đọc từ bảng đệm waiting_vehicles trong SQLite (< 5ms).
+    """Truy vấn danh sách xe chờ.
+    Ưu tiên 1: đọc từ waiting_vehicles.db của access_watcher (< 5ms, không phụ thuộc Z:).
+    Ưu tiên 2: fallback đọc từ bảng đệm waiting_vehicles trong SQLite (< 5ms).
     Nếu SQLite rỗng và chưa từng sync thành công, fallback gọi Access trực tiếp.
     """
+    rows = get_waiting_vehicles_from_watcher()
+    if rows or os.path.exists(WATCHER_DB_PATH):
+        return rows
+
     cached = get_waiting_vehicles_from_sqlite(db_path)
     if cached:
         return cached
@@ -724,7 +757,7 @@ def get_vehicles_today(
             }
 
         # N+1 Fix: Pre-fetch SQLite vehicle data for waiting_raw
-        waiting_ids = list(set([r.get("BienDK_ID") for r in waiting_raw if r.get("BienDK_ID")]))
+        waiting_ids = list(set([r.get("BienDK_ID") or r.get("biendk_id") for r in waiting_raw if (r.get("BienDK_ID") or r.get("biendk_id"))]))
         vehicle_map = {}
         if waiting_ids:
             chunk_size = 100
@@ -737,8 +770,8 @@ def get_vehicles_today(
 
         if waiting_raw:
             for r in waiting_raw:
-                sp = r.get("SoPhieuKD") or ""
-                biendk_id = r.get("BienDK_ID") or ""
+                sp = r.get("SoPhieuKD") or r.get("sophieu") or ""
+                biendk_id = r.get("BienDK_ID") or r.get("biendk_id") or ""
                 v_row = vehicle_map.get(biendk_id)
                 if v_row:
                     plate_display = v_row["biendk"]
@@ -746,13 +779,16 @@ def get_vehicles_today(
                     vtype = v_row["tenloaipt"] or ""
                     owner = v_row["chupt"] or ""
                 else:
-                    plate_display = r.get("BienDK") or biendk_id
-                    brand = decode_d32(r.get("NhanHieu") or "")
-                    vtype = decode_d32(r.get("TenLoaiPT") or "")
-                    owner = decode_d32(r.get("ChuPT") or "")
+                    plate_display = r.get("BienDK") or r.get("biendk") or biendk_id
+                    brand = r.get("nhanhieu") or decode_d32(r.get("NhanHieu") or "")
+                    vtype = r.get("tenloaipt") or decode_d32(r.get("TenLoaiPT") or "")
+                    owner = r.get("chupt") or decode_d32(r.get("ChuPT") or "")
                 
                 veh_dict = _resolve_vehicle(
-                    sp, biendk_id, r.get("KetLuan"), r.get("GioKD") or "", r.get("LanKD"),
+                    sp, biendk_id,
+                    r.get("KetLuan") if r.get("KetLuan") is not None else r.get("ketluan"),
+                    r.get("GioKD") or r.get("giokd") or "",
+                    r.get("LanKD") or r.get("lankd") or 1,
                     plate_display, brand, vtype, owner
                 )
                 if veh_dict:

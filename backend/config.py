@@ -20,6 +20,7 @@ RESOLUTION_MAP = {
 
 CONFIG_PATH = os.environ.get("PHOTO_CONFIG_PATH") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "photo_config.json")
 DB_PATH = os.environ.get("PTCGDB_PATH") or "C:\\PTCGDB_Online\\ptcgdb.db"
+WATCHER_DB_PATH = os.environ.get("WATCHER_DB_PATH") or "C:\\PTCGDB_Online\\waiting_vehicles.db"
 ACCESS_DB_UNC_PATH = r"\\T1507\Data\DataPTCGDB\PT90_1507D.mdb"
 ACCESS_DB_Z_PATH = r"Z:\DataPTCGDB\PT90_1507D.mdb"
 ACCESS_DB_PATH = os.environ.get("PTCGDB_ACCESS_PATH") or ACCESS_DB_Z_PATH
