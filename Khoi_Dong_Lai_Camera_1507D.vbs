@@ -30,10 +30,11 @@ If isReady Then
     On Error Resume Next
     Set http = CreateObject("MSXML2.ServerXMLHTTP.6.0")
     http.Open "POST", "http://127.0.0.1:8095/api/sync-vehicles-now", False
-    http.setTimeouts 2000, 2000, 5000, 5000
+    http.setTimeouts 2000, 2000, 5000, 20000
     http.Send
-    If Err.Number = 0 And http.Status = 200 Then
-        syncSuccess = True
+    ' Endpoint luon tra HTTP 200: phai doc "ok" trong noi dung moi biet dong bo co thanh cong that khong
+    If Err.Number = 0 Then
+        If http.Status = 200 And InStr(http.responseText, """ok"":true") > 0 Then syncSuccess = True
     End If
     On Error Goto 0
 End If

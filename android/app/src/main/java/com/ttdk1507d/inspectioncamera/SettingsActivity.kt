@@ -29,9 +29,7 @@ import com.ttdk1507d.inspectioncamera.firebase.FirebaseManager
 import com.ttdk1507d.inspectioncamera.util.CacheManager
 import com.ttdk1507d.inspectioncamera.util.NetworkUtil
 import com.ttdk1507d.inspectioncamera.util.PrefsManager
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File

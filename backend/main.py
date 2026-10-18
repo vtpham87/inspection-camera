@@ -1,6 +1,7 @@
 import hmac
 import os
 import re
+import subprocess
 import sys
 import tempfile
 from contextlib import asynccontextmanager
@@ -8,7 +9,7 @@ from datetime import datetime
 from fastapi import Depends, FastAPI, File, Form, Request, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -32,7 +33,7 @@ root_logger.addHandler(console_handler)
 
 logger = logging.getLogger("PhotoServer")
 
-from config import load_config, save_config, PhotoConfig, API_KEY, validate_save_path, firebase_disabled
+from config import load_config, save_config, PhotoConfig, API_KEY, CONFIG_PATH, DB_PATH, validate_save_path, firebase_disabled
 from photo_handler import (
     save_photo,
     normalize_plate,
@@ -45,8 +46,7 @@ from photo_handler import (
 )
 from vehicle_service import get_vehicles_today, check_plate_status
 
-CONFIG_PATH = os.environ.get("PHOTO_CONFIG_PATH") or os.path.join(PROJECT_DIR, "photo_config.json")
-DB_PATH = os.environ.get("PTCGDB_PATH") or "C:\\PTCGDB_Online\\ptcgdb.db"
+APP_VERSION = "1.6.0"
 
 
 def get_config_path() -> str:
@@ -59,7 +59,7 @@ def get_db_path() -> str:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if os.environ.get("DISABLE_FIREBASE_SYNC", "").strip().lower() in ("1", "true", "yes"):
+    if firebase_disabled():
         logger.warning("DISABLE_FIREBASE_SYNC bật: không chạy đồng bộ Firebase/Access (môi trường dev)")
     else:
         import threading
@@ -99,7 +99,7 @@ def _validate_date(value: str | None) -> str | None:
         raise HTTPException(status_code=400, detail="Ngày không hợp lệ (định dạng YYYY-MM-DD)") from None
     return value
 
-app = FastAPI(title="15-07D Photo Server", version="1.6.0", lifespan=lifespan)
+app = FastAPI(title="15-07D Photo Server", version=APP_VERSION, lifespan=lifespan)
 
 _CORS_ORIGINS = [o.strip() for o in (os.environ.get("PTCGDB_CORS_ORIGINS") or "").split(",") if o.strip()]
 if not API_KEY:
@@ -118,7 +118,7 @@ def health():
     return {
         "ok": True,
         "server": "15-07D Photo Server",
-        "version": "1.6.0",
+        "version": APP_VERSION,
         "time": datetime.now().isoformat(),
     }
 
@@ -138,7 +138,7 @@ def debug_access(request: Request):
     status = get_access_status()
     ps_exists = os.path.exists(POWERSHELL_32)
     sys_exists = os.path.exists(SYSDB_PATH)
-    waiting = get_waiting_vehicles_from_access()
+    waiting = get_waiting_vehicles_from_access(get_db_path())
     return {
         "access_status": status,
         "access_path": status["path"] or ACCESS_DB_PATH,
@@ -169,11 +169,10 @@ async def upload_photo(
         raise HTTPException(status_code=400, detail="Lần kiểm định (lan_kd) không hợp lệ (1-10)")
 
     config = load_config(get_config_path())
-    max_bytes = MAX_FILE_SIZE
-    file_bytes = await file.read(max_bytes + 1)  # không nạp cả file khổng lồ vào RAM
+    file_bytes = await file.read(MAX_FILE_SIZE + 1)  # không nạp cả file khổng lồ vào RAM
     if not file_bytes:
         raise HTTPException(status_code=400, detail="File ảnh rỗng")
-    if len(file_bytes) > max_bytes:
+    if len(file_bytes) > MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail=f"File ảnh vượt quá {MAX_FILE_SIZE // (1024 * 1024)}MB")
 
     try:
@@ -192,9 +191,9 @@ async def upload_photo(
 class DeleteRequest(BaseModel):
     plate: str
     photo_type: str
-    seq: int | None = None
+    seq: int | None = Field(None, ge=1, le=50)
     plate_color: str | None = None
-    lan_kd: int | None = 1
+    lan_kd: int | None = Field(1, ge=1, le=10)
 
 
 @app.delete("/api/photos", dependencies=[Depends(require_api_key)])
@@ -270,7 +269,6 @@ def check_plate(plate: str, plate_color: str | None = None, date: str | None = N
     return check_plate_status(get_db_path(), plate, plate_color, config, date=query_date)
 
 
-
 class CheckPathRequest(BaseModel):
     path: str
 
@@ -326,20 +324,22 @@ def sync_config_now():
 @app.post("/api/sync-vehicles-now", dependencies=[Depends(require_api_key)])
 def sync_vehicles_now():
     try:
-        from vehicle_service import sync_waiting_vehicles_to_sqlite
-        from firebase_sync import sync_vehicles_to_firebase
-        sync_waiting_vehicles_to_sqlite()
         if firebase_disabled():
+            from vehicle_service import sync_waiting_vehicles_to_sqlite
+            sync_waiting_vehicles_to_sqlite()
             return {"ok": True, "message": "Đã cập nhật bộ đệm xe cục bộ (Firebase tắt ở môi trường này)"}
-        sync_vehicles_to_firebase(force=True)
-        return {"ok": True, "message": "Đã đồng bộ danh sách xe lên điện thoại thành công!"}
+        from firebase_sync import sync_vehicles_to_firebase
+        ok = sync_vehicles_to_firebase(force=True)  # tự đồng bộ bộ đệm xe chờ trước khi đẩy lên Firebase
+        return {
+            "ok": ok,
+            "message": "Đã đồng bộ danh sách xe lên điện thoại thành công!" if ok else "Không đồng bộ được danh sách xe (xem server.log)",
+        }
     except Exception as e:
         return {"ok": False, "message": f"Lỗi đồng bộ xe: {e}"}
 
 
 @app.post("/api/restart-service", dependencies=[Depends(require_api_key)])
 def restart_service():
-    import subprocess
     try:
         vbs_path = os.path.join(PROJECT_DIR, "restart_background.vbs")
         if not os.path.exists(vbs_path):
@@ -718,7 +718,6 @@ HTML_CONTENT = """<!DOCTYPE html>
 @app.get("/settings", response_class=HTMLResponse)
 def index_settings():
     return HTMLResponse(content=HTML_CONTENT)
-
 
 
 if __name__ == "__main__":

@@ -89,16 +89,6 @@ class PrefsManager(private val prefs: SharedPreferences) {
         get() = prefs.getBoolean("firebase_enabled", true)
         set(value) { prefs.edit().putBoolean("firebase_enabled", value).apply() }
 
-    
-
-    
-
-    
-
-    
-
-    
-
     var photoResolution: String
         get() {
             val raw = prefs.getString("photo_resolution", "low") ?: "low"
@@ -236,7 +226,9 @@ class PrefsManager(private val prefs: SharedPreferences) {
         try {
             val tsConfig = Gson().fromJson(config.timestampConfigJson ?: "", TimestampConfig::class.java)
             if (tsConfig != null) timestampConfig = tsConfig
-        } catch(e: Exception) {}
+        } catch (e: Exception) {
+            // timestampConfigJson hỏng: giữ nguyên cấu hình đóng dấu hiện tại
+        }
         photoResolution = config.photoResolution
         jpegQuality = config.jpegQuality
         uploadMode = config.uploadMode
@@ -265,63 +257,41 @@ class PrefsManager(private val prefs: SharedPreferences) {
         }
     }
 
+    /** Khoá theo ngày (done_/photo_up_/cert_ + yyyyMMdd + biển số + lần KĐ [+ tên file]); định dạng giữ nguyên để tương thích dữ liệu cũ. */
+    private fun dayKey(prefix: String, plateClean: String, lanKd: Int, fileName: String? = null): String {
+        val base = "${prefix}_${getTodayString()}_${plateClean.uppercase()}_$lanKd"
+        return if (fileName != null) "${base}_$fileName" else base
+    }
+
     fun markPlateDoneToday(plateClean: String, lanKd: Int) {
-        val today = getTodayString()
-        val key = "done_${today}_${plateClean.uppercase()}_$lanKd"
-        prefs.edit().putLong(key, System.currentTimeMillis()).apply()
+        prefs.edit().putLong(dayKey("done", plateClean, lanKd), System.currentTimeMillis()).apply()
     }
 
-    fun isPlateDoneToday(plateClean: String, lanKd: Int): Boolean {
-        val today = getTodayString()
-        val key = "done_${today}_${plateClean.uppercase()}_$lanKd"
-        return prefs.getLong(key, 0L) > 0L
-    }
-
-    fun getPlateDoneTimestamp(plateClean: String, lanKd: Int): Long {
-        val today = getTodayString()
-        val key = "done_${today}_${plateClean.uppercase()}_$lanKd"
-        return prefs.getLong(key, 0L)
-    }
+    fun isPlateDoneToday(plateClean: String, lanKd: Int): Boolean =
+        prefs.getLong(dayKey("done", plateClean, lanKd), 0L) > 0L
 
     fun clearPlateDoneToday(plateClean: String, lanKd: Int) {
-        val today = getTodayString()
-        val key = "done_${today}_${plateClean.uppercase()}_$lanKd"
-        prefs.edit().remove(key).apply()
+        prefs.edit().remove(dayKey("done", plateClean, lanKd)).apply()
     }
 
     fun markPhotoUploaded(plateClean: String, lanKd: Int, fileName: String) {
-        val today = getTodayString()
-        val key = "photo_up_${today}_${plateClean.uppercase()}_${lanKd}_$fileName"
-        prefs.edit().putBoolean(key, true).apply()
+        prefs.edit().putBoolean(dayKey("photo_up", plateClean, lanKd, fileName), true).apply()
     }
 
-    fun isPhotoUploaded(plateClean: String, lanKd: Int, fileName: String): Boolean {
-        val today = getTodayString()
-        val key = "photo_up_${today}_${plateClean.uppercase()}_${lanKd}_$fileName"
-        return prefs.getBoolean(key, false)
-    }
+    fun isPhotoUploaded(plateClean: String, lanKd: Int, fileName: String): Boolean =
+        prefs.getBoolean(dayKey("photo_up", plateClean, lanKd, fileName), false)
 
     fun clearPhotoUploaded(plateClean: String, lanKd: Int, fileName: String) {
-        val today = getTodayString()
-        val key = "photo_up_${today}_${plateClean.uppercase()}_${lanKd}_$fileName"
-        prefs.edit().remove(key).apply()
+        prefs.edit().remove(dayKey("photo_up", plateClean, lanKd, fileName)).apply()
     }
 
     fun markCertIssued(plateClean: String, lanKd: Int, issued: Boolean) {
-        val today = getTodayString()
-        val key = "cert_${today}_${plateClean.uppercase()}_$lanKd"
-        if (issued) {
-            prefs.edit().putBoolean(key, true).apply()
-        } else {
-            prefs.edit().remove(key).apply()
-        }
+        val key = dayKey("cert", plateClean, lanKd)
+        if (issued) prefs.edit().putBoolean(key, true).apply() else prefs.edit().remove(key).apply()
     }
 
-    fun isCertIssued(plateClean: String, lanKd: Int): Boolean {
-        val today = getTodayString()
-        val key = "cert_${today}_${plateClean.uppercase()}_$lanKd"
-        return prefs.getBoolean(key, false)
-    }
+    fun isCertIssued(plateClean: String, lanKd: Int): Boolean =
+        prefs.getBoolean(dayKey("cert", plateClean, lanKd), false)
 
     /**
      * Các khoá theo ngày (done_/photo_up_/cert_ + yyyyMMdd) chỉ được đọc với ngày hôm nay nên khoá của ngày cũ vô dụng,

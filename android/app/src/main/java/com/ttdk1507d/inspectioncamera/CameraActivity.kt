@@ -3,7 +3,6 @@ package com.ttdk1507d.inspectioncamera
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
-import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
@@ -37,31 +36,19 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import androidx.work.Constraints
-import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
 import com.ttdk1507d.inspectioncamera.util.PlateUtil
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
 import com.google.android.material.button.MaterialButton
 import com.google.gson.Gson
-import com.ttdk1507d.inspectioncamera.api.ApiClient
-import com.ttdk1507d.inspectioncamera.firebase.FirebaseManager
 import com.ttdk1507d.inspectioncamera.model.AppConfig
 import com.ttdk1507d.inspectioncamera.model.PhotoType
-import com.ttdk1507d.inspectioncamera.util.NetworkUtil
 import com.ttdk1507d.inspectioncamera.util.PrefsManager
 import java.util.concurrent.TimeUnit
 import com.ttdk1507d.inspectioncamera.util.TimestampPainter
 import com.ttdk1507d.inspectioncamera.worker.PendingUploadMetadata
-import com.ttdk1507d.inspectioncamera.worker.PendingUploadWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.MultipartBody
-import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -147,10 +134,7 @@ class CameraActivity : AppCompatActivity() {
         val initialPhotos = intent.getStringArrayListExtra(EXTRA_PHOTOS_TAKEN)
         if (initialPhotos != null) {
             for (name in initialPhotos) {
-                val pt = PhotoType.values().firstOrNull { it.apiName == name }
-                if (pt != null) {
-                    capturedStatus[pt] = true
-                }
+                PhotoType.fromApiName(name)?.let { capturedStatus[it] = true }
             }
         }
 
@@ -186,9 +170,8 @@ class CameraActivity : AppCompatActivity() {
         } ?: return
 
         button.requestFocus()
-        val pt = PhotoType.values().firstOrNull { it.apiName == focusType }
-        if (pt != null) {
-            Toast.makeText(this, "Chụp lại: ${pt.label}", Toast.LENGTH_SHORT).show()
+        PhotoType.fromApiName(focusType)?.let {
+            Toast.makeText(this, "Chụp lại: ${it.label}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -377,7 +360,7 @@ class CameraActivity : AppCompatActivity() {
             tvAeAfLock.visibility = View.GONE
         }
 
-        vibrateTick()
+        vibrate(30, tick = true)
         showFocusRing(x, y, lock)
 
         val action = builder.build()
@@ -400,7 +383,7 @@ class CameraActivity : AppCompatActivity() {
         isAeAfLocked = false
         tvAeAfLock.visibility = View.GONE
         camera?.cameraControl?.cancelFocusAndMetering()
-        vibrateTick()
+        vibrate(30, tick = true)
         Toast.makeText(this, "Đã mở khóa AE/AF", Toast.LENGTH_SHORT).show()
     }
 
@@ -433,24 +416,6 @@ class CameraActivity : AppCompatActivity() {
             .start()
     }
 
-    private fun vibrateTick() {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-                vm?.defaultVibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val v = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-                v?.vibrate(VibrationEffect.createOneShot(30, VibrationEffect.DEFAULT_AMPLITUDE))
-            } else {
-                @Suppress("DEPRECATION")
-                val v = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-                v?.vibrate(30)
-            }
-        } catch (e: Exception) {
-            // Ignore
-        }
-    }
-
     private fun setupOrientationListener() {
         orientationEventListener?.disable()
         orientationEventListener = object : OrientationEventListener(this) {
@@ -478,68 +443,63 @@ class CameraActivity : AppCompatActivity() {
     private fun refreshLocalPhotoStatus() {
         refreshJob?.cancel()
         refreshJob = lifecycleScope.launch(Dispatchers.IO) {
-        val reviewPhotos = mutableListOf<LocalPhotoInfo>()
+            val reviewPhotos = mutableListOf<LocalPhotoInfo>()
 
-        val reviewDir = if (lanKd > 1) File(filesDir, "review/$plate/$lanKd") else File(filesDir, "review/$plate")
-        if (reviewDir.exists() && reviewDir.isDirectory) {
-            val files = reviewDir.listFiles { f -> f.extension.equals("jpg", ignoreCase = true) } ?: emptyArray()
-            for (file in files) {
-                val name = file.nameWithoutExtension
-                for (pt in PhotoType.ALL) {
-                    if (name.startsWith(pt.apiName)) {
-                        val rem = name.removePrefix(pt.apiName).removePrefix("_")
-                        val seq = rem.toIntOrNull()
-                        reviewPhotos.add(LocalPhotoInfo(pt, seq))
-                        break
-                    }
-                }
-            }
-        }
-
-        val pendingDir = File(filesDir, "pending")
-        if (pendingDir.exists() && pendingDir.isDirectory) {
-            val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
-            for (mf in metaFiles) {
-                try {
-                    val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
-                    if (meta.plate.equals(plate, ignoreCase = true) && meta.lanKd == lanKd) {
-                        val pt = PhotoType.fromApiName(meta.photoType)
-                        if (pt != null) {
-                            reviewPhotos.add(LocalPhotoInfo(pt, meta.seq))
+            val reviewDir = if (lanKd > 1) File(filesDir, "review/$plate/$lanKd") else File(filesDir, "review/$plate")
+            if (reviewDir.exists() && reviewDir.isDirectory) {
+                val files = reviewDir.listFiles { f -> f.extension.equals("jpg", ignoreCase = true) } ?: emptyArray()
+                for (file in files) {
+                    val name = file.nameWithoutExtension
+                    for (pt in PhotoType.ALL) {
+                        if (name.startsWith(pt.apiName)) {
+                            val seq = name.removePrefix(pt.apiName).removePrefix("_").toIntOrNull()
+                            reviewPhotos.add(LocalPhotoInfo(pt, seq))
+                            break
                         }
                     }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Lỗi đọc pending meta: ${mf.name}: ${e.message}")
                 }
             }
-        }
 
-        
+            val pendingDir = File(filesDir, "pending")
+            if (pendingDir.exists() && pendingDir.isDirectory) {
+                val metaFiles = pendingDir.listFiles { f -> f.extension == "meta" } ?: emptyArray()
+                for (mf in metaFiles) {
+                    try {
+                        val meta = gson.fromJson(mf.readText(), PendingUploadMetadata::class.java)
+                        if (meta.plate.equals(plate, ignoreCase = true) && meta.lanKd == lanKd) {
+                            PhotoType.fromApiName(meta.photoType)?.let { reviewPhotos.add(LocalPhotoInfo(it, meta.seq)) }
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Lỗi đọc pending meta: ${mf.name}: ${e.message}")
+                    }
+                }
+            }
+
             withContext(Dispatchers.Main) {
                 val existingPhotos = reviewPhotos.distinct()
 
-        for (pt in PhotoType.values()) {
-            capturedStatus[pt] = existingPhotos.any { it.photoType == pt }
-        }
+                for (pt in PhotoType.values()) {
+                    capturedStatus[pt] = existingPhotos.any { it.photoType == pt }
+                }
 
-        val diskPassengerSeq = (existingPhotos.filter { it.photoType == PhotoType.PASSENGER }.mapNotNull { it.seq }.maxOrNull() ?: 0) + 1
-        val diskNewVehicleSeq = (existingPhotos.filter { it.photoType == PhotoType.NEW_VEHICLE }.mapNotNull { it.seq }.maxOrNull() ?: 0) + 1
-        if (inFlightCaptures.get() == 0) {
-            passengerSeq = diskPassengerSeq
-            newVehicleSeq = diskNewVehicleSeq
-        } else {
-            // Còn ảnh đang xử lý: chỉ được tăng, không hạ, nếu không ảnh kế tiếp sẽ trùng tên và ghi đè
-            passengerSeq = maxOf(passengerSeq, diskPassengerSeq)
-            newVehicleSeq = maxOf(newVehicleSeq, diskNewVehicleSeq)
-        }
+                val diskPassengerSeq = (existingPhotos.filter { it.photoType == PhotoType.PASSENGER }.mapNotNull { it.seq }.maxOrNull() ?: 0) + 1
+                val diskNewVehicleSeq = (existingPhotos.filter { it.photoType == PhotoType.NEW_VEHICLE }.mapNotNull { it.seq }.maxOrNull() ?: 0) + 1
+                if (inFlightCaptures.get() == 0) {
+                    passengerSeq = diskPassengerSeq
+                    newVehicleSeq = diskNewVehicleSeq
+                } else {
+                    // Còn ảnh đang xử lý: chỉ được tăng, không hạ, nếu không ảnh kế tiếp sẽ trùng tên và ghi đè
+                    passengerSeq = maxOf(passengerSeq, diskPassengerSeq)
+                    newVehicleSeq = maxOf(newVehicleSeq, diskNewVehicleSeq)
+                }
 
-        val passengerCount = existingPhotos.count { it.photoType == PhotoType.PASSENGER }
-        val newVehicleCount = existingPhotos.count { it.photoType == PhotoType.NEW_VEHICLE }
+                val passengerCount = existingPhotos.count { it.photoType == PhotoType.PASSENGER }
+                val newVehicleCount = existingPhotos.count { it.photoType == PhotoType.NEW_VEHICLE }
 
-        updateButtonUI(btnRear45, PhotoType.REAR_45, capturedStatus[PhotoType.REAR_45] == true)
-        updateButtonUI(btnFront45, PhotoType.FRONT_45, capturedStatus[PhotoType.FRONT_45] == true)
-        updateButtonUI(btnPassenger, PhotoType.PASSENGER, capturedStatus[PhotoType.PASSENGER] == true, passengerCount)
-        updateButtonUI(btnNewVehicle, PhotoType.NEW_VEHICLE, capturedStatus[PhotoType.NEW_VEHICLE] == true, newVehicleCount)
+                updateButtonUI(btnRear45, PhotoType.REAR_45, capturedStatus[PhotoType.REAR_45] == true)
+                updateButtonUI(btnFront45, PhotoType.FRONT_45, capturedStatus[PhotoType.FRONT_45] == true)
+                updateButtonUI(btnPassenger, PhotoType.PASSENGER, capturedStatus[PhotoType.PASSENGER] == true, passengerCount)
+                updateButtonUI(btnNewVehicle, PhotoType.NEW_VEHICLE, capturedStatus[PhotoType.NEW_VEHICLE] == true, newVehicleCount)
             }
         }
     }
@@ -567,7 +527,7 @@ class CameraActivity : AppCompatActivity() {
         val capture = imageCapture ?: return
 
         // 1. Instant tactile feedback
-        vibrateSuccess()
+        vibrate(50)
 
         // 2. Optimistic UI update: immediately mark button as captured
         capturedStatus[type] = true
@@ -671,17 +631,10 @@ class CameraActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 Log.e(TAG, "Lỗi đóng imageProxy: ${e.message}")
             }
-            try {
-                rawBitmap?.recycle()
-                if (stampedBitmap != null && stampedBitmap != resizedBitmap) {
-                    resizedBitmap?.recycle()
-                    stampedBitmap?.recycle()
-                } else {
-                    resizedBitmap?.recycle()
-                }
-            } catch (e: Exception) {
-                // Ignore recycle error
-            }
+            // recycle() trên bitmap đã recycle là no-op, nên bitmap dùng chung giữa các bước không gây lỗi
+            rawBitmap?.recycle()
+            resizedBitmap?.recycle()
+            stampedBitmap?.recycle()
             refreshLocalPhotoStatus()
         }
     }
@@ -717,24 +670,24 @@ class CameraActivity : AppCompatActivity() {
         }
     }
 
-    private fun vibrateSuccess() {
+    /** Rung ngắn. tick=true: dùng hiệu ứng TICK trên Android 12+ (các bản cũ rung [ms] mili giây). */
+    @Suppress("DEPRECATION")
+    private fun vibrate(ms: Long, tick: Boolean = false) {
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-                vibratorManager?.defaultVibrator?.vibrate(
-                    VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE)
-                )
+            val vibrator = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                (getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
             } else {
-                @Suppress("DEPRECATION")
-                val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    vibrator?.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
-                } else {
-                    vibrator?.vibrate(50)
-                }
+                getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            }) ?: return
+            when {
+                tick && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+                    vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ->
+                    vibrator.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
+                else -> vibrator.vibrate(ms)
             }
         } catch (e: Exception) {
-            // Ignore vibration errors on devices without vibrator
+            // Thiết bị không có rung: bỏ qua
         }
     }
 

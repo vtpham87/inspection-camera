@@ -76,13 +76,14 @@ object CacheManager {
             // 1. Tự động dọn dẹp các ảnh review cũ hơn ngày hôm nay
             val reviewDir = File(context.filesDir, "review")
             if (reviewDir.exists() && reviewDir.isDirectory) {
-                cleanOldFiles(reviewDir)
+                deleteFilesWhere(reviewDir) { !isToday(it.lastModified()) }
             }
 
             // 2. Tự động xóa file tạm trong cacheDir cũ hơn 24 giờ
             val cacheDir = context.cacheDir
             if (cacheDir != null && cacheDir.exists()) {
-                cleanOldCacheFiles(cacheDir, 24 * 60 * 60 * 1000L)
+                val cutoff = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+                deleteFilesWhere(cacheDir) { it.lastModified() < cutoff }
             }
 
             // 3. Tự động dọn dẹp các ảnh review đã upload quá 15 phút (xe đã cấp tem)
@@ -95,7 +96,7 @@ object CacheManager {
         }
     }
 
-    private fun isToday(timeMillis: Long): Boolean {
+    fun isToday(timeMillis: Long): Boolean {
         if (timeMillis <= 0) return false
         val calNow = Calendar.getInstance()
         val calTarget = Calendar.getInstance().apply { this.timeInMillis = timeMillis }
@@ -103,36 +104,17 @@ object CacheManager {
                calNow.get(Calendar.DAY_OF_YEAR) == calTarget.get(Calendar.DAY_OF_YEAR)
     }
 
-    private fun cleanOldFiles(folder: File) {
+    /** Xoá đệ quy các file thoả điều kiện, rồi xoá luôn thư mục con đã rỗng. */
+    private fun deleteFilesWhere(folder: File, shouldDelete: (File) -> Boolean) {
         val list = folder.listFiles() ?: return
         for (f in list) {
             if (f.isDirectory) {
-                cleanOldFiles(f)
-                // Xóa thư mục rỗng
+                deleteFilesWhere(f, shouldDelete)
                 if (f.list()?.isEmpty() == true) {
                     f.delete()
                 }
-            } else if (f.isFile) {
-                if (!isToday(f.lastModified())) {
-                    f.delete()
-                }
-            }
-        }
-    }
-
-    private fun cleanOldCacheFiles(folder: File, maxAgeMillis: Long) {
-        val now = System.currentTimeMillis()
-        val list = folder.listFiles() ?: return
-        for (f in list) {
-            if (f.isDirectory) {
-                cleanOldCacheFiles(f, maxAgeMillis)
-                if (f.list()?.isEmpty() == true) {
-                    f.delete()
-                }
-            } else if (f.isFile) {
-                if (now - f.lastModified() > maxAgeMillis) {
-                    f.delete()
-                }
+            } else if (f.isFile && shouldDelete(f)) {
+                f.delete()
             }
         }
     }

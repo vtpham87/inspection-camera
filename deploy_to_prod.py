@@ -11,13 +11,15 @@ DEV_DIR = r"D:\inspection-camera\backend"
 PROD_DIR = r"D:\inspection-camera-prod\backend"
 PROD_ROOT = r"D:\inspection-camera-prod"
 
-PYTHON_FILES = [
+DEPLOY_FILES = [
     "config.py",
     "firebase_sync.py",
     "main.py",
     "photo_handler.py",
     "vehicle_service.py",
     "requirements.txt",
+    "start_background.vbs",
+    "restart_background.vbs",
 ]
 
 
@@ -64,7 +66,7 @@ def rollback(backup_dir):
     print("!" * 60)
     backup_backend = os.path.join(backup_dir, "backend")
     if os.path.exists(backup_backend):
-        for filename in PYTHON_FILES:
+        for filename in DEPLOY_FILES:
             src = os.path.join(backup_backend, filename)
             dst = os.path.join(PROD_DIR, filename)
             if os.path.exists(src):
@@ -101,7 +103,7 @@ def deploy():
     print("=" * 60)
     print("BƯỚC 3: ĐỒNG BỘ MÃ NGUỒN SANG PRODUCTION")
     print("=" * 60)
-    for filename in PYTHON_FILES:
+    for filename in DEPLOY_FILES:
         src = os.path.join(DEV_DIR, filename)
         dst = os.path.join(PROD_DIR, filename)
         if os.path.exists(src):

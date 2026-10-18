@@ -6,10 +6,11 @@ import threading
 import uuid
 from contextlib import nullcontext
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 from config import PhotoConfig
 
-_SEQ_LOCK = threading.Lock()  # giữ tên cũ (tương thích); khoá thực tế theo từng thư mục+tiền tố ở _seq_lock()
+_SEQ_LOCK = threading.Lock()  # chỉ bảo vệ dict _SEQ_LOCKS; khoá thực tế theo từng thư mục+tiền tố ở _seq_lock()
 _SEQ_LOCKS: dict[str, threading.Lock] = {}
 
 
@@ -22,10 +23,11 @@ MAX_FILE_SIZE = 15 * 1024 * 1024  # 15MB: dùng chung cho /api/upload và Fireba
 JPEG_MAGIC = b"\xff\xd8\xff"
 VALID_PLATE_RE = re.compile(r"^[A-Z0-9]+$")
 VALID_PHOTO_TYPES = {"rear_45", "front_45", "chassis", "passenger", "new_vehicle"}
+_PLATE_STRIP_RE = re.compile(r"[.\-\s]")
 
 
 def normalize_plate(raw: str) -> str:
-    cleaned = re.sub(r"[.\-\s]", "", raw).upper()
+    cleaned = _PLATE_STRIP_RE.sub("", raw).upper()
     if not cleaned or not VALID_PLATE_RE.match(cleaned):
         raise ValueError("Biển số không hợp lệ")
     return cleaned
@@ -38,7 +40,7 @@ def should_omit_color_suffix(plate: str) -> bool:
        ví dụ 15KT-123.45, 15LD-123.45, 15HC-123.45
     2. Biển cũ (không kết thúc bằng 5 số, ví dụ 11K2639)
     """
-    clean = re.sub(r"[.\-\s]", "", plate).upper()
+    clean = _PLATE_STRIP_RE.sub("", plate).upper()
     # 1. Xe sê-ri KT, LD, HC (ví dụ 15KT, 15LD, 15HC, 29LD...)
     if re.search(r"^\d{2}(?:KT|LD|HC)", clean):
         return True
@@ -50,12 +52,13 @@ def should_omit_color_suffix(plate: str) -> bool:
     return not bool(re.search(r"\d{5}$", base))
 
 
+@lru_cache(maxsize=2048)
 def clean_plate_and_color(
     plate: str,
     plate_color: str | None = None,
     lan_kd: int | None = 1,
 ) -> tuple[str, str | None, int]:
-    cleaned = re.sub(r"[.\-\s]", "", plate).upper()
+    cleaned = _PLATE_STRIP_RE.sub("", plate).upper()
     s = cleaned
     detected_color = None
     detected_lan = 1
@@ -138,7 +141,7 @@ def resolve_save_path(
         raise ValueError(f"Biển số không hợp lệ: {plate}")
     final_color = det_c
 
-    folder_plate = f"{clean_p}{final_color}" if (final_color and getattr(config, "plate_color_suffix", True)) else clean_p
+    folder_plate = f"{clean_p}{final_color}" if (final_color and config.plate_color_suffix) else clean_p
     path = template.replace("{date}", current_date).replace("{plate}", folder_plate)
     if create_dir:
         os.makedirs(path, exist_ok=True)
@@ -146,9 +149,7 @@ def resolve_save_path(
 
 
 def validate_jpeg(file_bytes: bytes) -> bool:
-    if len(file_bytes) < 3:
-        return False
-    return file_bytes[:3] == JPEG_MAGIC
+    return file_bytes.startswith(JPEG_MAGIC)
 
 
 def sync_new_vehicle_photos(
@@ -159,18 +160,16 @@ def sync_new_vehicle_photos(
 ) -> None:
     plate, plate_color, lan_kd = clean_plate_and_color(plate, plate_color, lan_kd)
 
-    if not getattr(config, "sync_new_vehicle_45", True):
+    if not config.sync_new_vehicle_45:
         return
 
     new_veh_dir = resolve_save_path("new_vehicle", plate, config, create_dir=False, plate_color=plate_color)
-    if not os.path.exists(new_veh_dir) or not os.path.isdir(new_veh_dir):
+    if not os.path.isdir(new_veh_dir):
         return
 
     # Only sync if new_veh_dir actually contains new_vehicle photos
     prefix = f"{plate}L{lan_kd}" if (lan_kd and lan_kd > 1) else plate
-    existing_photos = [f for f in os.listdir(new_veh_dir) if f.lower().endswith(".jpg")]
-    has_nv = any(f.startswith(f"{prefix}_") for f in existing_photos)
-    if not has_nv:
+    if not any(f.startswith(f"{prefix}_") and f.lower().endswith(".jpg") for f in os.listdir(new_veh_dir)):
         return
 
     for ptype in ("rear_45", "front_45"):
@@ -222,8 +221,6 @@ def save_photo(
     if plate_color not in (None, "", "T", "V", "X"):
         return {"ok": False, "error": "Màu biển không hợp lệ"}
 
-
-
     # Validate photo type
     if photo_type not in VALID_PHOTO_TYPES:
         return {"ok": False, "error": f"Loại ảnh không hợp lệ: {photo_type}"}
@@ -248,7 +245,7 @@ def save_photo(
             prefix = seq_prefix
             pattern = re.compile(rf"^{re.escape(prefix)}_(\d+)\.jpg$", re.IGNORECASE)
             existing = []
-            if os.path.exists(save_dir) and os.path.isdir(save_dir):
+            if os.path.isdir(save_dir):
                 for fname in os.listdir(save_dir):
                     m = pattern.match(fname)
                     if m:

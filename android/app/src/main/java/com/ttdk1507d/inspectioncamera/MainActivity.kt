@@ -30,11 +30,9 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.google.gson.Gson
 import com.ttdk1507d.inspectioncamera.adapter.VehicleAdapter
-import com.ttdk1507d.inspectioncamera.api.ApiClient
 import com.ttdk1507d.inspectioncamera.firebase.FirebaseManager
 import com.ttdk1507d.inspectioncamera.model.Vehicle
 import com.ttdk1507d.inspectioncamera.util.CacheManager
-import com.ttdk1507d.inspectioncamera.util.NetworkUtil
 import com.ttdk1507d.inspectioncamera.util.PlateUtil
 import com.ttdk1507d.inspectioncamera.util.PrefsManager
 import com.ttdk1507d.inspectioncamera.worker.PendingUploadMetadata
@@ -46,7 +44,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
@@ -337,7 +334,7 @@ class MainActivity : AppCompatActivity() {
             if (dir.exists() && dir.isDirectory) {
                 val files = dir.listFiles { f -> f.extension.equals("jpg", ignoreCase = true) } ?: emptyArray()
                 for (f in files) {
-                    if (isSameDay(f.lastModified())) {
+                    if (CacheManager.isToday(f.lastModified())) {
                         foundTypes.add(f.nameWithoutExtension)
                     }
                 }
@@ -346,29 +343,17 @@ class MainActivity : AppCompatActivity() {
 
         for (meta in pendingMetas) {
             val metaPlate = meta.plate.replace(NON_ALNUM_REGEX, "").uppercase()
-            if (metaPlate == cleanPlate && isSameDay(meta.timestamp)) {
+            if (metaPlate == cleanPlate && CacheManager.isToday(meta.timestamp)) {
                 foundTypes.add(meta.photoType)
             }
         }
         return foundTypes.size
     }
 
-    private fun hasLocalPhotos(plate: String, lanKd: Int): Boolean {
-        return getLocalPhotoCount(plate, lanKd, readPendingMetas()) > 0
-    }
-
     private fun isVehicleFinished(vehicle: Vehicle): Boolean {
         if (prefs.isPlateDoneToday(vehicle.plateClean, vehicle.lanKd)) return true
         if (vehicle.isFinished()) return true
         return false
-    }
-
-    private fun isSameDay(timeMillis: Long): Boolean {
-        if (timeMillis <= 0) return false
-        val calNow = Calendar.getInstance()
-        val calTarget = Calendar.getInstance().apply { this.timeInMillis = timeMillis }
-        return calNow.get(Calendar.YEAR) == calTarget.get(Calendar.YEAR) &&
-               calNow.get(Calendar.DAY_OF_YEAR) == calTarget.get(Calendar.DAY_OF_YEAR)
     }
 
     /**

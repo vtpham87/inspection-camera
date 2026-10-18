@@ -8,9 +8,10 @@ import logging
 import threading
 from datetime import datetime
 
-logger = logging.getLogger("vehicle_service")
-from config import PhotoConfig, ACCESS_DB_PATH, SYSDB_PATH, DB_PATH, WATCHER_DB_PATH, ACCESS_DB_USER, ACCESS_DB_PASSWORD
+from config import PhotoConfig, ACCESS_DB_PATH, ACCESS_DB_Z_PATH, SYSDB_PATH, DB_PATH, ACCESS_DB_USER, ACCESS_DB_PASSWORD
 from photo_handler import extract_plate_color, resolve_save_path, build_filename, should_omit_color_suffix
+
+logger = logging.getLogger("vehicle_service")
 
 PHOTO_TYPES = ["rear_45", "front_45", "chassis", "passenger", "new_vehicle"]
 
@@ -34,17 +35,6 @@ def decode_d32(text: str) -> str:
     if text.startswith("á tá"):
         text = "\x8d tá" + text[4:]
     return "".join(D32_MAP.get(c, c) for c in text)
-
-
-_ACCESS_CACHE: dict = {
-    "timestamp": 0.0,
-    "data": [],
-    "last_success": 0.0,
-    "has_success": False,
-}
-
-UNC_ACCESS_PATH = r"\\T1507\Data\DataPTCGDB\PT90_1507D.mdb"
-Z_ACCESS_PATH = r"Z:\DataPTCGDB\PT90_1507D.mdb"
 
 
 # Circuit breaker: chỉ giữ bộ đệm khi Access trả rỗng trong vài chu kỳ liên tiếp (chu kỳ 5s), sau đó coi là hết xe chờ thật
@@ -78,32 +68,26 @@ def _resolve_access_db_path_uncached() -> str | None:
     không hỗ trợ kết nối trực tiếp qua đường dẫn UNC.
     """
     global _LAST_NET_USE
-    # 1. Thử đường dẫn ổ Z:
-    if os.path.exists(Z_ACCESS_PATH):
-        return Z_ACCESS_PATH
-    # 2. Thử đường dẫn cấu hình nếu hợp lệ và không phải UNC
-    if ACCESS_DB_PATH and os.path.exists(ACCESS_DB_PATH) and not ACCESS_DB_PATH.startswith("\\\\"):
-        return ACCESS_DB_PATH
-    # 3. Nếu ổ Z: chưa mount nhưng mạng thông (UNC tồn tại), tự động mount lại ổ Z:
+    # 1. Đường dẫn cấu hình (PTCGDB_ACCESS_PATH), rồi ổ Z: mặc định; bỏ qua UNC (Jet ODBC không hỗ trợ)
+    for candidate in dict.fromkeys((ACCESS_DB_PATH, ACCESS_DB_Z_PATH)):
+        if candidate and not candidate.startswith("\\\\") and os.path.exists(candidate):
+            return candidate
+    # 2. Nếu ổ Z: chưa mount nhưng mạng thông (UNC tồn tại), tự động mount lại ổ Z:
     if time.time() - _LAST_NET_USE < _NET_USE_COOLDOWN:
         return None
     _LAST_NET_USE = time.time()
     try:
         subprocess.run(
             ["cmd.exe", "/c", "net", "use", "Z:", r"\\T1507\Data", "/persistent:yes"],
+            check=False,
             capture_output=True,
             timeout=5,
         )
-        if os.path.exists(Z_ACCESS_PATH):
-            return Z_ACCESS_PATH
+        if os.path.exists(ACCESS_DB_Z_PATH):
+            return ACCESS_DB_Z_PATH
     except Exception as e:
         logger.debug("Bỏ qua lỗi không nghiêm trọng: %s", e, exc_info=True)
     return None
-
-
-def ensure_access_db() -> bool:
-    """Kiểm tra CSDL Access có kết nối được hay không."""
-    return resolve_access_db_path() is not None
 
 
 _WAITING_SYNC_STATE: dict = {
@@ -197,7 +181,7 @@ try {{
     $conn.Open()
     $cmd = $conn.CreateCommand()
     $ps_cmd = @"
-SELECT t.SoPhieuKD, t.BienDK_ID, t.GioKD, t.KetLuan, t.LanKD, t.CD1, t.CD2, t.CD3, t.CD4, t.CD5,
+SELECT t.SoPhieuKD, t.BienDK_ID, t.GioKD, t.KetLuan, t.LanKD,
        p.BienDK, p.TenLoaiPT, p.NhanHieu, p.ChuPT
 FROM tmp_DangKyKD t LEFT JOIN PT_PhuongTien p ON t.BienDK_ID = p.BienDK_ID
 ORDER BY t.SoPhieuKD ASC
@@ -210,7 +194,7 @@ ORDER BY t.SoPhieuKD ASC
             SoPhieuKD = $reader['SoPhieuKD']
             BienDK_ID = $reader['BienDK_ID']
             GioKD     = if ($reader['GioKD'] -ne [DBNull]::Value) {{ $reader['GioKD'].ToString('HH:mm:ss') }} else {{ '' }}
-            KetLuan   = $reader['KetLuan']
+            KetLuan   = if ($reader['KetLuan'] -ne [DBNull]::Value) {{ [int]$reader['KetLuan'] }} else {{ -1 }}
             LanKD     = if ($reader['LanKD'] -ne [DBNull]::Value) {{ [int]$reader['LanKD'] }} else {{ 1 }}
             BienDK    = if ($reader['BienDK'] -ne [DBNull]::Value) {{ $reader['BienDK'].ToString() }} else {{ '' }}
             TenLoaiPT = if ($reader['TenLoaiPT'] -ne [DBNull]::Value) {{ $reader['TenLoaiPT'].ToString() }} else {{ '' }}
@@ -237,6 +221,7 @@ ORDER BY t.SoPhieuKD ASC
     try:
         res = subprocess.run(
             [POWERSHELL_32, "-NoProfile", "-Command", ps_script],
+            check=False,
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -266,27 +251,42 @@ ORDER BY t.SoPhieuKD ASC
         return None
 
 
+def _to_int(value, default: int) -> int:
+    """int() an toàn: None/chuỗi rỗng/kiểu lạ (vd DBNull serialize thành {}) -> default."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _fetch_vehicle_rows(cur: sqlite3.Cursor, bids: list[str]) -> dict:
+    """Đọc bảng vehicles theo lô 100 khoá (cur phải dùng row_factory=sqlite3.Row). Trả {biendk_id: row}."""
+    rows: dict = {}
+    for i in range(0, len(bids), 100):
+        chunk = bids[i:i + 100]
+        cur.execute(
+            f"SELECT biendk_id, biendk, nhanhieu, tenloaipt, chupt FROM vehicles WHERE biendk_id IN ({','.join('?' * len(chunk))})",
+            chunk,
+        )
+        for r in cur.fetchall():
+            rows[r["biendk_id"]] = r
+    return rows
+
+
 def _load_vehicle_map(db_path: str, bids: list[str]) -> dict:
     """Đọc thông tin xe từ bảng vehicles của CSDL nguồn (chỉ đọc). Thiếu bảng/DB lỗi -> {} (dùng dữ liệu Access)."""
-    vehicle_map: dict = {}
     if not bids:
-        return vehicle_map
+        return {}
     try:
         src = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5.0)
         try:
             src.row_factory = sqlite3.Row
-            cur = src.cursor()
-            for i in range(0, len(bids), 100):
-                chunk = bids[i:i + 100]
-                ph = ",".join("?" * len(chunk))
-                cur.execute(f"SELECT biendk_id, biendk, nhanhieu, tenloaipt, chupt FROM vehicles WHERE biendk_id IN ({ph})", chunk)
-                for r in cur.fetchall():
-                    vehicle_map[r["biendk_id"]] = r
+            return _fetch_vehicle_rows(src.cursor(), bids)
         finally:
             src.close()
     except sqlite3.Error as e:
-        logger.warning(f"Không đọc được bảng vehicles ({e}); dùng dữ liệu từ Access cho lượt đồng bộ này")
-    return vehicle_map
+        logger.warning("Không đọc được bảng vehicles (%s); dùng dữ liệu từ Access cho lượt đồng bộ này", e)
+        return {}
 
 
 def sync_waiting_vehicles_to_sqlite(db_path: str = DB_PATH) -> bool:
@@ -345,7 +345,7 @@ def _sync_waiting_locked(db_path: str) -> bool:
                 bid = str(r.get("BienDK_ID") or "")
                 v_row = vehicle_map.get(bid)
                 if v_row:
-                    plate_display = v_row["biendk"]
+                    plate_display = v_row["biendk"] or r.get("BienDK") or bid
                     brand = v_row["nhanhieu"] or ""
                     vtype = v_row["tenloaipt"] or ""
                     owner = v_row["chupt"] or ""
@@ -359,8 +359,8 @@ def _sync_waiting_locked(db_path: str) -> bool:
                     sp,
                     bid,
                     str(r.get("GioKD") or ""),
-                    int(r.get("KetLuan") if r.get("KetLuan") is not None else -1),
-                    int(r.get("LanKD") or 1),
+                    _to_int(r.get("KetLuan"), -1),
+                    _to_int(r.get("LanKD"), 1) or 1,
                     plate_display,
                     vtype,
                     brand,
@@ -388,8 +388,6 @@ def _sync_waiting_locked(db_path: str) -> bool:
                 _WAITING_SYNC_STATE.update(
                     last_success=now, has_success=True, status="ok", count=len(raw_items), last_error=None
                 )
-                # Cập nhật _ACCESS_CACHE để tương thích ngược
-                _ACCESS_CACHE.update(timestamp=now, data=raw_items, last_success=now, has_success=True)
             return True
         finally:
             conn.close()
@@ -414,22 +412,15 @@ def get_waiting_vehicles_from_sqlite(db_path: str = DB_PATH) -> list[dict]:
     buf = waiting_db_path(db_path)
     if not os.path.exists(buf):
         return []
-
     try:
         conn = sqlite3.connect(f"file:{buf}?mode=ro", uri=True, timeout=5.0)
         try:
-            cur = conn.cursor()
-            cur.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='waiting_vehicles'")
-            if cur.fetchone()[0] == 0:
-                return []
-            cur.execute("""
-                SELECT sophieu, biendk_id, giokd, ketluan, lankd, biendk, tenloaipt, nhanhieu, chupt
-                FROM waiting_vehicles
-                ORDER BY sophieu ASC
-            """)
-            rows = []
-            for r in cur.fetchall():
-                rows.append({
+            cur = conn.execute(
+                "SELECT sophieu, biendk_id, giokd, ketluan, lankd, biendk, tenloaipt, nhanhieu, chupt "
+                "FROM waiting_vehicles ORDER BY sophieu ASC"
+            )
+            return [
+                {
                     "SoPhieuKD": r[0],
                     "BienDK_ID": r[1],
                     "GioKD": r[2] or "",
@@ -439,98 +430,59 @@ def get_waiting_vehicles_from_sqlite(db_path: str = DB_PATH) -> list[dict]:
                     "TenLoaiPT": r[6] or "",
                     "NhanHieu": r[7] or "",
                     "ChuPT": r[8] or "",
-                })
-            return rows
+                }
+                for r in cur.fetchall()
+            ]
         finally:
             conn.close()
-    except Exception as e:
-        logger.warning(f"Lỗi đọc waiting_vehicles từ SQLite: {e}")
+    except sqlite3.OperationalError as e:  # chưa có bảng (chưa đồng bộ lần nào) hoặc file đang bị khoá
+        logger.debug("Chưa đọc được waiting_vehicles: %s", e)
         return []
-
-
-def get_waiting_vehicles_from_watcher(watcher_db: str = WATCHER_DB_PATH) -> list[dict]:
-    """Đọc trực tiếp từ file waiting_vehicles.db do access_watcher.py tạo ra."""
-    if not os.path.exists(watcher_db):
-        return []
-    try:
-        conn = sqlite3.connect(f"file:{watcher_db}?mode=ro", uri=True, timeout=3.0)
-        conn.row_factory = sqlite3.Row
-        try:
-            cur = conn.cursor()
-            cur.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='waiting_vehicles'")
-            if cur.fetchone()[0] == 0:
-                return []
-            cur.execute("""
-                SELECT sophieu, biendk_id, biendk, giokd, ketluan, lankd,
-                       nhanhieu, tenloaipt, chupt, updated_at
-                FROM waiting_vehicles
-                ORDER BY sophieu ASC
-            """)
-            rows = [dict(r) for r in cur.fetchall()]
-            return rows
-        finally:
-            conn.close()
     except Exception as e:
-        logger.warning(f"[watcher] Lỗi đọc watcher DB: {e}")
+        logger.warning("Lỗi đọc waiting_vehicles từ SQLite: %s", e)
         return []
 
 
 def get_waiting_vehicles_from_access(db_path: str = DB_PATH) -> list[dict] | None:
-    """Truy vấn danh sách xe chờ.
-    Ưu tiên 1: đọc từ waiting_vehicles.db của access_watcher (< 5ms, không phụ thuộc Z:).
-    Ưu tiên 2: fallback đọc từ bảng đệm waiting_vehicles trong SQLite (< 5ms).
-    Nếu SQLite rỗng và chưa từng sync thành công, fallback gọi Access trực tiếp.
-    """
-    rows = get_waiting_vehicles_from_watcher()
-    if rows or os.path.exists(WATCHER_DB_PATH):
-        return rows
+    """Danh sách xe chờ: ưu tiên bộ đệm SQLite (< 5ms, không phụ thuộc Z:).
 
+    Bộ đệm rỗng nhưng đã từng đồng bộ thành công = thật sự 0 xe chờ. Chưa từng đồng bộ -> hỏi thẳng Access
+    (None nếu lỗi kết nối).
+    """
     cached = get_waiting_vehicles_from_sqlite(db_path)
     if cached:
         return cached
-
-    # Nếu SQLite rỗng nhưng đã từng sync thành công (nghĩa là trạm hiện tại thực sự 0 xe chờ)
-    if _WAITING_SYNC_STATE.get("has_success", False):
-        return []
-
-    # Nếu SQLite chưa từng nạp lần nào, thử fetch trực tiếp từ Access
-    raw = fetch_waiting_from_access_raw()
-    if raw is not None:
-        return raw
-
-    if _ACCESS_CACHE.get("has_success", False):
-        return _ACCESS_CACHE["data"]
-    return None
+    with _STATE_LOCK:
+        if _WAITING_SYNC_STATE.get("has_success", False):
+            return []
+    return fetch_waiting_from_access_raw()
 
 
 def get_access_status() -> dict:
     """Trả về trạng thái kết nối CSDL Access và tính khả dụng của bộ đệm SQLite."""
     active_path = resolve_access_db_path()
     sqlite_count = 0
-    try:
-        buf = waiting_db_path(DB_PATH)
-        if os.path.exists(buf):
+    buf = waiting_db_path(DB_PATH)
+    if os.path.exists(buf):
+        try:
             conn = sqlite3.connect(f"file:{buf}?mode=ro", uri=True, timeout=1.0)
             try:
-                cur = conn.cursor()
-                cur.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='waiting_vehicles'")
-                if cur.fetchone()[0] > 0:
-                    cur.execute("SELECT count(*) FROM waiting_vehicles")
-                    sqlite_count = cur.fetchone()[0]
+                sqlite_count = conn.execute("SELECT count(*) FROM waiting_vehicles").fetchone()[0]
             finally:
                 conn.close()
-    except Exception as e:
-        logger.debug("Bỏ qua lỗi không nghiêm trọng: %s", e, exc_info=True)
+        except sqlite3.Error as e:  # chưa có bảng / file đang khoá: coi như bộ đệm rỗng
+            logger.debug("Bỏ qua lỗi không nghiêm trọng: %s", e)
 
+    with _STATE_LOCK:
+        state = dict(_WAITING_SYNC_STATE)
     return {
         "ready": active_path is not None,
         "path": active_path,
-        "has_cache": _WAITING_SYNC_STATE.get("has_success", False) or (sqlite_count > 0) or _ACCESS_CACHE.get("has_success", False),
-        "cache_count": sqlite_count if sqlite_count > 0 else len(_ACCESS_CACHE.get("data", [])),
-        "last_success": max(_WAITING_SYNC_STATE.get("last_success", 0.0), _ACCESS_CACHE.get("last_success", 0.0)),
-        "sync_status": _WAITING_SYNC_STATE.get("status", "idle"),
+        "has_cache": state["has_success"] or sqlite_count > 0,
+        "cache_count": sqlite_count if sqlite_count > 0 else state["count"],
+        "last_success": state["last_success"],
+        "sync_status": state["status"],
     }
-
 
 
 _DIR_CACHE: dict = {}
@@ -622,7 +574,7 @@ def check_plate_status(
             rows = []
             if cols:  # bảng inspections có thể chưa tồn tại (DB mới) -> không truy vấn để tránh lỗi 500
                 cur.execute(
-                    f"SELECT ketluan{lankd_col} FROM inspections WHERE (biendk_id = ? OR biendk_id LIKE ?) AND ngaykd = ? ORDER BY giokd DESC",
+                    f"SELECT ketluan{lankd_col} FROM inspections WHERE (biendk_id = ? OR biendk_id LIKE ?) AND ngaykd = ?",
                     (biendk_id, f"{clean_plate}%", date),
                 )
                 rows = cur.fetchall()
@@ -677,28 +629,20 @@ def get_vehicles_today(
         has_lankd = "lankd" in col_names
 
         failed_biendk_ids = set()
-        cur.execute("SELECT DISTINCT biendk_id FROM inspections WHERE ngaykd = ? AND ketluan = 1", (date,))
-        for fr in cur.fetchall():
-            bid = fr[0]
-            if bid:
-                failed_biendk_ids.add(bid)
-                p_clean, _ = extract_plate_color(bid)
-                failed_biendk_ids.add(p_clean)
+        if col_names:  # bảng inspections có thể chưa tồn tại (DB mới) -> bỏ qua thay vì lỗi 500
+            cur.execute("SELECT DISTINCT biendk_id FROM inspections WHERE ngaykd = ? AND ketluan = 1", (date,))
+            for fr in cur.fetchall():
+                bid = fr[0]
+                if bid:
+                    failed_biendk_ids.add(bid)
+                    failed_biendk_ids.add(extract_plate_color(bid)[0])
 
         is_today = (date == today_str)
         is_production_db = os.path.normpath(db_path).endswith("ptcgdb.db")
-        waiting_raw = []
-        if is_today and is_production_db:
-            waiting_raw = get_waiting_vehicles_from_sqlite(db_path)
-            if not waiting_raw and not _WAITING_SYNC_STATE.get("has_success", False):
-                waiting_res = get_waiting_vehicles_from_access(db_path)
-                if waiting_res is not None:
-                    waiting_raw = waiting_res
-                else:
-                    waiting_raw = []
+        waiting_raw = (get_waiting_vehicles_from_access(db_path) or []) if (is_today and is_production_db) else []
 
         seen_tickets = set()
-        
+
         def _resolve_vehicle(sp, biendk_id, ketluan, giokd, raw_lankd, plate_display, brand, vtype, owner, sotem_val=""):
             if sp in seen_tickets:
                 return None
@@ -719,11 +663,9 @@ def get_vehicles_today(
             if lan_kd_val >= 2:
                 photos_taken = _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=lan_kd_val)
             else:
-                l2_photos = _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=2)
-                if l2_photos and suggest_lan_2:
-                    photos_taken = l2_photos
-                else:
-                    photos_taken = _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=1)
+                photos_taken = (
+                    suggest_lan_2 and _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=2)
+                ) or _check_photos_taken(plate_num, plate_color, config, date=date, lan_kd=1)
 
             has_both_45 = ("rear_45" in photos_taken) and ("front_45" in photos_taken)
             is_completed = bool(
@@ -756,45 +698,39 @@ def get_vehicles_today(
                 "is_completed": is_completed,
             }
 
-        # N+1 Fix: Pre-fetch SQLite vehicle data for waiting_raw
-        waiting_ids = list(set([r.get("BienDK_ID") or r.get("biendk_id") for r in waiting_raw if (r.get("BienDK_ID") or r.get("biendk_id"))]))
-        vehicle_map = {}
+        # Đọc trước thông tin xe cho cả danh sách chờ (tránh N+1); thiếu bảng vehicles -> dùng dữ liệu Access
+        vehicle_map: dict = {}
+        waiting_ids = list({r.get("BienDK_ID") for r in waiting_raw if r.get("BienDK_ID")})
         if waiting_ids:
-            chunk_size = 100
-            for i in range(0, len(waiting_ids), chunk_size):
-                chunk = waiting_ids[i:i+chunk_size]
-                placeholders = ",".join(["?"] * len(chunk))
-                cur.execute(f"SELECT biendk_id, biendk, nhanhieu, tenloaipt, chupt FROM vehicles WHERE biendk_id IN ({placeholders})", chunk)
-                for r in cur.fetchall():
-                    vehicle_map[r["biendk_id"]] = r
+            try:
+                vehicle_map = _fetch_vehicle_rows(cur, waiting_ids)
+            except sqlite3.OperationalError as e:
+                logger.warning("Không đọc được bảng vehicles (%s); dùng dữ liệu từ Access", e)
 
         if waiting_raw:
             for r in waiting_raw:
-                sp = r.get("SoPhieuKD") or r.get("sophieu") or ""
-                biendk_id = r.get("BienDK_ID") or r.get("biendk_id") or ""
+                sp = r.get("SoPhieuKD") or ""
+                biendk_id = r.get("BienDK_ID") or ""
                 v_row = vehicle_map.get(biendk_id)
                 if v_row:
-                    plate_display = v_row["biendk"]
+                    plate_display = v_row["biendk"] or r.get("BienDK") or biendk_id
                     brand = v_row["nhanhieu"] or ""
                     vtype = v_row["tenloaipt"] or ""
                     owner = v_row["chupt"] or ""
                 else:
-                    plate_display = r.get("BienDK") or r.get("biendk") or biendk_id
-                    brand = r.get("nhanhieu") or decode_d32(r.get("NhanHieu") or "")
-                    vtype = r.get("tenloaipt") or decode_d32(r.get("TenLoaiPT") or "")
-                    owner = r.get("chupt") or decode_d32(r.get("ChuPT") or "")
-                
+                    plate_display = r.get("BienDK") or biendk_id
+                    brand = decode_d32(r.get("NhanHieu") or "")
+                    vtype = decode_d32(r.get("TenLoaiPT") or "")
+                    owner = decode_d32(r.get("ChuPT") or "")
+
                 veh_dict = _resolve_vehicle(
-                    sp, biendk_id,
-                    r.get("KetLuan") if r.get("KetLuan") is not None else r.get("ketluan"),
-                    r.get("GioKD") or r.get("giokd") or "",
-                    r.get("LanKD") or r.get("lankd") or 1,
+                    sp, biendk_id, r.get("KetLuan"), r.get("GioKD") or "", r.get("LanKD") or 1,
                     plate_display, brand, vtype, owner
                 )
                 if veh_dict:
                     results.append(veh_dict)
 
-        if not waiting_raw or not filter_waiting:
+        if col_names and (not waiting_raw or not filter_waiting):
             where_clause = "WHERE i.ngaykd = ?"
             if filter_waiting:
                 where_clause += " AND (i.ketluan != 1 OR i.ketluan IS NULL)"
@@ -821,7 +757,6 @@ def get_vehicles_today(
                 )
                 if veh_dict:
                     results.append(veh_dict)
-
     finally:
         conn.close()
 

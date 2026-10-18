@@ -1,10 +1,9 @@
 package com.ttdk1507d.inspectioncamera.firebase
 
-import android.os.Build
-import android.util.Base64
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import java.io.ByteArrayOutputStream
+import android.os.Build
+import android.util.Base64
 import android.util.Log
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -26,6 +25,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -51,6 +51,7 @@ object FirebaseManager {
     private val listenerMap = mutableMapOf<ValueEventListener, DatabaseReference>()
     private const val TAG = "FirebaseManager"
     private const val MAX_RAW_BYTES = 500 * 1024
+    private const val REST_TIMEOUT_MS = 4000
 
     // Bản dev có thể trỏ sang cụm Firebase riêng (BuildConfig.FIREBASE_URLS: danh sách URL cách nhau dấu phẩy,
     // thứ tự: cụm 1, 2, 3, dự phòng). Rỗng = dùng URL mặc định của bản chính thức.
@@ -170,30 +171,18 @@ object FirebaseManager {
         if (!photoFile.exists()) return false
         val prepared = preparePhoto(photoFile) ?: return false
 
-        val primaryNode = getScheduledNode()
-        Log.d(TAG, "Uploading photo to primary node ${primaryNode.name}...")
-
-        // Thử node chính (timeout 12s)
-        val primarySuccess = withTimeoutOrNull(12_000L) {
-            pushPhotoToNode(primaryNode, plate, plateColor, photoType, seq, lanKd, prepared)
-        } ?: false
-
-        if (primarySuccess) {
-            Log.d(TAG, "Uploaded successfully to primary node ${primaryNode.name}")
-            return true
+        // Cụm chính theo lịch ngày, thất bại (hoặc quá 12s) thì failover sang cụm dự phòng
+        for (node in listOf(getScheduledNode(), NODE_BACKUP).distinct()) {
+            Log.d(TAG, "Uploading photo to node ${node.name}...")
+            val ok = withTimeoutOrNull(12_000L) {
+                pushPhotoToNode(node, plate, plateColor, photoType, seq, lanKd, prepared)
+            } ?: false
+            if (ok) {
+                Log.i(TAG, "Uploaded successfully to ${node.name}")
+                return true
+            }
+            Log.w(TAG, "Upload to ${node.name} failed")
         }
-
-        // Chuyển sang node dự phòng Failover
-        Log.w(TAG, "Primary node ${primaryNode.name} upload failed, failing over to ${NODE_BACKUP.name}...")
-        val backupSuccess = withTimeoutOrNull(12_000L) {
-            pushPhotoToNode(NODE_BACKUP, plate, plateColor, photoType, seq, lanKd, prepared)
-        } ?: false
-
-        if (backupSuccess) {
-            Log.i(TAG, "Uploaded successfully to backup node ${NODE_BACKUP.name}")
-            return true
-        }
-
         Log.e(TAG, "Upload failed on both primary and backup nodes for plate $plate ($photoType)")
         return false
     }
@@ -250,16 +239,16 @@ object FirebaseManager {
 
     /** Giảm về tối đa 1280px, thử chất lượng 70 → 55 → 40 cho tới khi ≤ 500KB. Trả null nếu không decode được. */
     private fun recompressForFallback(photoFile: File): ByteArray? {
-        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        android.graphics.BitmapFactory.decodeFile(photoFile.absolutePath, bounds)
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(photoFile.absolutePath, bounds)
         var sampleSize = 1
         val maxDim = 1280 // kích thước tối đa cho ảnh gửi dự phòng để Base64 nhỏ
         while ((bounds.outWidth / sampleSize) > maxDim || (bounds.outHeight / sampleSize) > maxDim) {
             sampleSize *= 2
         }
-        val options = android.graphics.BitmapFactory.Options().apply { inSampleSize = sampleSize }
+        val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
         val bmp = try {
-            android.graphics.BitmapFactory.decodeFile(photoFile.absolutePath, options)
+            BitmapFactory.decodeFile(photoFile.absolutePath, options)
         } catch (e: OutOfMemoryError) {
             Log.e(TAG, "Thiếu bộ nhớ khi nén ảnh dự phòng: ${e.message}")
             null
@@ -267,8 +256,8 @@ object FirebaseManager {
         try {
             var result: ByteArray? = null
             for (quality in intArrayOf(70, 55, 40)) {
-                val baos = java.io.ByteArrayOutputStream()
-                bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, quality, baos)
+                val baos = ByteArrayOutputStream()
+                bmp.compress(Bitmap.CompressFormat.JPEG, quality, baos)
                 result = baos.toByteArray()
                 if (result.size <= MAX_RAW_BYTES) break
             }
@@ -345,26 +334,32 @@ object FirebaseManager {
         }
     }
 
+    /** Gọi REST của RTDB (timeout 4s, luôn đóng kết nối). body != null: gửi JSON UTF-8. */
+    private inline fun <T> rest(url: String, method: String, body: String? = null, block: (HttpURLConnection) -> T): T {
+        val conn = URL(url).openConnection() as HttpURLConnection
+        try {
+            conn.connectTimeout = REST_TIMEOUT_MS
+            conn.readTimeout = REST_TIMEOUT_MS
+            conn.requestMethod = method
+            if (body != null) {
+                conn.doOutput = true
+                conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            }
+            return block(conn)
+        } finally {
+            conn.disconnect()
+        }
+    }
+
     private fun testNode(node: FirebaseNode): NodeTestResult {
-        var conn: HttpURLConnection? = null
         return try {
             val start = System.currentTimeMillis()
-            val url = URL("${node.url}/.json?shallow=true")
-            conn = url.openConnection() as HttpURLConnection
-            conn.connectTimeout = 4000
-            conn.readTimeout = 4000
-            conn.requestMethod = "GET"
-            val code = conn.responseCode
+            val code = rest("${node.url}/.json?shallow=true", "GET") { it.responseCode }
             val latency = System.currentTimeMillis() - start
-            if (code in 200..299) {
-                NodeTestResult(node, true, latency)
-            } else {
-                NodeTestResult(node, false, latency, "HTTP $code")
-            }
+            if (code in 200..299) NodeTestResult(node, true, latency) else NodeTestResult(node, false, latency, "HTTP $code")
         } catch (e: Exception) {
             NodeTestResult(node, false, 0, e.message ?: "Không phản hồi")
-        } finally {
-            conn?.disconnect()
         }
     }
 
@@ -416,24 +411,14 @@ object FirebaseManager {
      * Lấy cấu hình một lần từ Firebase (/config)
      */
     suspend fun fetchConfigOnce(): Map<String, Any>? = withContext(Dispatchers.IO) {
-        val node = getScheduledNode()
         try {
-            val url = URL("${node.url}/config.json")
-            val conn = url.openConnection() as HttpURLConnection
-            conn.connectTimeout = 4000
-            conn.readTimeout = 4000
-            conn.requestMethod = "GET"
-            if (conn.responseCode in 200..299) {
-                val text = conn.inputStream.bufferedReader().use { it.readText() }
-                conn.disconnect()
-                if (text.isNotEmpty() && text != "null") {
-                    val mapType = object : TypeToken<Map<String, Any>>() {}.type
-                    Gson().fromJson<Map<String, Any>>(text, mapType)
-                } else null
-            } else {
-                conn.disconnect()
-                null
+            val text = rest("${getScheduledNode().url}/config.json", "GET") { conn ->
+                if (conn.responseCode in 200..299) conn.inputStream.bufferedReader().use { it.readText() } else null
             }
+            if (!text.isNullOrEmpty() && text != "null") {
+                val mapType = object : TypeToken<Map<String, Any>>() {}.type
+                Gson().fromJson<Map<String, Any>>(text, mapType)
+            } else null
         } catch (e: Exception) {
             Log.w(TAG, "Lỗi fetchConfigOnce: ${e.message}")
             null
@@ -446,50 +431,33 @@ object FirebaseManager {
     suspend fun sendConfigUpdate(updates: Map<String, Any>): Boolean = withContext(Dispatchers.IO) {
         try {
             val jsonPayload = Gson().toJson(updates)
-            var anySuccess = false
-            ALL_NODES.forEach { targetNode ->
-                try {
-                    val url = URL("${targetNode.url}/config_update.json")
-                    val conn = url.openConnection() as HttpURLConnection
-                    conn.connectTimeout = 4000
-                    conn.readTimeout = 4000
-                    conn.requestMethod = "PUT"
-                    conn.doOutput = true
-                    conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                    conn.outputStream.use { os ->
-                        os.write(jsonPayload.toByteArray(Charsets.UTF_8))
-                    }
-                    val code = conn.responseCode
-                    conn.disconnect()
-                    if (code in 200..299) anySuccess = true
-                    Log.d(TAG, "Sent config_update to ${targetNode.name}: code $code")
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to send config_update to ${targetNode.name}: ${e.message}")
-                }
-
-                // Cập nhật trực tiếp /config.json để app không bị ghi đè ngược cấu hình cũ
-                try {
-                    val urlConfig = URL("${targetNode.url}/config.json")
-                    val connConfig = urlConfig.openConnection() as HttpURLConnection
-                    connConfig.connectTimeout = 4000
-                    connConfig.readTimeout = 4000
-                    connConfig.requestMethod = "PATCH"
-                    connConfig.doOutput = true
-                    connConfig.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                    connConfig.outputStream.use { os ->
-                        os.write(jsonPayload.toByteArray(Charsets.UTF_8))
-                    }
-                    val code = connConfig.responseCode
-                    connConfig.disconnect()
-                    Log.d(TAG, "Sent config patch to ${targetNode.name}: code $code")
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to patch config to ${targetNode.name}: ${e.message}")
-                }
+            // Gửi song song tới cả 4 cụm: máy offline không phải chờ lần lượt 8 lần timeout 4s
+            coroutineScope {
+                ALL_NODES.map { node -> async { sendConfigToNode(node, jsonPayload) } }.awaitAll().any { it }
             }
-            anySuccess
         } catch (e: Exception) {
             Log.e(TAG, "Lỗi sendConfigUpdate: ${e.message}", e)
             false
         }
+    }
+
+    /** @return true nếu /config_update trên cụm này được ghi thành công. */
+    private fun sendConfigToNode(node: FirebaseNode, jsonPayload: String): Boolean {
+        val updated = try {
+            val code = rest("${node.url}/config_update.json", "PUT", jsonPayload) { it.responseCode }
+            Log.d(TAG, "Sent config_update to ${node.name}: code $code")
+            code in 200..299
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to send config_update to ${node.name}: ${e.message}")
+            false
+        }
+        // Cập nhật trực tiếp /config.json để app không bị ghi đè ngược cấu hình cũ
+        try {
+            val code = rest("${node.url}/config.json", "PATCH", jsonPayload) { it.responseCode }
+            Log.d(TAG, "Sent config patch to ${node.name}: code $code")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to patch config to ${node.name}: ${e.message}")
+        }
+        return updated
     }
 }
